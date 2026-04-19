@@ -12,7 +12,7 @@ Listed alphabetically within sections.
 
 **Audit log.** The `audit_log` table. Records every state change with actor, action, subject, timestamp. Append-only.
 
-**Calibration.** Measuring how closely the Assessor's automated scores agree with human reviewer scores. Outputs agreement metrics (exact match, within-0.5, systematic bias per competency). Runs in CI as a warning-only check. See `docs/testing-strategy.md` and the `calibration-run` skill.
+**Calibration.** Measuring how closely the Assessor's automated scores agree with human reviewer scores. Outputs agreement metrics (exact match, within-0.5, systematic bias per competency). Runs in CI as a warning-only check. See `./testing-strategy.md` and the `calibration-run` skill.
 
 **Candidate.** The person being interviewed. Identified by a row in the `candidate` table. Authenticates via magic link — never holds an account (see ADR-016).
 
@@ -98,7 +98,7 @@ Listed alphabetically within sections.
 
 ## Agent / AI concepts
 
-**Agent contract.** The documented input/output schema of an LLM agent, including prompt structure, expected JSON fields, and invariants. Lives in `docs/agents.docx` and `prompts/<agent>/<version>/`.
+**Agent contract.** The documented input/output schema of an LLM agent, including prompt structure, expected JSON fields, and invariants. Lives in `../specs/agents.docx` and `prompts/<agent>/<version>/`.
 
 **Context window.** The maximum number of tokens a model can process in a single call. We budget session prompts to stay well below model limits with headroom for growth.
 

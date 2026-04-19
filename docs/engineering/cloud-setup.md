@@ -2,7 +2,7 @@
 
 How TechScreen uses Google Cloud. Single project, single region, prod-only, Terraform-managed after a one-shot manual bootstrap. Everything here is written so a new engineer can reconstruct the topology end-to-end.
 
-Related: [ADR-009](../adr/009-prod-only-topology.md), [ADR-012](../adr/012-cloud-run-traffic-splitting.md), [ADR-013](../adr/013-secret-management.md), [ADR-015](../adr/015-region-europe-west1.md), [constitution §5, §6, §8](../.specify/memory/constitution.md).
+Related: [ADR-009](../../adr/009-prod-only-topology.md), [ADR-012](../../adr/012-cloud-run-traffic-splitting.md), [ADR-013](../../adr/013-no-plaintext-secrets.md), [ADR-015](../../adr/015-region-europe-west1.md), [constitution §5, §6, §8](../../.specify/memory/constitution.md).
 
 ---
 
@@ -156,7 +156,7 @@ No JSON keys for any service account. Ever. See ADR-013 and the anti-pattern ent
 
 Adding a secret:
 
-1. Add the key (no value) to `.env.example`.
+1. Add the key to `.env.example` with an empty value (secrets always empty; non-secret defaults are allowed per ADR-022).
 2. Add a `google_secret_manager_secret` resource in `infra/terraform/secrets.tf`.
 3. Deploy via Terraform — this creates an empty secret.
 4. Fill the secret value **manually** via Cloud Console or `gcloud secrets versions add`. Never commit the value. Never pass it in a PR description.

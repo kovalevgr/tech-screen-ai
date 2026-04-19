@@ -6,7 +6,7 @@ This file is the entry point for [Claude Code](https://docs.claude.com/en/docs/c
 
 ## What this project is
 
-TechScreen is an internal AI-powered technical interview system for N-iX. It conducts structured technical interviews with candidates, produces reviewer-auditable assessments, and improves via reviewer corrections. See [`README.md`](./README.md) for a public-facing summary and [`docs/mvp-scope.docx`](./docs/mvp-scope.docx) for MVP scope.
+TechScreen is an internal AI-powered technical interview system for N-iX. It conducts structured technical interviews with candidates, produces reviewer-auditable assessments, and improves via reviewer corrections. See [`README.md`](./README.md) for a public-facing summary and [`docs/specs/mvp-scope.docx`](./docs/specs/mvp-scope.docx) for MVP scope.
 
 ---
 
@@ -14,11 +14,16 @@ TechScreen is an internal AI-powered technical interview system for N-iX. It con
 
 1. [`.specify/memory/constitution.md`](./.specify/memory/constitution.md) — **20 non-negotiable invariants.** If a change would violate any of these, stop and flag it.
 2. [`adr/`](./adr/) — 21 architectural decisions with context and consequences. Start at [`adr/README.md`](./adr/README.md) for the index.
-3. [`docs/architecture.docx`](./docs/architecture.docx) — system architecture diagram and data flow.
-4. [`docs/data-model.docx`](./docs/data-model.docx) — full schema with invariants.
-5. [`docs/agents.docx`](./docs/agents.docx) — Interviewer / Assessor / Planner contracts.
+3. [`docs/specs/architecture.docx`](./docs/specs/architecture.docx) — system architecture diagram and data flow.
+4. [`docs/specs/data-model.docx`](./docs/specs/data-model.docx) — full schema with invariants.
+5. [`docs/specs/agents.docx`](./docs/specs/agents.docx) — Interviewer / Assessor / Planner contracts.
 
-Everything else in `docs/` is domain reference — consult when relevant.
+Everything else in `docs/` is domain reference — consult when relevant. Layout:
+
+- [`docs/specs/`](./docs/specs/) — canonical product specs (.docx) for humans/stakeholders.
+- [`docs/engineering/`](./docs/engineering/) — operational references (.md) Claude Code agents consult during work (conventions, playbooks, glossary, implementation plan, multi-agent workflow).
+- [`docs/design/`](./docs/design/) — design system (principles, tokens, components, per-screen specs).
+- [`docs/kickoff/`](./docs/kickoff/) — one-time launch artefacts (dev briefing, kickoff decks).
 
 ---
 
@@ -77,7 +82,7 @@ We have five Claude Code sub-agents defined under [`.claude/agents/`](./.claude/
 | `prompt-engineer`   | Agent prompts, rubric YAML, calibration.                                                                 |
 | `reviewer`          | Read-only. Validates constitution adherence, secrets scan, test coverage, migration safety before merge. |
 
-Full workflow and maturity phases are documented in [`docs/multi-agent-workflow.md`](./docs/multi-agent-workflow.md).
+Full workflow and maturity phases are documented in [`docs/engineering/multi-agent-workflow.md`](./docs/engineering/multi-agent-workflow.md).
 
 **Default behaviour at MVP:** sequential single-agent. Sub-agent fan-out happens only when either the user explicitly requests it in the prompt, or the orchestrator proposes it in `/plan` and the user approves. Automatic parallelisation is disabled.
 
@@ -102,19 +107,11 @@ Invoke a skill by name. Do not duplicate skill logic in ad-hoc scripts.
 .
 ├── .specify/memory/constitution.md  Project invariants.
 ├── adr/                             Architectural decisions (001..021).
-├── docs/                            Shared human-readable docs.
-│   ├── *.docx                       Architecture, data model, agents, methodology, roadmap, scope.
-│   ├── design/                      Design system, per-screen specs.
-│   ├── diagrams/                    `.dot` sources + rendered `.png` diagrams.
-│   ├── glossary.md                  Domain terms.
-│   ├── coding-conventions.md        Python/TS style and layering.
-│   ├── vertex-integration.md        How we call Vertex.
-│   ├── prompt-engineering-playbook.md  How to write and change agent prompts.
-│   ├── anti-patterns.md             What not to do, with reasons.
-│   ├── testing-strategy.md          Test layers and calibration.
-│   ├── deploy-playbook.md           /deploy flow.
-│   ├── cloud-setup.md               GCP topology, IAM, secrets mapping.
-│   └── multi-agent-workflow.md      How fan-out is decided and executed.
+├── docs/
+│   ├── specs/                       Canonical .docx specs (architecture, data-model, agents, methodology, mvp-scope, roadmap).
+│   ├── engineering/                 Agent-readable operational references (.md): conventions, playbooks, glossary, implementation plan, multi-agent workflow, vertex-integration, testing strategy, anti-patterns.
+│   ├── design/                      Design system — principles, tokens, components, per-screen specs.
+│   └── kickoff/                     One-time launch artefacts (dev briefings).
 ├── app/
 │   ├── backend/                     FastAPI service.
 │   └── frontend/                    Next.js service.
@@ -142,7 +139,7 @@ Invoke a skill by name. Do not duplicate skill logic in ad-hoc scripts.
 - **Add a feature flag.** New row in `configs/feature-flags.yaml` + migration that seeds the DB row with `enabled=false`.
 - **Deploy.** Run `/deploy` when the PR is merged and green. Then `/promote 10`, `/promote 50`, `/promote 100`.
 - **Roll back.** Run `/rollback`. Single Cloud Run traffic shift, completes in under a minute.
-- **Secret needed.** Add a key to `.env.example` (no value). Add a `google_secret_manager_secret` to Terraform. Fill the value in Secret Manager manually — never commit the value.
+- **Secret needed.** Add a key to `.env.example` with an empty value (secrets always empty; non-secret defaults OK per ADR-022). Add a `google_secret_manager_secret` to Terraform. Fill the value in Secret Manager manually — never commit the value.
 - **Database schema change.** Alembic migration + ADR if destructive + append-only invariants (§3) respected.
 - **Touch a screen.** Reference `docs/design/screens/<NN-xxx>/spec.md` from the plan. If the spec doesn't exist yet, write it first.
 
@@ -152,7 +149,7 @@ Invoke a skill by name. Do not duplicate skill logic in ad-hoc scripts.
 
 1. Check the constitution (one of the 20 principles probably applies).
 2. Check the ADRs (scan titles first via [`adr/README.md`](./adr/README.md)).
-3. Check the relevant `docs/*.md` reference.
+3. Check the relevant `docs/engineering/*.md` reference.
 4. Ask the user. Do not guess on decisions that would affect invariants or architecture.
 
 When in doubt, surface the question rather than assume. A five-minute clarification is cheaper than a two-hour course correction.

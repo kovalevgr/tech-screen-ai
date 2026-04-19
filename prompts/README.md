@@ -1,6 +1,6 @@
 # Prompts
 
-All agent system prompts live here. Prompts are versioned per agent; a bad `v0003` is replaced by `v0004`, never edited in place (see [`docs/prompt-engineering-playbook.md`](../docs/prompt-engineering-playbook.md) and constitution §11).
+All agent system prompts live here. Prompts are versioned per agent; a bad `v0003` is replaced by `v0004`, never edited in place (see [`docs/engineering/prompt-engineering-playbook.md`](../docs/engineering/prompt-engineering-playbook.md) and constitution §11).
 
 ---
 
@@ -62,4 +62,4 @@ Use the `agent-prompt-edit` skill. It:
 3. Prompts the author to fill `notes.md` (what changed, why, hypothesised effect).
 4. Runs the `calibration-run` skill and attaches the delta to the PR.
 
-See `docs/prompt-engineering-playbook.md` for the pre-merge checklist.
+See `docs/engineering/prompt-engineering-playbook.md` for the pre-merge checklist.

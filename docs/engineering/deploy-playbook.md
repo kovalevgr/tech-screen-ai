@@ -2,7 +2,7 @@
 
 How TechScreen ships code to production. The only long-lived environment is `prod`; there is no staging. Safety comes from Docker parity, traffic splitting, and explicit human approval at the migration checkpoint.
 
-Related: [ADR-009](../adr/009-prod-only-topology.md), [ADR-010](../adr/010-docker-first-parity.md), [ADR-012](../adr/012-cloud-run-traffic-splitting.md), [constitution §8, §10, §19](../.specify/memory/constitution.md).
+Related: [ADR-009](../../adr/009-prod-only-topology.md), [ADR-010](../../adr/010-docker-first-parity.md), [ADR-012](../../adr/012-cloud-run-traffic-splitting.md), [constitution §8, §10, §19](../../.specify/memory/constitution.md).
 
 ---
 
@@ -85,7 +85,7 @@ The `/deploy` command runs the following steps in order. Each step logs to the o
 
 ### Step 6 — Smoke tests
 
-- A minimal suite (see `docs/testing-strategy.md` §7) runs against the new revision's direct URL.
+- A minimal suite (see `./testing-strategy.md` §7) runs against the new revision's direct URL.
 - Health check, one synthetic session, Secret Manager read, feature flag read.
 - Budget: < 60 seconds.
 - **Failure blocks `/promote`.** The operator may investigate via logs and either fix-forward (new deploy) or abandon (revision stays at 0%).

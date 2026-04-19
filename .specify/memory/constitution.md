@@ -54,7 +54,7 @@ Secrets never appear in source, logs, Docker images, LLM context, or any committ
 
 **Why.** A leaked Vertex API key, DB password, or session signing key is a P0 incident. The cheapest way to prevent leaks is to never have the secret in a place it could leak.
 
-**Enforcement.** `pre-commit` runs `gitleaks` and `detect-secrets`. CI blocks any PR that matches the secret regex allow-list. `.env.example` contains keys with no values. JSON service-account keys are not used anywhere — see §6.
+**Enforcement.** `pre-commit` runs `gitleaks` and `detect-secrets`. CI blocks any PR that matches the secret regex allow-list. `.env.example` contains keys; secret keys carry empty values, and non-secret defaults (enums, public URLs, placeholder domains) are permitted — the `forbid-env-values` hook flags credential-shaped strings (PEM headers, JWTs, URLs with inline credentials, opaque strings ≥32 chars). See ADR-022. JSON service-account keys are not used anywhere — see §6.
 
 ---
 
@@ -144,7 +144,7 @@ When a feature spans layers (backend + frontend, or two parallel backend modules
 
 **Why.** Parallel work without a contract produces merge conflicts and silent mismatches. We pay a small upfront cost to save a larger merge-time cost.
 
-**Enforcement.** `docs/multi-agent-workflow.md` gates parallel fan-out on contract presence. Orchestrator refuses to dispatch parallel sub-agents without a referenced contract artefact.
+**Enforcement.** `docs/engineering/multi-agent-workflow.md` gates parallel fan-out on contract presence. Orchestrator refuses to dispatch parallel sub-agents without a referenced contract artefact.
 
 ---
 

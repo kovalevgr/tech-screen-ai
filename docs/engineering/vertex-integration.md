@@ -2,7 +2,7 @@
 
 This document describes how TechScreen calls Google Vertex AI for every LLM-driven operation. The goal is to make every call observable, bounded, and replaceable.
 
-Related: [ADR-002](../adr/002-llm-provider-vertex-ai.md), [ADR-003](../adr/003-model-selection-gemini-flash-pro.md), [constitution §12](../.specify/memory/constitution.md).
+Related: [ADR-002](../../adr/002-llm-provider-vertex-ai.md), [ADR-003](../../adr/003-model-selection-gemini-flash-pro.md), [constitution §12](../../.specify/memory/constitution.md).
 
 ---
 
@@ -200,7 +200,7 @@ Every `turn_trace` row is indexed so we can answer:
 - "p95 latency for Assessor over the last 7 days" — regression detection.
 - "Rate of schema validation failures per model version" — calibration signal.
 
-Dashboards live in Cloud Monitoring (see `docs/cloud-setup.md`). Critical alerts:
+Dashboards live in Cloud Monitoring (see `./cloud-setup.md`). Critical alerts:
 
 - Session cost ceiling hit — routed to on-call email.
 - Error rate > 2% over 10 minutes — routed to on-call email.

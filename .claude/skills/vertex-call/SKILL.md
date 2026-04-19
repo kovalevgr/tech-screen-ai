@@ -126,6 +126,6 @@ If you need to change the active prompt version, change this file — do **not**
 ## References
 
 - `app/backend/llm/vertex.py` — the wrapper.
-- `docs/vertex-integration.md` — conceptual overview.
+- `docs/engineering/vertex-integration.md` — conceptual overview.
 - Constitution §12, §17.
 - ADR-003 (Model Garden), ADR-010 (Docker parity), ADR-013 (no JSON SA keys; WIF only).

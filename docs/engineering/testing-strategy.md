@@ -2,7 +2,7 @@
 
 How TechScreen earns confidence without a staging environment. We rely on multiple test layers, Docker parity with production, and a calibration loop that watches agent behaviour over time.
 
-Related: [ADR-009](../adr/009-prod-only-topology.md), [ADR-010](../adr/010-docker-first-parity.md), [constitution §7, §13](../.specify/memory/constitution.md).
+Related: [ADR-009](../../adr/009-prod-only-topology.md), [ADR-010](../../adr/010-docker-first-parity.md), [constitution §7, §13](../../.specify/memory/constitution.md).
 
 ---
 

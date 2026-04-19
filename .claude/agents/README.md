@@ -2,7 +2,7 @@
 
 Sub-agents for TechScreen development. Each is a single Markdown file with YAML frontmatter (name, description, tool allow-list) followed by the agent's system prompt.
 
-Full workflow and rationale are in [`docs/multi-agent-workflow.md`](../../docs/multi-agent-workflow.md) and [ADR-014](../../adr/014-multi-agent-orchestration-explicit.md).
+Full workflow and rationale are in [`docs/engineering/multi-agent-workflow.md`](../../docs/engineering/multi-agent-workflow.md) and [ADR-014](../../adr/014-multi-agent-orchestration-explicit.md).
 
 ---
 
@@ -26,4 +26,4 @@ Full workflow and rationale are in [`docs/multi-agent-workflow.md`](../../docs/m
 
 ## Default behaviour
 
-Single-agent, sequential. Fan-out happens only when the user asks or the orchestrator proposes it in `/plan` and the user approves (constitution §18). See `docs/multi-agent-workflow.md` for decision flow and worktree isolation.
+Single-agent, sequential. Fan-out happens only when the user asks or the orchestrator proposes it in `/plan` and the user approves (constitution §18). See `docs/engineering/multi-agent-workflow.md` for decision flow and worktree isolation.

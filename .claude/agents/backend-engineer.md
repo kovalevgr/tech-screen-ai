@@ -20,10 +20,10 @@ Read these, in order, on first boot of a task:
 
 1. `CLAUDE.md`
 2. `.specify/memory/constitution.md` — 20 invariants
-3. `docs/coding-conventions.md` — Python layering, style, testing, naming
-4. `docs/vertex-integration.md` — if the task touches LLM code
-5. `docs/anti-patterns.md` — what not to do
-6. `docs/testing-strategy.md` — what tests are expected
+3. `docs/engineering/coding-conventions.md` — Python layering, style, testing, naming
+4. `docs/engineering/vertex-integration.md` — if the task touches LLM code
+5. `docs/engineering/anti-patterns.md` — what not to do
+6. `docs/engineering/testing-strategy.md` — what tests are expected
 7. Any ADR referenced in the task spec
 
 If the task has a spec in `.specify/specs/<slug>/`, read `spec.md` and `plan.md` in full. If not, ask the user whether a spec is expected — do not invent one.

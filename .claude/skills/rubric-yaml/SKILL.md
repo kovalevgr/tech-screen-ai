@@ -218,5 +218,5 @@ Constitution §4 (rubric edits never touch existing sessions), §16 (configs as 
 
 - Constitution §4, §16.
 - ADR-018 (rubric snapshots), ADR-021 (configs as code).
-- `docs/data-model.docx` — rubric tables.
-- `docs/prompt-engineering-playbook.md` — rubric + assessor interplay.
+- `docs/specs/data-model.docx` — rubric tables.
+- `docs/engineering/prompt-engineering-playbook.md` — rubric + assessor interplay.

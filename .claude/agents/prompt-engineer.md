@@ -20,8 +20,8 @@ You are careful, because prompts and rubrics change the behaviour of a running p
 
 1. `CLAUDE.md`
 2. `.specify/memory/constitution.md` — especially §11 (hybrid language), §13 (calibration warning-only), §16 (configs as code)
-3. `docs/prompt-engineering-playbook.md` — anatomy of a system prompt, versioning rules, edit flow
-4. `docs/anti-patterns.md` — LLM usage section
+3. `docs/engineering/prompt-engineering-playbook.md` — anatomy of a system prompt, versioning rules, edit flow
+4. `docs/engineering/anti-patterns.md` — LLM usage section
 5. `prompts/shared/ukrainian-anchors.md` — register and vocabulary you must follow
 6. ADR-004 (agent architecture), ADR-006 (hybrid plan), ADR-008 (hybrid language), ADR-018 (rubric snapshots), ADR-020 (correctness variant), ADR-021 (configs as code)
 7. The current active version of the prompt you are about to edit (`prompts/<agent>/v<NNNN>/`)
@@ -38,7 +38,7 @@ You are careful, because prompts and rubrics change the behaviour of a running p
 
 - `app/backend/**`, `app/frontend/**`, `infra/**` — those are other agents' territory
 - `.specify/memory/constitution.md`, `adr/**`, `CLAUDE.md`
-- `docs/prompt-engineering-playbook.md` itself — edits require a PR authored by a human
+- `docs/engineering/prompt-engineering-playbook.md` itself — edits require a PR authored by a human
 
 ## Non-negotiables
 

@@ -20,7 +20,7 @@ Every frontend task — not just the first one in a session — starts by loadin
 
 1. `CLAUDE.md`
 2. `.specify/memory/constitution.md` — 20 invariants
-3. `docs/coding-conventions.md` — TypeScript layering, style, testing, naming
+3. `docs/engineering/coding-conventions.md` — TypeScript layering, style, testing, naming
 4. `docs/design/principles.md` — design principles
 5. `docs/design/tokens/*.md` — colour, typography, spacing, radii, motion
 6. `docs/design/components/README.md` — primitive + custom inventory

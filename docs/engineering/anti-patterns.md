@@ -168,7 +168,7 @@ Things we have explicitly decided not to do, with the reason. Each entry is shor
 
 **Why.** Silent drift destroys calibration baselines. Nobody can tell which v0003 produced which metric.
 
-**Do instead.** v0004. Even for a one-word fix. See `docs/prompt-engineering-playbook.md`.
+**Do instead.** v0004. Even for a one-word fix. See `./prompt-engineering-playbook.md`.
 
 ---
 

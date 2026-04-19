@@ -2,7 +2,7 @@
 
 How we write, edit, and release agent system prompts in TechScreen. Agent output quality is mostly determined by prompt quality — this is our most-read, most-edited artefact class per line of code.
 
-Related: [ADR-004](../adr/004-agent-architecture-2-plus-1.md), [ADR-008](../adr/008-hybrid-prompt-language.md), [constitution §11](../.specify/memory/constitution.md).
+Related: [ADR-004](../../adr/004-agent-architecture-2-plus-1.md), [ADR-008](../../adr/008-hybrid-prompt-language.md), [constitution §11](../../.specify/memory/constitution.md).
 
 ---
 

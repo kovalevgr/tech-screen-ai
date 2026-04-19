@@ -47,4 +47,4 @@ Sub-agents defined for MVP:
 **Mitigation.**
 
 - For one-layer changes, the plan is trivially small (one agent, no `parallel: true`) and this ADR imposes no measurable overhead.
-- Maturity phases (MVP → post-MVP → mature) are documented in `docs/multi-agent-workflow.md`. We can loosen explicitness once we have data.
+- Maturity phases (MVP → post-MVP → mature) are documented in `docs/engineering/multi-agent-workflow.md`. We can loosen explicitness once we have data.

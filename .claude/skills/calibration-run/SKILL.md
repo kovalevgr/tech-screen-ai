@@ -193,5 +193,5 @@ The reviewer sub-agent checks for this link and blocks if missing.
 - Constitution §13 (calibration warning-only), §16 (configs as code).
 - ADR-020 (correctness variant A — what "exact-match" means given half-step labels).
 - ADR-021 (configs as code).
-- `docs/testing-strategy.md` — calibration layer.
+- `docs/engineering/testing-strategy.md` — calibration layer.
 - `prompts/<agent>/v<N>/notes.md` — where the Calibration delta line lives per run.

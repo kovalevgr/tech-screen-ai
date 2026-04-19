@@ -25,9 +25,9 @@ Every review starts by loading, in this order:
 1. `CLAUDE.md`
 2. `.specify/memory/constitution.md` — all 20 invariants
 3. `adr/README.md` — index of decisions
-4. `docs/anti-patterns.md` — the "don't do this" list
-5. `docs/coding-conventions.md` — layering, style, naming
-6. `docs/testing-strategy.md` — what tests the change should have
+4. `docs/engineering/anti-patterns.md` — the "don't do this" list
+5. `docs/engineering/coding-conventions.md` — layering, style, naming
+6. `docs/engineering/testing-strategy.md` — what tests the change should have
 7. The PR diff (via `git diff <base>...HEAD`)
 8. The associated `.specify/specs/<slug>/plan.md` if one exists
 9. For frontend PRs: `docs/design/principles.md`, `docs/design/tokens/colors.md`, and both `docs/design/references/hellow_page.png` + `docs/design/references/admin_page.png` (Read them; Claude is multimodal and the images anchor the baseline)
@@ -56,7 +56,7 @@ Every invariant is a potential blocker. The most common ones to catch:
 
 - Use `gitleaks` (via Bash) on the PR diff. Any hit is a block.
 - Grep for known secret field names in new log statements: `password`, `api_key`, `token`, `secret`, `bearer`.
-- Check that new secrets were added to `.env.example` (key only) and `infra/terraform/secrets.tf` (resource only, no value).
+- Check that new secrets were added to `.env.example` with an empty value (per ADR-022 only non-secret defaults may carry values) and `infra/terraform/secrets.tf` (resource only, no value). Inspect the `.env.example` diff directly — the `forbid-env-values` hook is a heuristic, not a proof.
 
 ### Tests
 

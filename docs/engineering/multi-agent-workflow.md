@@ -2,7 +2,7 @@
 
 How TechScreen uses Claude Code sub-agents. The short version: **explicit, not automatic.** Sub-agent fan-out happens when the user asks for it or the orchestrator proposes it in `/plan` and the user approves — never silently.
 
-Related: [ADR-014](../adr/014-multi-agent-orchestration-explicit.md), [ADR-017](../adr/017-spec-driven-development.md), [constitution §14, §18](../.specify/memory/constitution.md).
+Related: [ADR-014](../../adr/014-multi-agent-orchestration.md), [ADR-017](../../adr/017-spec-driven-github-spec-kit.md), [constitution §14, §18](../../.specify/memory/constitution.md).
 
 ---
 
@@ -21,7 +21,7 @@ What sub-agents do **not** give us: magic coordination. The human is still the d
 
 ## The agents
 
-All sub-agents are defined in [`.claude/agents/`](../.claude/agents/). Each is a single Markdown file with frontmatter describing the agent's role, allowed tools, and system prompt.
+All sub-agents are defined in [`.claude/agents/`](../../.claude/agents/). Each is a single Markdown file with frontmatter describing the agent's role, allowed tools, and system prompt.
 
 | Agent               | Scope                                                                                         | Allowed to edit                                                                                  |
 | ------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -168,7 +168,7 @@ We are currently in Phase 0. Phase transitions require an ADR amendment.
 1. **No fan-out without a committed contract.** The plan must reference `openapi.yaml` or a JSON schema file that exists on the feature branch.
 2. **No sub-agent edits outside its layer.** If `backend-engineer` tries to touch `app/frontend/**`, the orchestrator rejects.
 3. **No sub-agent touches the constitution, ADRs, or `CLAUDE.md`.** Those are floor documents and are only edited via dedicated PRs authored by a human.
-4. **No sub-agent runs `/deploy` or `/promote` or `/rollback`.** Deploy operations are human-only (see `docs/deploy-playbook.md`).
+4. **No sub-agent runs `/deploy` or `/promote` or `/rollback`.** Deploy operations are human-only (see `./deploy-playbook.md`).
 5. **No sub-agent skips the spec.** Every non-trivial task starts at `/specify`. Trivial carve-out is for typos and dependency bumps.
 
 ---

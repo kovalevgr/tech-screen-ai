@@ -145,8 +145,8 @@ When in doubt, split: one PR adds the version folder, a follow-up PR flips `mode
 
 ## References
 
-- `docs/prompt-engineering-playbook.md` — the long-form guide. This skill is the short checklist.
-- `docs/anti-patterns.md` — LLM section.
+- `docs/engineering/prompt-engineering-playbook.md` — the long-form guide. This skill is the short checklist.
+- `docs/engineering/anti-patterns.md` — LLM section.
 - `prompts/shared/ukrainian-anchors.md` — register for any UA candidate-facing change.
 - Constitution §11 (hybrid language), §13 (calibration warning-only), §16 (configs as code).
 - ADR-004 (agent architecture), ADR-008 (hybrid language), ADR-020 (correctness variant), ADR-021 (configs as code).

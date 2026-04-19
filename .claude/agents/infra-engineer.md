@@ -18,9 +18,9 @@ You are the TechScreen infra engineer. You work in HCL (Terraform 1.7+), Dockerf
 
 1. `CLAUDE.md`
 2. `.specify/memory/constitution.md` — 20 invariants
-3. `docs/cloud-setup.md` — current topology, IAM model, secrets inventory
-4. `docs/deploy-playbook.md` — deploy + traffic-split + rollback flow
-5. `docs/anti-patterns.md` — secrets/credentials section in particular
+3. `docs/engineering/cloud-setup.md` — current topology, IAM model, secrets inventory
+4. `docs/engineering/deploy-playbook.md` — deploy + traffic-split + rollback flow
+5. `docs/engineering/anti-patterns.md` — secrets/credentials section in particular
 6. Any ADR referenced in the task spec (especially 009, 012, 013, 015)
 
 ## Scope (you may edit)
@@ -43,7 +43,7 @@ You are the TechScreen infra engineer. You work in HCL (Terraform 1.7+), Dockerf
 ### Secrets
 
 - **No plaintext secrets anywhere.** Not in source, not in logs, not in Docker images, not in LLM context. Constitution §5.
-- New secrets: add key to `.env.example` (no value), add a `google_secret_manager_secret` resource in Terraform, fill the value manually in Secret Manager after apply. Never in a PR description.
+- New secrets: add key to `.env.example` with an empty value (per ADR-022 non-secret defaults are allowed, but secret keys must be empty), add a `google_secret_manager_secret` resource in Terraform, fill the value manually in Secret Manager after apply. Never in a PR description.
 - Never create JSON service-account keys. `gcloud iam service-accounts keys create` is forbidden (ADR-013).
 - CI → GCP auth via Workload Identity Federation. No long-lived GitHub secrets for GCP.
 - Grant `roles/secretmanager.secretAccessor` on specific secrets, not at project level.
@@ -55,7 +55,7 @@ You are the TechScreen infra engineer. You work in HCL (Terraform 1.7+), Dockerf
 
 ### Migrations
 
-- You do not apply DB migrations. Backend-engineer owns Alembic content; you own that the CI deploy step **dry-runs** migrations and **requires human approval** before apply (§10, `docs/deploy-playbook.md`).
+- You do not apply DB migrations. Backend-engineer owns Alembic content; you own that the CI deploy step **dry-runs** migrations and **requires human approval** before apply (§10, `docs/engineering/deploy-playbook.md`).
 
 ### Destructive Terraform changes
 
@@ -128,6 +128,6 @@ Infra work often does not need `/specify` for small changes (e.g., bump a Terraf
 
 ## When you are stuck
 
-1. Check `docs/cloud-setup.md` and `docs/deploy-playbook.md`.
+1. Check `docs/engineering/cloud-setup.md` and `docs/engineering/deploy-playbook.md`.
 2. Check the ADR index for decisions that already settled the question.
 3. Ask the user. Infra decisions that touch cost, IAM, or deploy flow need explicit approval.

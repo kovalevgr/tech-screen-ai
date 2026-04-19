@@ -4,13 +4,13 @@
 
 Audience: Claude Code orchestrator and sub-agents (`backend-engineer`, `frontend-engineer`, `infra-engineer`, `prompt-engineer`, `reviewer`).
 
-This document is the authoritative task breakdown for the 12-week MVP build. It follows the Spec Kit `/plan` convention described in [`CLAUDE.md`](../CLAUDE.md) — every task carries explicit `agent:`, `parallel:`, `depends_on:`, `contract:`, and `acceptance:` fields so the orchestrator can fan out safely and `reviewer` can gate merges.
+This document is the authoritative task breakdown for the 12-week MVP build. It follows the Spec Kit `/plan` convention described in [`CLAUDE.md`](../../CLAUDE.md) — every task carries explicit `agent:`, `parallel:`, `depends_on:`, `contract:`, and `acceptance:` fields so the orchestrator can fan out safely and `reviewer` can gate merges.
 
 ---
 
 ## 0. How to read this document
 
-- **Tiers** map 1:1 to calendar weeks from [`docs/mvp-scope.docx`](./mvp-scope.docx) (W1 → Tier 1, W12 → Tier 12).
+- **Tiers** map 1:1 to calendar weeks from [`docs/specs/mvp-scope.docx`](../specs/mvp-scope.docx) (W1 → Tier 1, W12 → Tier 12).
 - **Task IDs** are stable: `T01`..`TNN`. Do not renumber; append instead.
 - **`agent:`** is one of `backend-engineer`, `frontend-engineer`, `infra-engineer`, `prompt-engineer`, `orchestrator` (main Claude), or `human` (Ihor — business/ops decisions).
 - **`parallel: true`** means this task can run concurrently with others in the same tier that also declare `parallel: true`, **provided the contract it depends on is already committed.** No contract → fan-out disabled (constitution §14, ADR-014).
@@ -22,7 +22,7 @@ The floor that every sub-agent reads before touching a task in this plan:
 
 1. `.specify/memory/constitution.md` — 20 invariants.
 2. `adr/` — 21 decisions.
-3. `docs/anti-patterns.md`, `docs/coding-conventions.md`, `docs/testing-strategy.md`.
+3. `docs/engineering/anti-patterns.md`, `docs/engineering/coding-conventions.md`, `docs/engineering/testing-strategy.md`.
 4. For frontend PRs: `docs/design/principles.md`, `docs/design/tokens/colors.md`, and both `docs/design/references/*.png`.
 
 Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task is closed only after reviewer returns ✅.
@@ -53,18 +53,18 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 - **agent:** `human` + `infra-engineer`
 - **parallel:** true (runs independently of code in W1–W2)
 - **depends_on:** [T01]
-- **contract:** `docs/vertex-quota.md` (one-pager: region, quotas requested, current limits, who approved)
+- **contract:** `docs/engineering/vertex-quota.md` (one-pager: region, quotas requested, current limits, who approved)
 - **description:**
   PoC scope — request **standard** quotas, not enterprise. Resist the urge to over-provision; we'll re-evaluate before Phase 2 scale.
 
   **Deliverables:**
   - Region choice: `europe-west4` (Netherlands) — closest regional hub to UA user base with GDPR compliance; confirm both Gemini 2.5 Pro and Flash are available.
   - Request (via GCP Console → Quotas): `aiplatform.googleapis.com` — `GenerateContentRequestsPerMinutePerProjectPerModel` raised from default to ~60 rpm for both models (enough for 3× concurrent sessions + calibration batch).
-  - `docs/vertex-quota.md` logs: what was requested, what was granted, GCP support-case ID, requested-by, granted-on.
+  - `docs/engineering/vertex-quota.md` logs: what was requested, what was granted, GCP support-case ID, requested-by, granted-on.
   - **Re-evaluation trigger:** if Phase 2 (post-pilot) targets > 20 concurrent sessions, raise a new task `T01a-v2` to request higher quota before any rollout.
 
 - **acceptance:**
-  - `docs/vertex-quota.md` committed with granted quota values.
+  - `docs/engineering/vertex-quota.md` committed with granted quota values.
   - Smoke: `curl` against Vertex Flash from `dev` Cloud Run returns within 10 s.
   - Budget alerts configured per §12 (50% / 90% / 100% of $50/mo).
 - **references:** constitution §1 (candidates first — fail-open on quota is unacceptable), §12 (budget caps), ADR-006
@@ -110,7 +110,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
   - Smoke test hits Gemini 2.5 Flash and returns parsed JSON conforming to a supplied schema.
   - Unit tests cover: timeout >30s raises `VertexTimeoutError`; schema miss retries then raises `VertexSchemaError`; cost recorded via injected tracker.
   - `ruff` + `mypy --strict` pass.
-- **references:** ADR-006, ADR-013, constitution §12, docs/vertex-integration.md
+- **references:** ADR-006, ADR-013, constitution §12, docs/engineering/vertex-integration.md
 
 ### T05 — DB schema v0 + Alembic baseline + append-only enforcement
 
@@ -159,10 +159,10 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
   - `app/backend/services/feature_flags.py`: `is_enabled(name, *, session_id=None) -> bool` with in-process cache (60s TTL) + Postgres LISTEN/NOTIFY for invalidation.
   - `configs/feature-flags.yaml`: source-of-truth file under §16 Configs-as-Code. Schema validated by JSON schema (the contract above).
   - **Self-contained GHA workflow** `.github/workflows/sync-feature-flags.yml` (does not depend on T16): on `main` merge, diff `configs/feature-flags.yaml` against DB, upsert with `updated_by = 'configs-as-code'`. T16 (Configs-as-Code sync for rubric) extends this same workflow with rubric-sync as a second job — see T16.
-  - `docs/feature-flags.md`: index of every flag, owner, default, "what flipping it does". Each entry has lifecycle state: `active` or `sunset` (with `sunset_pr:` back-reference and `sunset_date:`).
+  - `docs/engineering/feature-flags.md`: index of every flag, owner, default, "what flipping it does". Each entry has lifecycle state: `active` or `sunset` (with `sunset_pr:` back-reference and `sunset_date:`).
   - Pre-commit hook `feature-flag-registered` is **bidirectional**:
     - Any new `is_enabled("xxx")` call must have `xxx:` in `configs/feature-flags.yaml`.
-    - Any PR that removes the last `is_enabled("xxx")` call must flip the yaml entry to `state: sunset` and add an entry to `docs/feature-flags.md` sunset table (not delete it — sunset flags remain documented for audit).
+    - Any PR that removes the last `is_enabled("xxx")` call must flip the yaml entry to `state: sunset` and add an entry to `docs/engineering/feature-flags.md` sunset table (not delete it — sunset flags remain documented for audit).
 
   **Out of scope for this task:** Admin UI for toggling flags (Phase 2). MVP toggles via PR to `configs/feature-flags.yaml` or direct SQL on prod for emergency disable.
 
@@ -194,7 +194,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 - **agent:** `infra-engineer`
 - **parallel:** true (with T07, T09 after T06)
 - **depends_on:** [T06]
-- **contract:** `.github/workflows/deploy.yml` + `.github/workflows/rollback.yml` + `docs/deploy-playbook.md`
+- **contract:** `.github/workflows/deploy.yml` + `.github/workflows/rollback.yml` + `docs/engineering/deploy-playbook.md`
 - **description:**
   §19 says rollback must complete in under five minutes. That requires the commands to exist, be documented, and be tested — not just implied.
 
@@ -202,7 +202,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
   - `/deploy` slash command (GitHub Actions `workflow_dispatch` + ChatOps trigger): builds `prod` Docker target, pushes to Artifact Registry, deploys new Cloud Run revision at **0% traffic**, runs post-deploy smoke against the new revision URL, reports result in PR comment. **Migration-approval gate wiring is deferred until T10 lands** — ship `/deploy` without the check, then extend in a follow-up PR once T10's `migration-approved` label mechanic is in place (same W1–W2 window).
   - `/promote N` command: shifts traffic to the latest revision in steps (`/promote 10`, `/promote 50`, `/promote 100`).
   - `/rollback` command: single `gcloud run services update-traffic --to-revisions=<previous>=100` call. Target wall-clock ≤ 60 s from invocation.
-  - `docs/deploy-playbook.md`: runbook with the exact commands, who has access, what to do if the command fails.
+  - `docs/engineering/deploy-playbook.md`: runbook with the exact commands, who has access, what to do if the command fails.
 
 - **acceptance:**
   - `/deploy` on a trivial PR produces a 0%-traffic revision and posts its URL.
@@ -818,7 +818,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
   - Does **not** block pilot launch — the pilot cohort is internal/invited, consent is handled by the pilot intro page, and any deletion request within the 18-month window is honoured via T46.
 
 - **acceptance:**
-  - Sign-off in `docs/security-review-2026-pilot.md`; no Critical CVEs open.
+  - Sign-off in `docs/engineering/security-review-2026-pilot.md`; no Critical CVEs open.
   - Retention-policy caveat recorded in the sign-off doc with a "re-evaluate before scale" flag.
 
 ### T46 — GDPR delete endpoint + retention policy
@@ -846,7 +846,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 - **agent:** `human`
 - **parallel:** true
 - **depends_on:** []
-- **contract:** `docs/pilot-ops-playbook.md`
+- **contract:** `docs/engineering/pilot-ops-playbook.md`
 - **description:**
   How recruiters assign interviews, incident handling (where to look in dashboards, who to page), escalation path. Include a runbook for "candidate reports a bug mid-session".
 - **acceptance:**
@@ -883,7 +883,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 
 - **acceptance:**
   - 3 sessions complete concurrently with zero Vertex 429s, zero WebSocket cross-talk, Cloud Run scales as expected, DB pool stays under 80 % utilisation.
-  - Results recorded in `docs/load-smoke-2026-pilot.md`. Any failure files a P0 blocker for T49.
+  - Results recorded in `docs/engineering/load-smoke-2026-pilot.md`. Any failure files a P0 blocker for T49.
 
 ### T49 — Full pilot dry-run
 
@@ -894,7 +894,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 - **description:**
   One internal candidate runs the full pilot flow end-to-end: invitation email → intro → session → reviewer annotation → final decision. Observability dashboards watched live.
 - **acceptance:**
-  - Dry-run completes with zero P0/P1 bugs; retro notes added to `docs/pilot-ops-playbook.md`.
+  - Dry-run completes with zero P0/P1 bugs; retro notes added to `docs/engineering/pilot-ops-playbook.md`.
 
 ---
 
@@ -918,7 +918,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 - **agent:** `prompt-engineer` + `human`
 - **parallel:** false
 - **depends_on:** [T50]
-- **contract:** `docs/pilot-report-2026-qN.md`
+- **contract:** `docs/engineering/pilot-report-2026-qN.md`
 - **description:**
   Measure against §7 targets: inter-rater agreement, FP/FN, session completion rate, cost/session, avg LLM latency, coverage. Per-candidate pass, per-competency breakdown. Data pulled from append-only audit tables.
 
@@ -928,7 +928,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
   1. Raw metrics table vs §7 targets (✅ / ⚠ / ❌).
   2. Per-session notes (one line each): completed / failed-reason / cost / p95 latency.
   3. Per-competency coverage heatmap.
-  4. Incidents log pointer (`docs/pilot-ops-playbook.md` retro section).
+  4. Incidents log pointer (`docs/engineering/pilot-ops-playbook.md` retro section).
   5. Recommendation for T52: proceed / iterate / pivot, with rationale in ≤ 300 words.
 
 - **acceptance:**
@@ -942,7 +942,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 - **depends_on:** [T51]
 - **contract:** none
 - **description:**
-  Retro with engineers + recruiters + reviewers. Decision: proceed to Phase 2 / iterate MVP / pivot. Capture decisions in `docs/roadmap.docx` (update H1 triggers).
+  Retro with engineers + recruiters + reviewers. Decision: proceed to Phase 2 / iterate MVP / pivot. Capture decisions in `docs/specs/roadmap.docx` (update H1 triggers).
 - **acceptance:**
   - Retro notes committed; Phase 2 kickoff plan (if applicable) drafted.
 
@@ -1017,4 +1017,4 @@ Counts are absolute task counts per agent across the full 12-week plan. Flags hi
 
 ---
 
-**End of plan.** Entry point back: [`CLAUDE.md`](../CLAUDE.md) · [`docs/mvp-scope.docx`](./mvp-scope.docx) · [`docs/multi-agent-workflow.md`](./multi-agent-workflow.md).
+**End of plan.** Entry point back: [`CLAUDE.md`](../../CLAUDE.md) · [`docs/specs/mvp-scope.docx`](../specs/mvp-scope.docx) · [`docs/engineering/multi-agent-workflow.md`](./multi-agent-workflow.md).

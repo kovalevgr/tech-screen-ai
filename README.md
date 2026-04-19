@@ -4,7 +4,7 @@ Internal AI-powered technical screening system for N-iX.
 
 TechScreen conducts structured technical interviews with candidates, evaluates answers against a calibrated competency rubric, and produces reviewer-auditable reports. It augments human interviewers rather than replacing them: reviewers can override any model decision, and those overrides become training signal for the next release.
 
-> **Status:** MVP planning phase. No production code yet. See `docs/mvp-scope.docx` for the current scope.
+> **Status:** MVP planning phase. No production code yet. See `docs/specs/mvp-scope.docx` for the current scope.
 
 ## What this repository is for
 
@@ -56,9 +56,11 @@ docker compose -f docker-compose.test.yml up --abort-on-container-exit
 ├── CLAUDE.md                        # Entry point for Claude Code / AI assistants.
 ├── .specify/memory/constitution.md  # Project invariants. Non-negotiable.
 ├── adr/                             # Architecture Decision Records (Michael Nygard format).
-├── docs/                            # Shared design docs (architecture, data model, roadmap, agents, etc.).
+├── docs/
+│   ├── specs/                       # Canonical .docx specs (architecture, data-model, agents, methodology, mvp-scope, roadmap).
+│   ├── engineering/                 # Agent-readable operational refs (.md): conventions, playbooks, glossary, implementation plan, workflow.
 │   ├── design/                      # UI/UX design system, per-screen specs.
-│   └── diagrams/                    # Source `.dot` files and rendered `.png` diagrams.
+│   └── kickoff/                     # One-time launch artefacts (dev briefings).
 ├── prompts/                         # Agent prompt templates (Interviewer, Assessor, Planner).
 ├── configs/                         # Rubrics, position templates, feature flag defaults.
 ├── app/
@@ -80,18 +82,19 @@ docker compose -f docker-compose.test.yml up --abort-on-container-exit
 
 Start here before making a non-trivial change.
 
-| Document                                                                 | Purpose                                                     |
-| ------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| [`.specify/memory/constitution.md`](./.specify/memory/constitution.md)   | Project invariants. Never violate.                          |
-| [`CLAUDE.md`](./CLAUDE.md)                                               | How to work in this repo with AI assistance.                |
-| [`docs/mvp-scope.docx`](./docs/mvp-scope.docx)                           | What ships in the MVP.                                      |
-| [`docs/architecture.docx`](./docs/architecture.docx)                     | System architecture, data flow, component diagram.          |
-| [`docs/data-model.docx`](./docs/data-model.docx)                         | Database schema, key invariants, table-by-table reference.  |
-| [`docs/agents.docx`](./docs/agents.docx)                                 | Interviewer / Assessor / Planner agent contracts.           |
-| [`docs/assessment-methodology.docx`](./docs/assessment-methodology.docx) | Rubric, scoring, correctness approach, calibration loop.    |
-| [`docs/roadmap.docx`](./docs/roadmap.docx)                               | Horizon-1/2/3 plan and deferred features.                   |
-| [`docs/design/README.md`](./docs/design/README.md)                       | Design system and per-screen specs.                         |
-| [`adr/`](./adr/)                                                         | Every architectural decision with context and consequences. |
+| Document                                                                               | Purpose                                                     |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| [`.specify/memory/constitution.md`](./.specify/memory/constitution.md)                 | Project invariants. Never violate.                          |
+| [`CLAUDE.md`](./CLAUDE.md)                                                             | How to work in this repo with AI assistance.                |
+| [`docs/specs/mvp-scope.docx`](./docs/specs/mvp-scope.docx)                             | What ships in the MVP.                                      |
+| [`docs/specs/architecture.docx`](./docs/specs/architecture.docx)                       | System architecture, data flow, component diagram.          |
+| [`docs/specs/data-model.docx`](./docs/specs/data-model.docx)                           | Database schema, key invariants, table-by-table reference.  |
+| [`docs/specs/agents.docx`](./docs/specs/agents.docx)                                   | Interviewer / Assessor / Planner agent contracts.           |
+| [`docs/specs/assessment-methodology.docx`](./docs/specs/assessment-methodology.docx)   | Rubric, scoring, correctness approach, calibration loop.    |
+| [`docs/specs/roadmap.docx`](./docs/specs/roadmap.docx)                                 | Horizon-1/2/3 plan and deferred features.                   |
+| [`docs/engineering/implementation-plan.md`](./docs/engineering/implementation-plan.md) | 12-week MVP task breakdown (58 tasks).                      |
+| [`docs/design/README.md`](./docs/design/README.md)                                     | Design system and per-screen specs.                         |
+| [`adr/`](./adr/)                                                                       | Every architectural decision with context and consequences. |
 
 ## How work happens here
 

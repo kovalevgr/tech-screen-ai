@@ -41,3 +41,4 @@ Proposed → Accepted → (Deprecated | Superseded by ADR-NNN)
 | [019](./019-append-only-audit-trail.md)              | Accepted | Append-only audit trail                                   |
 | [020](./020-correctness-variant-a-mvp.md)            | Accepted | Correctness evaluation: Variant A for MVP                 |
 | [021](./021-configs-as-code.md)                      | Accepted | Configs as code: rubrics, prompts, flags in Git           |
+| [022](./022-env-example-non-secret-defaults.md)      | Accepted | Non-secret defaults permitted in `.env.example`           |
