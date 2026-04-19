@@ -1,0 +1,111 @@
+# TechScreen — CI / integration-test stack.
+#
+# Same services as dev, but:
+#   - Postgres data lives in a tmpfs (ephemeral, fast).
+#   - Backend runs the built image without bind-mounts (prod-shape parity,
+#     ADR-010). Reload is off.
+#   - Frontend is not run by default; E2E Playwright brings it up through
+#     a separate profile when needed.
+#   - vertex-mock is always present.
+#
+# Invoked by CI: `docker compose -f docker-compose.test.yml up --build --abort-on-container-exit`.
+
+name: techscreen-test
+
+services:
+  postgres:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_USER: techscreen
+      POSTGRES_PASSWORD: techscreen
+      POSTGRES_DB: techscreen_test
+    # tmpfs for speed; no volume — data dies with the container.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U techscreen -d techscreen_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  vertex-mock:
+    build:
+      context: .
+      dockerfile: Dockerfile.vertex-mock
+    environment:
+      MOCK_PORT: "8080"
+      LOG_FORMAT: json
+      LOG_LEVEL: warning
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    environment:
+      APP_ENV: test
+      LLM_BACKEND: mock
+      LOG_FORMAT: json
+      LOG_LEVEL: info
+      DATABASE_URL: postgresql+asyncpg://techscreen:techscreen@postgres:5432/techscreen_test
+      VERTEX_MOCK_URL: http://vertex-mock:8080
+      MAGIC_LINK_SIGNING_KEY: test-signing-key-not-a-real-secret
+      SESSION_COOKIE_SECRET: test-cookie-secret-not-a-real-secret
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vertex-mock:
+        condition: service_healthy
+    # Run migrations, then tests. CI uses --abort-on-container-exit to
+    # propagate this exit code.
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        alembic upgrade head
+        pytest --maxfail=1 --strict-markers -ra app/backend/tests
+
+  frontend:
+    profiles: ["e2e"]
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      target: runtime
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://backend:8000
+        NEXT_PUBLIC_APP_ENV: test
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_API_BASE_URL: http://backend:8000
+      NEXT_PUBLIC_APP_ENV: test
+    depends_on:
+      - backend
+
+  e2e:
+    profiles: ["e2e"]
+    image: mcr.microsoft.com/playwright:v1.48.0-jammy
+    working_dir: /repo
+    environment:
+      PLAYWRIGHT_BASE_URL: http://frontend:3000
+      CI: "1"
+    volumes:
+      - ./:/repo
+    depends_on:
+      - frontend
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        cd /repo/app/frontend
+        pnpm install --frozen-lockfile
+        pnpm exec playwright install --with-deps chromium
+        pnpm e2e

@@ -1,0 +1,117 @@
+# TechScreen — local dev stack.
+#
+# Goal: one `docker compose up` brings up everything needed to exercise the
+# app end-to-end without touching GCP. Same image shapes as CI and prod
+# (ADR-010); behaviour differences are env-var driven.
+#
+# Services:
+#   postgres     — Postgres 16, data persisted in a named volume.
+#   vertex-mock  — FastAPI mock standing in for Vertex Gemini.
+#   backend      — FastAPI app, bind-mounted for hot reload during dev.
+#   frontend     — Next.js dev server, bind-mounted for hot reload.
+
+name: techscreen-dev
+
+services:
+  postgres:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: techscreen
+      POSTGRES_PASSWORD: techscreen
+      POSTGRES_DB: techscreen
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U techscreen -d techscreen"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  vertex-mock:
+    build:
+      context: .
+      dockerfile: Dockerfile.vertex-mock
+    restart: unless-stopped
+    environment:
+      MOCK_PORT: "8080"
+      LOG_FORMAT: json
+      LOG_LEVEL: info
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      APP_ENV: dev
+      LLM_BACKEND: mock
+      LOG_FORMAT: json
+      LOG_LEVEL: debug
+      DATABASE_URL: postgresql+asyncpg://techscreen:techscreen@postgres:5432/techscreen
+      VERTEX_MOCK_URL: http://vertex-mock:8080
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vertex-mock:
+        condition: service_healthy
+    # Bind-mount source for hot reload. Uvicorn reload is enabled via the
+    # override command below.
+    volumes:
+      - ./app/backend:/app/app/backend
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+      - ./configs:/app/configs
+      - ./prompts:/app/prompts
+    command:
+      - uvicorn
+      - app.backend.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - /app/app/backend
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      target: build
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+        NEXT_PUBLIC_APP_ENV: dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      NEXT_PUBLIC_APP_ENV: dev
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./app/frontend:/app
+      - frontend-node-modules:/app/node_modules
+    working_dir: /app
+    command: ["pnpm", "dev", "--hostname", "0.0.0.0", "--port", "3000"]
+
+volumes:
+  postgres-data:
+  frontend-node-modules:
