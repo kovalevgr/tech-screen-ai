@@ -18,11 +18,11 @@ Rendered as the Interviewer's first turn at session start. This string is **fixe
 
 ## Variables
 
-| Name | Source | Notes |
-| --- | --- | --- |
-| `{FirstName}` | `candidate.first_name` | Fallback: "колего" if null |
-| `{Area}` | `interview_plan.area_label_uk` | Free-form Ukrainian area label, e.g., "Backend-розробка" |
-| `{ExpectedMinutes}` | `interview_plan.expected_minutes` | Integer; fallback: "30" |
+| Name                | Source                            | Notes                                                    |
+| ------------------- | --------------------------------- | -------------------------------------------------------- |
+| `{FirstName}`       | `candidate.first_name`            | Fallback: "колего" if null                               |
+| `{Area}`            | `interview_plan.area_label_uk`    | Free-form Ukrainian area label, e.g., "Backend-розробка" |
+| `{ExpectedMinutes}` | `interview_plan.expected_minutes` | Integer; fallback: "30"                                  |
 
 Variables are substituted by the orchestrator before sending the string as the session's first turn.
 

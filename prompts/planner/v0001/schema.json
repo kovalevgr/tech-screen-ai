@@ -4,11 +4,7 @@
   "title": "PlannerOutput",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "plan_version_seed",
-    "expected_minutes",
-    "competencies"
-  ],
+  "required": ["plan_version_seed", "expected_minutes", "competencies"],
   "properties": {
     "plan_version_seed": {
       "type": "string",

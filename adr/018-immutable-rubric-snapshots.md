@@ -23,14 +23,17 @@ An interview conducted under rubric version **v5** must keep meaning the same wh
 ## Consequences
 
 **Positive.**
+
 - Enforces constitution §4 (immutable snapshots).
 - Historical consistency: a 6-month-old session looks the same today as the day it happened.
 - Calibration math across versions is apples-to-apples because each session carries its own rubric.
 
 **Negative.**
+
 - Storage cost: every session carries a ~5–20 KB JSONB copy of the rubric. For 10k sessions this is ~50–200 MB — trivial.
 - Cross-session rubric analytics ("how did we score `concurrency` across Q1 vs Q2?") require aware joins that respect rubric differences.
 
 **Mitigation.**
+
 - Snapshot JSONB is GZIP-compressed by Postgres' TOAST layer — actual disk cost is smaller than the uncompressed size.
 - Cross-version analytics are covered by `rubric_node.stable_id` — a stable identifier that persists across rubric renames, used for longitudinal queries.

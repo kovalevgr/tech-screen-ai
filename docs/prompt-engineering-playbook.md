@@ -55,6 +55,7 @@ A bulleted list of what the agent must accomplish in its single call. Maximum fi
 A description of the input structure the agent will receive. References the JSON schema or data shape.
 
 > You will receive:
+>
 > - `interview_plan_snapshot`: the plan frozen for this session, including seed questions and depth-probe branches.
 > - `recent_turns`: the last eight turns (candidate + interviewer) in chronological order.
 > - `current_competency`: the competency currently under evaluation.

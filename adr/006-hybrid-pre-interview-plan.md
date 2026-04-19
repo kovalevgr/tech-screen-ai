@@ -28,15 +28,18 @@ The **recruiter reviews and edits** the plan in the Review UI. On approval, the 
 ## Consequences
 
 **Positive.**
+
 - Every interview has guaranteed competency coverage by construction.
 - Recruiter stays in the loop — they see and tune the plan before candidates join.
 - The plan is auditable: we can show a candidate or compliance officer exactly what was prepared vs. what happened.
 - Calibration becomes easier — different candidates answer overlapping seed questions, so Assessor behaviour is comparable across sessions.
 
 **Negative.**
+
 - Adds a manual review step to every session, which costs recruiter time (~5 min/session).
 - The plan can drift from the live rubric between generation and session start — mitigated by §4 of the constitution (immutable snapshots).
 
 **Mitigation.**
+
 - Planner defaults are tuned so that most plans need minimal recruiter editing.
 - "Plan freshness" warning fires if the rubric version changed since plan generation.

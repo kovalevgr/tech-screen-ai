@@ -8,13 +8,13 @@ Full workflow and rationale are in [`docs/multi-agent-workflow.md`](../../docs/m
 
 ## The agents
 
-| File | Role |
-| --- | --- |
-| [`backend-engineer.md`](./backend-engineer.md) | FastAPI, SQLAlchemy, Alembic, Pydantic, Vertex adapter, orchestrator, domain code, backend tests. |
-| [`frontend-engineer.md`](./frontend-engineer.md) | Next.js, shadcn/ui, Tailwind, design system, React Query, OpenAPI client. |
-| [`infra-engineer.md`](./infra-engineer.md) | Terraform, Docker, Cloud Run, GCP IAM, GitHub Actions. |
-| [`prompt-engineer.md`](./prompt-engineer.md) | Agent system prompts, rubric YAML, calibration dataset and runs. |
-| [`reviewer.md`](./reviewer.md) | Read-only gate: constitution adherence, secrets scan, test coverage, migration safety. |
+| File                                             | Role                                                                                              |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| [`backend-engineer.md`](./backend-engineer.md)   | FastAPI, SQLAlchemy, Alembic, Pydantic, Vertex adapter, orchestrator, domain code, backend tests. |
+| [`frontend-engineer.md`](./frontend-engineer.md) | Next.js, shadcn/ui, Tailwind, design system, React Query, OpenAPI client.                         |
+| [`infra-engineer.md`](./infra-engineer.md)       | Terraform, Docker, Cloud Run, GCP IAM, GitHub Actions.                                            |
+| [`prompt-engineer.md`](./prompt-engineer.md)     | Agent system prompts, rubric YAML, calibration dataset and runs.                                  |
+| [`reviewer.md`](./reviewer.md)                   | Read-only gate: constitution adherence, secrets scan, test coverage, migration safety.            |
 
 ## Hard rules (enforced by the orchestrator)
 

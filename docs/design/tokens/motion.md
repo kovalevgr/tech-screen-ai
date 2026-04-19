@@ -6,13 +6,13 @@ Durations, easings, and reduced-motion behaviour. Motion communicates causation;
 
 ## Durations
 
-| Token | Value | Use |
-| --- | --- | --- |
-| `motion.instant` | 0 ms | Toggles where no transition helps understanding |
-| `motion.fast` | 100 ms | Button press feedback, chip toggle |
-| `motion.base` | 150 ms | Default transition for hover / focus / state change |
-| `motion.medium` | 200 ms | Entering / leaving elements |
-| `motion.slow` | 300 ms | Page transitions, large panel slide-in |
+| Token            | Value  | Use                                                 |
+| ---------------- | ------ | --------------------------------------------------- |
+| `motion.instant` | 0 ms   | Toggles where no transition helps understanding     |
+| `motion.fast`    | 100 ms | Button press feedback, chip toggle                  |
+| `motion.base`    | 150 ms | Default transition for hover / focus / state change |
+| `motion.medium`  | 200 ms | Entering / leaving elements                         |
+| `motion.slow`    | 300 ms | Page transitions, large panel slide-in              |
 
 Anything longer than 300 ms is a bug. The candidate should never wait on a transition to reach content.
 
@@ -20,11 +20,11 @@ Anything longer than 300 ms is a bug. The candidate should never wait on a trans
 
 ## Easings
 
-| Token | Value | Use |
-| --- | --- | --- |
-| `ease.standard` | `cubic-bezier(0.2, 0.8, 0.2, 1)` | Default for most transitions |
-| `ease.emphasised` | `cubic-bezier(0.3, 0, 0, 1)` | Entering / arriving content |
-| `ease.exit` | `cubic-bezier(0.4, 0, 1, 1)` | Leaving content (quicker tail) |
+| Token             | Value                            | Use                            |
+| ----------------- | -------------------------------- | ------------------------------ |
+| `ease.standard`   | `cubic-bezier(0.2, 0.8, 0.2, 1)` | Default for most transitions   |
+| `ease.emphasised` | `cubic-bezier(0.3, 0, 0, 1)`     | Entering / arriving content    |
+| `ease.exit`       | `cubic-bezier(0.4, 0, 1, 1)`     | Leaving content (quicker tail) |
 
 No `ease-linear` except for loading spinners. No bouncing / overshoot curves.
 
@@ -55,10 +55,13 @@ This is enforced in the base `globals.css`:
 
 ```css
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 100ms !important;
     transition-duration: 100ms !important;
-    transition-property: opacity, color, background-color, border-color !important;
+    transition-property:
+      opacity, color, background-color, border-color !important;
   }
 }
 ```

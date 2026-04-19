@@ -69,13 +69,13 @@ Specifications live under `.specify/specs/<slug>/` with `spec.md`, `plan.md`, `t
 
 We have five Claude Code sub-agents defined under [`.claude/agents/`](./.claude/agents/):
 
-| Agent | Role |
-| --- | --- |
-| `backend-engineer` | FastAPI, SQLAlchemy, Alembic, Vertex adapter. |
-| `frontend-engineer` | Next.js, shadcn/ui, Tailwind, design system. |
-| `infra-engineer` | Terraform, Docker, GitHub Actions, Cloud Run. |
-| `prompt-engineer` | Agent prompts, rubric YAML, calibration. |
-| `reviewer` | Read-only. Validates constitution adherence, secrets scan, test coverage, migration safety before merge. |
+| Agent               | Role                                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------- |
+| `backend-engineer`  | FastAPI, SQLAlchemy, Alembic, Vertex adapter.                                                            |
+| `frontend-engineer` | Next.js, shadcn/ui, Tailwind, design system.                                                             |
+| `infra-engineer`    | Terraform, Docker, GitHub Actions, Cloud Run.                                                            |
+| `prompt-engineer`   | Agent prompts, rubric YAML, calibration.                                                                 |
+| `reviewer`          | Read-only. Validates constitution adherence, secrets scan, test coverage, migration safety before merge. |
 
 Full workflow and maturity phases are documented in [`docs/multi-agent-workflow.md`](./docs/multi-agent-workflow.md).
 

@@ -22,14 +22,17 @@ LLMs produce content and structured assessments inside states the orchestrator s
 ## Consequences
 
 **Positive.**
+
 - Sessions are reproducible: given the same seed and same turn trace, flow is identical.
 - Bugs in the orchestrator are debuggable as Python stack traces, not as "the model decided X".
 - Max turn count, max session duration, and max cost per session are enforced as hard invariants by the state machine.
 - Aligns with constitution §2.
 
 **Negative.**
+
 - Less adaptive than an LLM-driven flow. If a candidate's answer suggests a new line of questioning, the orchestrator cannot "improvise" a new state on the fly.
 
 **Mitigation.**
+
 - Adaptivity comes from the `InterviewPlan` scaffold (ADR-006): the plan contains multiple question paths, and the orchestrator picks among them based on Assessor output. This is structured adaptivity, not free-form branching.
 - If we genuinely need a new state, it is added in code under an ADR, not improvised at runtime.

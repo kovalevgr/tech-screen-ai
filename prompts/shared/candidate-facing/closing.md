@@ -16,8 +16,8 @@ The Interviewer's final turn. Fixed (not LLM-generated) to keep calibration and 
 
 ## Variables
 
-| Name | Source | Notes |
-| --- | --- | --- |
+| Name          | Source                 | Notes                      |
+| ------------- | ---------------------- | -------------------------- |
 | `{FirstName}` | `candidate.first_name` | Fallback: "колего" if null |
 
 ---

@@ -35,14 +35,17 @@ A small `FeatureFlags` service caches flags in-process with a 30-second TTL. Adm
 ## Consequences
 
 **Positive.**
+
 - Zero external dependency for a critical part of our safety story.
 - Cost: $0.
 - Flag flips are auditable in our own `audit_log` alongside everything else.
 - Aligns with configs-as-code (ADR-021).
 
 **Negative.**
+
 - No advanced targeting (percent rollouts per user, segment targeting). We do not need these at MVP — Cloud Run traffic splitting (ADR-012) handles percentage rollouts.
 - If the application DB is down, flags are down. This is acceptable because if the DB is down, the system is down anyway.
 
 **Mitigation.**
+
 - The flag library falls back to `configs/feature-flags.yaml` defaults if the DB query fails, never returning "flag unknown" to the caller.

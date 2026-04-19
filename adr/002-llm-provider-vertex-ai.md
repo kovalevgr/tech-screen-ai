@@ -22,15 +22,18 @@ Model selection across providers is available via Model Garden (Gemini first-par
 ## Consequences
 
 **Positive.**
+
 - Single billing stream, single IAM surface, single audit log.
 - Workload Identity Federation (ADR-013) works uniformly — no vendor-specific credential format.
 - A/B tests across providers (Gemini vs Claude on the same prompt) are API-compatible with minor schema adaptors.
 - Data residency aligns with our Cloud Run region (see ADR-015).
 
 **Negative.**
+
 - Model availability on Vertex lags provider-native by days to weeks. A new Gemini or Claude version may be accessible on its native API before appearing in Model Garden.
 - We inherit Vertex quota limits, which are per-project and per-model and must be raised in advance of load tests.
 
 **Mitigation.**
+
 - Vertex adapter is isolated in a single module (`app/backend/llm/vertex.py`). If we ever need to call a native API, the change is contained.
 - Quota increases are requested as part of deploy checklist before any meaningful load.

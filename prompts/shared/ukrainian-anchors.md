@@ -21,12 +21,15 @@ Target register: **warm, professional, peer-to-peer.** Neither overly formal (st
 ### Bad register — examples
 
 - Too cold / bureaucratic:
+
   > Надайте інформацію стосовно вашого досвіду роботи з базами даних.
 
 - Too casual:
+
   > Слухай, розкажи як ти з базами працював?
 
 - Too effusive:
+
   > Дуже-дуже дякую за вашу прекрасну відповідь! Ви просто чудово все розповіли!
 
 - Code-switched (avoid unless a technical term has no natural Ukrainian form):
@@ -83,33 +86,33 @@ The interviewer is warm but economical. Praise is brief, specific, and infrequen
 
 When a Ukrainian equivalent exists and reads naturally, we use it. Where it does not, the English term is acceptable. Mixing mid-sentence is avoided — if a paragraph uses an English term, it stays English for that term throughout.
 
-| English | Preferred Ukrainian | Notes |
-| --- | --- | --- |
-| API | API | Acronym; kept as-is |
-| framework | фреймворк | |
-| database | база даних | |
-| query | запит | |
-| index | індекс | |
-| transaction | транзакція | |
-| deadlock | взаємне блокування / deadlock | English often clearer in technical speech |
-| consistency | узгодженість / консистентність | Either acceptable; "консистентність" reads professional |
-| eventual consistency | eventual consistency | No natural Ukrainian form |
-| caching | кешування | |
-| queue | черга | |
-| event | подія | |
-| microservice | мікросервіс | |
-| monolith | моноліт | |
-| deployment | деплой / розгортання | |
-| rollback | відкат / rollback | Either acceptable |
-| dependency | залежність | |
-| refactor | рефакторинг | |
-| testing | тестування | |
-| unit test | юніт-тест | |
-| integration test | інтеграційний тест | |
-| fault tolerance | відмовостійкість | |
-| load balancer | балансувальник / load balancer | |
-| serverless | serverless | No natural Ukrainian form |
-| cloud provider | хмарний провайдер | |
+| English              | Preferred Ukrainian            | Notes                                                   |
+| -------------------- | ------------------------------ | ------------------------------------------------------- |
+| API                  | API                            | Acronym; kept as-is                                     |
+| framework            | фреймворк                      |                                                         |
+| database             | база даних                     |                                                         |
+| query                | запит                          |                                                         |
+| index                | індекс                         |                                                         |
+| transaction          | транзакція                     |                                                         |
+| deadlock             | взаємне блокування / deadlock  | English often clearer in technical speech               |
+| consistency          | узгодженість / консистентність | Either acceptable; "консистентність" reads professional |
+| eventual consistency | eventual consistency           | No natural Ukrainian form                               |
+| caching              | кешування                      |                                                         |
+| queue                | черга                          |                                                         |
+| event                | подія                          |                                                         |
+| microservice         | мікросервіс                    |                                                         |
+| monolith             | моноліт                        |                                                         |
+| deployment           | деплой / розгортання           |                                                         |
+| rollback             | відкат / rollback              | Either acceptable                                       |
+| dependency           | залежність                     |                                                         |
+| refactor             | рефакторинг                    |                                                         |
+| testing              | тестування                     |                                                         |
+| unit test            | юніт-тест                      |                                                         |
+| integration test     | інтеграційний тест             |                                                         |
+| fault tolerance      | відмовостійкість               |                                                         |
+| load balancer        | балансувальник / load balancer |                                                         |
+| serverless           | serverless                     | No natural Ukrainian form                               |
+| cloud provider       | хмарний провайдер              |                                                         |
 
 When uncertain, pick the form that the candidate themselves would likely use in a peer conversation.
 

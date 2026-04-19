@@ -25,15 +25,18 @@ Ramp decisions are human-initiated (no automated graduation at MVP). The slash c
 ## Consequences
 
 **Positive.**
+
 - Native GCP feature, no extra infrastructure.
 - Rollback is a single `gcloud run services update-traffic` call, typically completes in 30–60 seconds (constitution §19).
 - Previous revisions remain deployed for one week, giving time to investigate before auto-cleanup.
 - Same mechanism works for backend and frontend independently.
 
 **Negative.**
+
 - Cloud Run traffic splitting is at the **service** level, not per-request-attribute. We cannot route "Ukrainian users" vs "other users" to different revisions.
 - Sessions initiated on an old revision do not follow traffic shifts mid-session — they complete on their original revision. This is generally desirable but requires care on schema changes.
 
 **Mitigation.**
+
 - Per-session "stickiness" is explicit in our model: the session's `app_revision` column records which revision served it. Schema/contract changes must be backwards compatible within a rollback window.
 - Cleanup policy: revisions older than 7 days with 0% traffic are automatically deleted by a scheduled job.

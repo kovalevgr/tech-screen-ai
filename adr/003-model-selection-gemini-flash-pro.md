@@ -22,14 +22,17 @@ The A/B comparison with Claude Sonnet 4.6 on Ukrainian interview content is defe
 ## Consequences
 
 **Positive.**
+
 - Flash cost on Interviewer + Assessor keeps per-session spend at ~$0.15–0.30 (see constitution §12 budget model).
 - Pro on the Planner produces notably better seed question coverage than Flash in pilot tests.
 - One model family across three agents simplifies prompt engineering, context window assumptions, and observability.
 
 **Negative.**
+
 - Flash under-performs on nuanced Ukrainian grammar edge cases. Compensation: explicit `UKRAINIAN STYLE ANCHORS` section in prompts (constitution §11).
 - Gemini 2.5 Pro has higher TPS cost (~5× Flash) — but it runs once per session, not per turn, so absolute cost remains small.
 
 **Mitigation.**
+
 - Model name is a config value (`configs/models.yaml`), not a hard-coded constant. Swapping a model for a calibration test is a config change, not a code change.
 - Per-agent cost tracking (§12) surfaces regressions early.

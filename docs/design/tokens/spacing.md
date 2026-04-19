@@ -13,19 +13,19 @@ Calibrated against `docs/design/references/` — the Chat-iX references use the 
 
 ## Scale
 
-| Token | Value | Tailwind | Typical use |
-| --- | --- | --- | --- |
-| `space.0` | 0 px | `p-0` | Reset |
-| `space.1` | 4 px | `p-1` | Inline icon-to-text gap |
-| `space.2` | 8 px | `p-2` | Chip padding, tight stack |
-| `space.3` | 12 px | `p-3` | Compact buttons, dense rows |
-| `space.4` | 16 px | `p-4` | Default padding, paragraph gap |
-| `space.5` | 20 px | `p-5` | Form field spacing |
-| `space.6` | 24 px | `p-6` | Card padding, section gap |
-| `space.8` | 32 px | `p-8` | Panel padding |
-| `space.10` | 40 px | `p-10` | Large section gap |
-| `space.12` | 48 px | `p-12` | Hero / empty state padding |
-| `space.16` | 64 px | `p-16` | Page-level vertical rhythm |
+| Token      | Value | Tailwind | Typical use                    |
+| ---------- | ----- | -------- | ------------------------------ |
+| `space.0`  | 0 px  | `p-0`    | Reset                          |
+| `space.1`  | 4 px  | `p-1`    | Inline icon-to-text gap        |
+| `space.2`  | 8 px  | `p-2`    | Chip padding, tight stack      |
+| `space.3`  | 12 px | `p-3`    | Compact buttons, dense rows    |
+| `space.4`  | 16 px | `p-4`    | Default padding, paragraph gap |
+| `space.5`  | 20 px | `p-5`    | Form field spacing             |
+| `space.6`  | 24 px | `p-6`    | Card padding, section gap      |
+| `space.8`  | 32 px | `p-8`    | Panel padding                  |
+| `space.10` | 40 px | `p-10`   | Large section gap              |
+| `space.12` | 48 px | `p-12`   | Hero / empty state padding     |
+| `space.16` | 64 px | `p-16`   | Page-level vertical rhythm     |
 
 No half-steps, no `space.7`, no `space.11`. If something "almost fits" at 28 px, it fits at 24 or 32.
 

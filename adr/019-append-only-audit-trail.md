@@ -29,15 +29,18 @@ Effective scores are computed as "latest correction wins", not by updating the o
 ## Consequences
 
 **Positive.**
+
 - Constitution §3 enforced.
 - Full reconstructability: any historical decision can be explained step-by-step.
 - Calibration metrics (Assessor vs reviewer agreement) are always computable because both sides of the comparison are preserved.
 - Audit of reviewers themselves (how often they override, toward which direction) becomes possible — useful for reviewer training.
 
 **Negative.**
+
 - Storage grows monotonically. For MVP scale this is negligible; at scale we partition old rows or archive to cold storage.
 - Queries for "effective" values require window functions or materialised views rather than a simple select.
 
 **Mitigation.**
+
 - DB-level `REVOKE UPDATE, DELETE` on the application role for these tables. The database enforces the invariant, not just code discipline.
 - `vw_effective_assessment` materialised view exposes the "latest correction wins" view as a simple query interface.

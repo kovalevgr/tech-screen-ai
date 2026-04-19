@@ -20,7 +20,7 @@ Process:
 
 1. `/specify` and `/plan` are produced by the orchestrator Claude.
 2. `/plan` must label each task with an `agent:` field (e.g. `backend-engineer`, `frontend-engineer`, `prompt-engineer`, `reviewer`).
-3. Tasks that can run in parallel are explicitly marked `parallel: true` and grouped. The plan states *why* they are safe to run in parallel (typically: disjoint file sets + a committed contract — see constitution §14).
+3. Tasks that can run in parallel are explicitly marked `parallel: true` and grouped. The plan states _why_ they are safe to run in parallel (typically: disjoint file sets + a committed contract — see constitution §14).
 4. The human approves the plan before `/implement`.
 5. `/implement` refuses to fan out tasks not marked `parallel: true`.
 
@@ -35,13 +35,16 @@ Sub-agents defined for MVP:
 ## Consequences
 
 **Positive.**
+
 - Predictable, debuggable parallelism.
 - Cost of fan-out is visible at plan time, not a surprise mid-`implement`.
 - Sub-agent definitions let each one carry a focused system prompt — better quality per domain.
 
 **Negative.**
+
 - More ceremony than fully-automatic orchestration. A one-layer feature could skip all this and just run sequentially.
 
 **Mitigation.**
+
 - For one-layer changes, the plan is trivially small (one agent, no `parallel: true`) and this ADR imposes no measurable overhead.
 - Maturity phases (MVP → post-MVP → mature) are documented in `docs/multi-agent-workflow.md`. We can loosen explicitness once we have data.

@@ -33,7 +33,7 @@ Look in `configs/models.yaml`:
 
 ```yaml
 interviewer:
-  prompt_version: v0003   # active in prod
+  prompt_version: v0003 # active in prod
 ```
 
 The active version is the one pinned here, not the highest folder number. If they disagree, ask — a hanging draft folder is a sign of a half-finished PR.
@@ -70,19 +70,24 @@ Open the new folder and make the change. Some rules the reviewer will enforce:
 # <agent> <version> — notes
 
 ## What changed vs <previous version>
+
 - Bullet 1.
 - Bullet 2.
 
 ## Why
+
 - Motivation, in 1–3 sentences. Cite the calibration finding, the incident, the ADR, or the user feedback.
 
 ## Hypothesised behaviour change
+
 - What you expect calibration to show. Agreement up/down, red-flag recall up/down, specific failure mode reduced.
 
 ## Known risks
+
 - What could go wrong. What to watch for in the first 20 candidate sessions after promotion.
 
 ## Calibration delta
+
 - Filled after the calibration run. Reference the report path or PR comment.
 ```
 

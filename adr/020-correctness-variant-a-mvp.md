@@ -35,13 +35,16 @@ Variants B and C are on the roadmap (H1/H2) and will be enabled when:
 ## Consequences
 
 **Positive.**
+
 - Simple. Works day 1. No corpus, no extra models, no extra cost per turn.
 - Calibration data from reviewer overrides informs whether we need B/C at all.
 
 **Negative.**
+
 - Model hallucination risk: the Assessor might mark `wrong` things that are actually correct (false positive) or miss `wrong` things it hallucinated as correct (false negative).
 - Reviewer load is higher until the model's correctness calibration converges.
 
 **Mitigation.**
+
 - Reviewer UI surfaces `wrong` flags prominently with the model's rationale, making overrides fast.
 - Calibration dashboard tracks `FACTUALLY_WRONG` agreement specifically; if accuracy stalls, we escalate to Variant B.

@@ -38,14 +38,17 @@ A leak of any of these is at minimum an embarrassment, at worst a GDPR incident.
 ## Consequences
 
 **Positive.**
+
 - Zero long-lived credentials anywhere that can be committed, leaked, or improperly rotated.
 - WIF provides short-lived, per-run, auditable tokens for CI.
 - Alignment with constitution §5 and §6 (these ADRs ratify those principles).
 
 **Negative.**
+
 - WIF setup is non-obvious and requires a first-time bootstrap script (`infra/bootstrap.sh`).
 - Local developers need gcloud set up; curl-style scripts that hard-code a key will not work.
 
 **Mitigation.**
+
 - `infra/bootstrap.sh` is documented and idempotent.
 - Onboarding doc explains gcloud setup in < 5 steps.

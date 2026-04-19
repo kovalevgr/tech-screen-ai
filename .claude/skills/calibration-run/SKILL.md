@@ -104,12 +104,14 @@ The report is one markdown file, something like:
 
 ```markdown
 # Calibration — assessor v0004 vs rubric v7
+
 Run: 2026-04-19T15:02Z
 Dataset: 52 labelled turns
 
 ## Overall
-| Metric              | v0003 (prior) | v0004 (new) | Δ |
-|---------------------|---------------|-------------|---|
+
+| Metric              | v0003 (prior) | v0004 (new) | Δ     |
+| ------------------- | ------------- | ----------- | ----- |
 | Exact-match         | 0.62          | 0.68        | +0.06 |
 | Within-0.5          | 0.83          | 0.88        | +0.05 |
 | Red-flag precision  | 0.89          | 0.92        | +0.03 |
@@ -117,22 +119,26 @@ Dataset: 52 labelled turns
 | Over-confident rate | 0.14          | 0.09        | −0.05 |
 
 ## Per-competency
-| Competency                     | n  | exact | Δ     | bias  |
-|--------------------------------|----|-------|-------|-------|
-| python.concurrency             | 8  | 0.75  | +0.12 | −0.10 |
-| system-design.consistency      | 7  | 0.57  | +0.00 | +0.30 |
-| databases.transactions         | 6  | 0.83  | +0.16 | −0.00 |
-| distributed-systems.cap        | 5  | 0.40  | −0.20 | +0.40 |
-| ...                            |    |       |       |       |
+
+| Competency                | n   | exact | Δ     | bias  |
+| ------------------------- | --- | ----- | ----- | ----- |
+| python.concurrency        | 8   | 0.75  | +0.12 | −0.10 |
+| system-design.consistency | 7   | 0.57  | +0.00 | +0.30 |
+| databases.transactions    | 6   | 0.83  | +0.16 | −0.00 |
+| distributed-systems.cap   | 5   | 0.40  | −0.20 | +0.40 |
+| ...                       |     |       |       |       |
 
 ## Red flags
+
 Precision: 0.92. Recall: 0.79.
+
 - False positives (reported, labeller says no): 2
   - turn 0029 (system-design.caching) — Assessor flagged CONTRADICTION, labeller disagrees.
 - False negatives (not reported, labeller says yes): 5
   - turn 0017 (databases.indexing) — FACTUALLY_WRONG missed.
 
 ## Regressions to review
+
 - distributed-systems.cap — exact-match dropped 0.20. Five of five bias-positive (model rates higher than labeller). Worth reading before merge.
 ```
 

@@ -26,14 +26,17 @@ Assessor agent operates **on Ukrainian candidate text**, but its JSON output use
 ## Consequences
 
 **Positive.**
+
 - Best-of-both-worlds: stronger instruction-following from English systems, native Ukrainian candidate experience.
 - Engineering team reviews prompts in the language they work in.
 - Assessor JSON is stable across language changes.
 
 **Negative.**
+
 - Ukrainian exemplars must be maintained — if register or tone drifts, recruiters notice.
 - Model occasionally code-switches (inserts English words in Ukrainian output) — mitigated by anchors and a post-generation style check.
 
 **Mitigation.**
+
 - Ukrainian exemplars live in `prompts/shared/ukrainian-anchors.md` and are versioned per prompt release.
 - Language-consistency test runs on every prompt change: generates N sample outputs and asserts they are monolingually Ukrainian.

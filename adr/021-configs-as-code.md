@@ -34,14 +34,17 @@ The **source of truth** for rubrics, position templates, prompts, and feature fl
 ## Consequences
 
 **Positive.**
+
 - Every config change has a reviewable diff and an author.
 - Historical configurations can be checked out and replayed exactly.
 - Disaster recovery: if the DB is wiped, we re-seed from Git.
 
 **Negative.**
+
 - Two writes per UI edit (DB + Git PR) — more moving parts.
 - Non-engineers must trust a Git-backed workflow they cannot directly inspect.
 
 **Mitigation.**
+
 - The "export DB to PR" step is one button in the Admin UI and is explained in the Admin guide.
 - Config changes go through the same calibration loop as prompt changes — a config change that materially affects Assessor behaviour gets a calibration report in its PR.

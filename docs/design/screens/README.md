@@ -15,29 +15,29 @@ The prose spec is authoritative. Screenshots support the prose but never replace
 
 ### Candidate flow
 
-| ID | Name | Status |
-| --- | --- | --- |
-| `01-candidate-join` | Magic-link landing; consent, name confirmation, session start | stub |
-| `02-candidate-session` | Live session: dialogue pane, input, pause/help affordances | stub |
-| `03-candidate-completed` | End of session; short thank-you + explanation of next steps | stub |
+| ID                       | Name                                                          | Status |
+| ------------------------ | ------------------------------------------------------------- | ------ |
+| `01-candidate-join`      | Magic-link landing; consent, name confirmation, session start | stub   |
+| `02-candidate-session`   | Live session: dialogue pane, input, pause/help affordances    | stub   |
+| `03-candidate-completed` | End of session; short thank-you + explanation of next steps   | stub   |
 
 ### Recruiter flow
 
-| ID | Name | Status |
-| --- | --- | --- |
-| `10-recruiter-login` | Google Workspace SSO sign-in | stub |
-| `11-recruiter-dashboard` | List of sessions: filters, state chips, quick actions | stub |
-| `12-recruiter-plan-review` | Pre-interview plan review: approve / request adjustments before candidate joins | stub |
-| `13-recruiter-session-monitor` | Live monitor: read-only view of an in-progress session | stub |
-| `14-recruiter-session-review` | Post-session review: dialogue, assessments, corrections, audit | stub |
-| `15-recruiter-rubric-browser` | Read-only browser of rubric versions / snapshots | stub |
+| ID                             | Name                                                                            | Status |
+| ------------------------------ | ------------------------------------------------------------------------------- | ------ |
+| `10-recruiter-login`           | Google Workspace SSO sign-in                                                    | stub   |
+| `11-recruiter-dashboard`       | List of sessions: filters, state chips, quick actions                           | stub   |
+| `12-recruiter-plan-review`     | Pre-interview plan review: approve / request adjustments before candidate joins | stub   |
+| `13-recruiter-session-monitor` | Live monitor: read-only view of an in-progress session                          | stub   |
+| `14-recruiter-session-review`  | Post-session review: dialogue, assessments, corrections, audit                  | stub   |
+| `15-recruiter-rubric-browser`  | Read-only browser of rubric versions / snapshots                                | stub   |
 
 ### Admin (internal, behind feature flag)
 
-| ID | Name | Status |
-| --- | --- | --- |
-| `90-admin-flags` | Feature flag toggles | stub |
-| `91-admin-calibration` | Latest calibration report summary | stub |
+| ID                     | Name                              | Status |
+| ---------------------- | --------------------------------- | ------ |
+| `90-admin-flags`       | Feature flag toggles              | stub   |
+| `91-admin-calibration` | Latest calibration report summary | stub   |
 
 ---
 

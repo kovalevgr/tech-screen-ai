@@ -21,15 +21,18 @@ Index type: `IVFFlat` initially; upgrade to `HNSW` if recall or latency requires
 ## Consequences
 
 **Positive.**
+
 - One DB to manage, back up, monitor, migrate.
 - Joins between relational metadata and vector neighbours are a simple SQL query — no two-store coordination.
 - Cost at MVP scale is near zero — an extra column on an existing row.
 - Aligns with the "minimise moving parts" bias of a pre-PMF MVP.
 
 **Negative.**
+
 - pgvector is not a specialist vector engine. At ~100k+ vectors with high QPS we will hit recall/latency limits.
 - Some advanced reranking / hybrid search features require additional Postgres extensions or application-side logic.
 
 **Mitigation.**
+
 - The vector access code is isolated behind a `VectorStore` interface. Migrating to Pinecone or Qdrant later is a 2-day job of moving embeddings and swapping the interface implementation — not a rewrite.
 - Monitor recall@k and p95 latency on the RAG query; trigger migration when we cross preset thresholds.

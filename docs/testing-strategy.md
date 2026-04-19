@@ -22,10 +22,12 @@ Related: [ADR-009](../adr/009-prod-only-topology.md), [ADR-010](../adr/010-docke
 **What.** Pure-function and class-level tests in Python and TypeScript.
 
 **Scope.**
+
 - Backend: `app/backend/**/tests/`, one file per source file.
 - Frontend: co-located `*.test.tsx` next to the component.
 
 **Rules.**
+
 - No network. No DB. No Vertex.
 - Mocks only at the LLM boundary (`llm/*` module) or at the HTTP client boundary on the frontend (`msw`).
 - Fast: single test < 100ms. Full unit suite < 60s.
@@ -39,11 +41,13 @@ Related: [ADR-009](../adr/009-prod-only-topology.md), [ADR-010](../adr/010-docke
 **What.** Tests that exercise real side-effecting collaborators — Postgres, the Vertex mock, the file system, the feature flag service.
 
 **Scope.**
+
 - Repository queries against a real Postgres schema (applied via `alembic upgrade head`).
 - State-machine flows through multiple agents using `vertex-mock`.
 - Feature-flag-gated code paths with both flag states.
 
 **Rules.**
+
 - Runs inside `docker-compose.test.yml`. Postgres, vertex-mock, and the backend under test all live in that compose network.
 - Test isolation: each test either uses a transaction rolled back at teardown, or a dedicated schema created per test.
 - No shared mutable fixtures across tests.
@@ -57,10 +61,12 @@ Related: [ADR-009](../adr/009-prod-only-topology.md), [ADR-010](../adr/010-docke
 **What.** Tests that validate the OpenAPI spec matches backend behaviour AND that the frontend's generated client matches the OpenAPI spec.
 
 **Scope.**
+
 - Backend: for every endpoint, assert response conforms to the spec's schema (using `schemathesis` or equivalent).
 - Frontend: the generated client is regenerated in CI; a diff means the frontend PR forgot to regenerate.
 
 **Rules.**
+
 - OpenAPI spec is committed at `app/backend/openapi.yaml` (generated from FastAPI in CI).
 - Any PR that changes a route and forgets to update the spec fails the contract-drift check.
 
@@ -71,10 +77,12 @@ Related: [ADR-009](../adr/009-prod-only-topology.md), [ADR-010](../adr/010-docke
 **What.** Tests that replay a fixed set of candidate turns through the current prompt version and assert that the Assessor output matches a known-good fixture within tolerance.
 
 **Scope.**
+
 - Small curated set (~20 turns initially) spanning: strong answers, weak answers, off-topic, factually wrong, code-switched.
 - For each: the expected level ±1 and the expected red flags.
 
 **Rules.**
+
 - Does NOT call real Vertex. Uses `vertex-mock` with pre-recorded responses for each prompt hash.
 - Fails only on material drift — exact match is not required because fixtures are sample outputs, not the canonical truth.
 - Updating a fixture is a conscious PR act, not a rubber-stamp.
@@ -90,6 +98,7 @@ Related: [ADR-009](../adr/009-prod-only-topology.md), [ADR-010](../adr/010-docke
 **Scope.** Smoke paths, not exhaustive coverage. Target 5–8 scenarios that cover the critical path from a recruiter creating a session through a candidate completing one.
 
 **Rules.**
+
 - Runs in `docker-compose.test.yml` with backend + frontend + Postgres + vertex-mock all live.
 - Uses stable selectors (`data-testid`), not Tailwind classes or XPath.
 - Screenshots captured on failure, attached to CI output.
@@ -103,11 +112,13 @@ Related: [ADR-009](../adr/009-prod-only-topology.md), [ADR-010](../adr/010-docke
 **What.** Compare Assessor output on a labelled dataset against human ground-truth scores. Produces agreement metrics.
 
 **Scope.**
+
 - Dataset: ~50 labelled turns at MVP start, growing as reviewers produce corrections.
 - Metrics per competency: exact match %, within-0.5 %, systematic bias (mean signed error).
 - Metrics overall: rates of `FACTUALLY_WRONG` agreement, `RED_FLAG` precision/recall.
 
 **Rules.**
+
 - Warning only. Never blocks merge. Constitution §13.
 - Report posted as a PR comment with trend vs previous run.
 - Baseline is the previous version's metric, not an absolute target — regressions are relative.
@@ -123,11 +134,13 @@ Related: [ADR-009](../adr/009-prod-only-topology.md), [ADR-010](../adr/010-docke
 **What.** A minimal suite that runs against a Cloud Run revision receiving 0% traffic, before any user sees it.
 
 **Scope.**
+
 - Authenticated health check.
 - A single synthetic session start + one candidate turn + assessment produced.
 - Feature flag table read. Secret Manager secret read.
 
 **Rules.**
+
 - Runs via `/deploy` after the new revision is up.
 - Takes < 60s.
 - Failure blocks `/promote 10`.

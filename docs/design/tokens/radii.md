@@ -8,15 +8,15 @@ The scale is calibrated against the Chat-iX reference (`docs/design/references/`
 
 ## Scale
 
-| Token | Value | Tailwind | Use |
-| --- | --- | --- | --- |
-| `radius.none` | 0 px | `rounded-none` | Full-bleed dividers, table rows, never interactive |
-| `radius.xs` | 2 px | `rounded-[2px]` | Inline tags, key-cap shapes |
-| `radius.sm` | 4 px | `rounded-sm` | Checkboxes, small chips, inline code |
-| `radius.md` | 6 px | `rounded-md` | Buttons, inputs, dropdowns, small cards (default) |
-| `radius.lg` | 10 px | `rounded-lg` | Cards, panels, popovers |
-| `radius.xl` | 14 px | `rounded-xl` | Modal dialogs only |
-| `radius.pill` | 9999 px | `rounded-full` | Status pills, avatars, primary CTA when icon-only |
+| Token         | Value   | Tailwind        | Use                                                |
+| ------------- | ------- | --------------- | -------------------------------------------------- |
+| `radius.none` | 0 px    | `rounded-none`  | Full-bleed dividers, table rows, never interactive |
+| `radius.xs`   | 2 px    | `rounded-[2px]` | Inline tags, key-cap shapes                        |
+| `radius.sm`   | 4 px    | `rounded-sm`    | Checkboxes, small chips, inline code               |
+| `radius.md`   | 6 px    | `rounded-md`    | Buttons, inputs, dropdowns, small cards (default)  |
+| `radius.lg`   | 10 px   | `rounded-lg`    | Cards, panels, popovers                            |
+| `radius.xl`   | 14 px   | `rounded-xl`    | Modal dialogs only                                 |
+| `radius.pill` | 9999 px | `rounded-full`  | Status pills, avatars, primary CTA when icon-only  |
 
 No `rounded-2xl`. No custom `rounded-[14px]` outside this table — `radius.xl` is exactly 14 px. If a spec calls for something between, pick the nearest token.
 

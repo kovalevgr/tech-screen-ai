@@ -40,14 +40,14 @@ The Admin UI is **read-only** for rubric content (constitution §16, ADR-021). P
 
 ```yaml
 # configs/rubric/python.yaml
-version: 7                         # bumped whenever this file changes
-retired: false                     # retire whole areas by flipping this
+version: 7 # bumped whenever this file changes
+retired: false # retire whole areas by flipping this
 nodes:
-  - id: python.concurrency         # STABLE identifier; never rename, never reuse after retire
+  - id: python.concurrency # STABLE identifier; never rename, never reuse after retire
     label_uk: "Конкурентність у Python"
     label_en: "Python concurrency"
     retired: false
-    parent: null                   # top-level node in this area
+    parent: null # top-level node in this area
     levels:
       - level: 1
         label_uk: "Початковий"
@@ -168,15 +168,18 @@ Write `configs/rubric/notes/<new-version>.md`:
 # rubric v<N+1> — notes
 
 ## Change list
+
 - added python.async (4 levels).
 - revised system-design.consistency L3 descriptor.
 - retired python.generators-and-iterators (subsumed into python.async).
 
 ## Why
+
 - Calibration showed L3 descriptor was ambiguous — reviewers disagreed on 40 % of L3 calls.
 - python.async request came from the senior-role interviewer template.
 
 ## Impact on in-flight sessions
+
 - None. Existing sessions keep `rubric_snapshot: v<N>`.
 - New sessions created after this merge use v<N+1>.
 ```

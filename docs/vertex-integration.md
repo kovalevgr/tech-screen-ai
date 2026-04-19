@@ -91,12 +91,12 @@ The adapter does **not** own:
 
 The adapter retries on this set of errors only:
 
-| Error | Retries | Backoff |
-| --- | --- | --- |
-| `google.api_core.exceptions.ServiceUnavailable` | 3 | 0.5s, 1s, 2s (jittered) |
-| `google.api_core.exceptions.DeadlineExceeded` | 1 | 2s |
-| `google.api_core.exceptions.ResourceExhausted` | 2 | 4s, 8s |
-| Connection errors / timeouts at the HTTP layer | 3 | 0.5s, 1s, 2s |
+| Error                                           | Retries | Backoff                 |
+| ----------------------------------------------- | ------- | ----------------------- |
+| `google.api_core.exceptions.ServiceUnavailable` | 3       | 0.5s, 1s, 2s (jittered) |
+| `google.api_core.exceptions.DeadlineExceeded`   | 1       | 2s                      |
+| `google.api_core.exceptions.ResourceExhausted`  | 2       | 4s, 8s                  |
+| Connection errors / timeouts at the HTTP layer  | 3       | 0.5s, 1s, 2s            |
 
 The adapter does **not** retry on:
 

@@ -1,6 +1,6 @@
 # Assessor — level prompting guide — v0001
 
-Levels are defined by the rubric node's explicit L1–L4 descriptors. This guide tells you how to *interpret* those descriptors consistently.
+Levels are defined by the rubric node's explicit L1–L4 descriptors. This guide tells you how to _interpret_ those descriptors consistently.
 
 ---
 

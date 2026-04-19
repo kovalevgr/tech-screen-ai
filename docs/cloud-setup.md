@@ -16,20 +16,20 @@ Related: [ADR-009](../adr/009-prod-only-topology.md), [ADR-012](../adr/012-cloud
 
 ## Resource inventory
 
-| Resource | Purpose | Size / tier |
-| --- | --- | --- |
-| Cloud Run service `techscreen-backend` | FastAPI API | min 0, max 5 instances, 1 vCPU / 1 GiB |
-| Cloud Run service `techscreen-frontend` | Next.js SSR | min 0, max 5 instances, 1 vCPU / 1 GiB |
-| Cloud SQL Postgres 15 instance `techscreen-pg` | App DB + pgvector | `db-f1-micro`, 10 GB SSD, PITR on |
-| Cloud SQL database `techscreen` | Application schema | |
-| Cloud SQL database `techscreen_shadow` | Alembic autogenerate target | |
-| Secret Manager | All secrets (DB URL, magic-link signing key, etc.) | |
-| Artifact Registry `techscreen` | Docker images for both services | `europe-west1` |
-| Cloud Storage bucket `<project>-tfstate` | Terraform remote state | versioned, 30-day lifecycle |
-| Cloud Storage bucket `<project>-techscreen-assets` | Generated artefacts, exports | Standard, versioning off |
-| Cloud Monitoring workspace | Dashboards, alert policies | |
-| Cloud Logging | All services | 30-day retention |
-| IAM Workload Identity Pool `github-actions` | CI auth via OIDC | |
+| Resource                                           | Purpose                                            | Size / tier                            |
+| -------------------------------------------------- | -------------------------------------------------- | -------------------------------------- |
+| Cloud Run service `techscreen-backend`             | FastAPI API                                        | min 0, max 5 instances, 1 vCPU / 1 GiB |
+| Cloud Run service `techscreen-frontend`            | Next.js SSR                                        | min 0, max 5 instances, 1 vCPU / 1 GiB |
+| Cloud SQL Postgres 15 instance `techscreen-pg`     | App DB + pgvector                                  | `db-f1-micro`, 10 GB SSD, PITR on      |
+| Cloud SQL database `techscreen`                    | Application schema                                 |                                        |
+| Cloud SQL database `techscreen_shadow`             | Alembic autogenerate target                        |                                        |
+| Secret Manager                                     | All secrets (DB URL, magic-link signing key, etc.) |                                        |
+| Artifact Registry `techscreen`                     | Docker images for both services                    | `europe-west1`                         |
+| Cloud Storage bucket `<project>-tfstate`           | Terraform remote state                             | versioned, 30-day lifecycle            |
+| Cloud Storage bucket `<project>-techscreen-assets` | Generated artefacts, exports                       | Standard, versioning off               |
+| Cloud Monitoring workspace                         | Dashboards, alert policies                         |                                        |
+| Cloud Logging                                      | All services                                       | 30-day retention                       |
+| IAM Workload Identity Pool `github-actions`        | CI auth via OIDC                                   |                                        |
 
 Vertex AI is accessed as a managed API (no dedicated resource is provisioned).
 
@@ -39,15 +39,15 @@ Vertex AI is accessed as a managed API (no dedicated resource is provisioned).
 
 For the MVP pilot volume (≤ 50 completed sessions / month):
 
-| Line item | Approx USD/mo |
-| --- | --- |
-| Cloud Run (both services, mostly idle) | $2 |
-| Cloud SQL `db-f1-micro` + 10 GB + PITR | $9 |
-| Artifact Registry storage | negligible |
-| Cloud Storage (state + assets) | < $1 |
-| Secret Manager | < $1 |
-| Vertex AI (Gemini 2.5 Flash/Pro) | $4 – $10 |
-| Total | **~$20 – $25** |
+| Line item                              | Approx USD/mo  |
+| -------------------------------------- | -------------- |
+| Cloud Run (both services, mostly idle) | $2             |
+| Cloud SQL `db-f1-micro` + 10 GB + PITR | $9             |
+| Artifact Registry storage              | negligible     |
+| Cloud Storage (state + assets)         | < $1           |
+| Secret Manager                         | < $1           |
+| Vertex AI (Gemini 2.5 Flash/Pro)       | $4 – $10       |
+| Total                                  | **~$20 – $25** |
 
 Monthly budget alert at $50 (constitution §12). Alerts at 50 / 90 / 100 % of budget fire to the ops inbox.
 
@@ -146,13 +146,13 @@ No JSON keys for any service account. Ever. See ADR-013 and the anti-pattern ent
 
 ## Secret Manager inventory
 
-| Secret | Owner | Consumer | Notes |
-| --- | --- | --- | --- |
-| `DATABASE_URL` | infra | backend | `postgres://` with `techscreen` user |
-| `MAGIC_LINK_SIGNING_KEY` | backend | backend | HMAC key for candidate magic links |
-| `SESSION_COOKIE_SECRET` | backend | backend | Signs internal SSO session cookies |
-| `SENDGRID_API_KEY` | infra | backend | Transactional email |
-| `CALIBRATION_DATASET_KEY` | ops | calibration-run | Optional, if the dataset is encrypted at rest |
+| Secret                    | Owner   | Consumer        | Notes                                         |
+| ------------------------- | ------- | --------------- | --------------------------------------------- |
+| `DATABASE_URL`            | infra   | backend         | `postgres://` with `techscreen` user          |
+| `MAGIC_LINK_SIGNING_KEY`  | backend | backend         | HMAC key for candidate magic links            |
+| `SESSION_COOKIE_SECRET`   | backend | backend         | Signs internal SSO session cookies            |
+| `SENDGRID_API_KEY`        | infra   | backend         | Transactional email                           |
+| `CALIBRATION_DATASET_KEY` | ops     | calibration-run | Optional, if the dataset is encrypted at rest |
 
 Adding a secret:
 
@@ -195,13 +195,13 @@ MVP keeps it simple:
 
 ### Alerts
 
-| Alert | Condition | Route |
-| --- | --- | --- |
-| Error rate high | > 2% of requests for 10 min | ops email |
-| LLM latency p95 high | > 10s for 10 min | ops email |
-| Cloud SQL connection pool exhaustion | > 80% utilisation for 5 min | ops email |
-| Budget 90% | GCP Billing alert | ops email |
-| Any rollback executed | log-based alert on deploy audit row | ops email |
+| Alert                                | Condition                           | Route     |
+| ------------------------------------ | ----------------------------------- | --------- |
+| Error rate high                      | > 2% of requests for 10 min         | ops email |
+| LLM latency p95 high                 | > 10s for 10 min                    | ops email |
+| Cloud SQL connection pool exhaustion | > 80% utilisation for 5 min         | ops email |
+| Budget 90%                           | GCP Billing alert                   | ops email |
+| Any rollback executed                | log-based alert on deploy audit row | ops email |
 
 Dashboards live under `Cloud Monitoring → Dashboards → TechScreen`. The Terraform module `monitoring.tf` creates them.
 

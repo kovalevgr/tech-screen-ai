@@ -23,13 +23,13 @@ What sub-agents do **not** give us: magic coordination. The human is still the d
 
 All sub-agents are defined in [`.claude/agents/`](../.claude/agents/). Each is a single Markdown file with frontmatter describing the agent's role, allowed tools, and system prompt.
 
-| Agent | Scope | Allowed to edit |
-| --- | --- | --- |
-| `backend-engineer` | FastAPI, SQLAlchemy, Alembic, Pydantic, Vertex adapter, agent module code | `app/backend/**`, `alembic/**`, `configs/**` (service-level), tests under `app/backend/tests/**` |
-| `frontend-engineer` | Next.js App Router, shadcn/ui, Tailwind, design system, React Query, OpenAPI client | `app/frontend/**` |
-| `infra-engineer` | Terraform, Docker, Cloud Run, GCP IAM, GitHub Actions | `infra/**`, `.github/workflows/**`, `Dockerfile*`, `docker-compose*.yml` |
-| `prompt-engineer` | Agent system prompts, rubric YAML, calibration datasets | `prompts/**`, `configs/rubric/**`, `calibration/**` |
-| `reviewer` | Read-only. Validates constitution, secrets scan, test coverage, migration safety before merge | none (comments only) |
+| Agent               | Scope                                                                                         | Allowed to edit                                                                                  |
+| ------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `backend-engineer`  | FastAPI, SQLAlchemy, Alembic, Pydantic, Vertex adapter, agent module code                     | `app/backend/**`, `alembic/**`, `configs/**` (service-level), tests under `app/backend/tests/**` |
+| `frontend-engineer` | Next.js App Router, shadcn/ui, Tailwind, design system, React Query, OpenAPI client           | `app/frontend/**`                                                                                |
+| `infra-engineer`    | Terraform, Docker, Cloud Run, GCP IAM, GitHub Actions                                         | `infra/**`, `.github/workflows/**`, `Dockerfile*`, `docker-compose*.yml`                         |
+| `prompt-engineer`   | Agent system prompts, rubric YAML, calibration datasets                                       | `prompts/**`, `configs/rubric/**`, `calibration/**`                                              |
+| `reviewer`          | Read-only. Validates constitution, secrets scan, test coverage, migration safety before merge | none (comments only)                                                                             |
 
 Each agent loads `CLAUDE.md`, the constitution, and the ADRs on boot. Each agent also reads its layer's specific reference doc (e.g., `coding-conventions.md` for backend/frontend, `vertex-integration.md` for backend touching LLM code, `prompt-engineering-playbook.md` for the prompt-engineer).
 
@@ -88,16 +88,19 @@ A `plan.md` that enables fan-out looks like this (excerpt):
 ## Tasks
 
 ### Group A (contract) — sequential, main orchestrator
+
 - A1 — Update OpenAPI spec `app/backend/openapi.yaml` to add `POST /sessions/{id}/pause`.
 - A2 — Regenerate frontend client.
 - A3 — Commit the contract.
 
 ### Group B (implementation) — parallel: true
+
 - B1 — agent: backend-engineer — implement route, service, repository changes. Add integration test.
 - B2 — agent: frontend-engineer — implement the `PauseButton` component and wire up the new mutation. Add component test.
 - B3 — agent: infra-engineer — no-op for this change (omitted).
 
 ### Group C (verification) — sequential, main orchestrator
+
 - C1 — Run docker-compose.test.yml end-to-end.
 - C2 — Request reviewer agent pass on the combined diff.
 ```

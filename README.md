@@ -80,18 +80,18 @@ docker compose -f docker-compose.test.yml up --abort-on-container-exit
 
 Start here before making a non-trivial change.
 
-| Document | Purpose |
-| --- | --- |
-| [`.specify/memory/constitution.md`](./.specify/memory/constitution.md) | Project invariants. Never violate. |
-| [`CLAUDE.md`](./CLAUDE.md) | How to work in this repo with AI assistance. |
-| [`docs/mvp-scope.docx`](./docs/mvp-scope.docx) | What ships in the MVP. |
-| [`docs/architecture.docx`](./docs/architecture.docx) | System architecture, data flow, component diagram. |
-| [`docs/data-model.docx`](./docs/data-model.docx) | Database schema, key invariants, table-by-table reference. |
-| [`docs/agents.docx`](./docs/agents.docx) | Interviewer / Assessor / Planner agent contracts. |
-| [`docs/assessment-methodology.docx`](./docs/assessment-methodology.docx) | Rubric, scoring, correctness approach, calibration loop. |
-| [`docs/roadmap.docx`](./docs/roadmap.docx) | Horizon-1/2/3 plan and deferred features. |
-| [`docs/design/README.md`](./docs/design/README.md) | Design system and per-screen specs. |
-| [`adr/`](./adr/) | Every architectural decision with context and consequences. |
+| Document                                                                 | Purpose                                                     |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| [`.specify/memory/constitution.md`](./.specify/memory/constitution.md)   | Project invariants. Never violate.                          |
+| [`CLAUDE.md`](./CLAUDE.md)                                               | How to work in this repo with AI assistance.                |
+| [`docs/mvp-scope.docx`](./docs/mvp-scope.docx)                           | What ships in the MVP.                                      |
+| [`docs/architecture.docx`](./docs/architecture.docx)                     | System architecture, data flow, component diagram.          |
+| [`docs/data-model.docx`](./docs/data-model.docx)                         | Database schema, key invariants, table-by-table reference.  |
+| [`docs/agents.docx`](./docs/agents.docx)                                 | Interviewer / Assessor / Planner agent contracts.           |
+| [`docs/assessment-methodology.docx`](./docs/assessment-methodology.docx) | Rubric, scoring, correctness approach, calibration loop.    |
+| [`docs/roadmap.docx`](./docs/roadmap.docx)                               | Horizon-1/2/3 plan and deferred features.                   |
+| [`docs/design/README.md`](./docs/design/README.md)                       | Design system and per-screen specs.                         |
+| [`adr/`](./adr/)                                                         | Every architectural decision with context and consequences. |
 
 ## How work happens here
 

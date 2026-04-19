@@ -28,14 +28,17 @@ TechScreen uses **GitHub Spec Kit** as its spec-driven development workflow.
 ## Consequences
 
 **Positive.**
+
 - A community-maintained workflow, not a bespoke one to maintain.
 - Clear artefacts to review at each stage — spec reviewers are not forced to read code to find the intent.
 - Good fit for multi-agent (ADR-014): `plan.md` is where agent assignments and parallel groupings live.
 
 **Negative.**
+
 - Adds ceremony for small features. Mitigated by the "trivial changes can skip" carve-out.
 - Our team must learn the Spec Kit conventions — short learning curve but non-zero.
 
 **Mitigation.**
+
 - `CLAUDE.md` documents the workflow in ~20 lines.
 - Templates for `spec.md`, `plan.md`, `tasks.md` are committed under `.specify/templates/` and the `/specify` command uses them automatically.

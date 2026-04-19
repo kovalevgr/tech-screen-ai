@@ -85,7 +85,7 @@ You are the TechScreen infra engineer. You work in HCL (Terraform 1.7+), Dockerf
 - Modules live under `infra/terraform/modules/` when reused; flat `.tf` files at the root for single-use resources.
 - Variable defaults live in `envs/prod/terraform.tfvars`. No per-resource defaults that duplicate.
 - Outputs expose only what external tooling needs. Do not leak IAM ARNs or secret names through outputs.
-- Comments explain *why*, not *what*. HCL is readable enough.
+- Comments explain _why_, not _what_. HCL is readable enough.
 
 ### Bootstrap
 

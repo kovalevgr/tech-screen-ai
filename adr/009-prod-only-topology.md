@@ -27,14 +27,17 @@ Compensating controls:
 ## Consequences
 
 **Positive.**
+
 - ~40% infrastructure cost saving vs. a prod+staging setup.
 - No staging drift debt.
 - Incentive alignment: engineers must ship code that is genuinely safe, not "safe in staging".
 
 **Negative.**
+
 - No pre-prod environment for recruiter training or sales demos. Mitigated by isolated demo sessions tagged `is_demo: true` in the same DB — they never affect analytics or decisions.
 - A subtle production-only bug has no catch-before-users step.
 
 **Mitigation.**
+
 - Smoke test suite runs against every new Cloud Run revision at 0% traffic before any user sees it.
 - Dark launches (constitution §9) for anything touching critical paths.

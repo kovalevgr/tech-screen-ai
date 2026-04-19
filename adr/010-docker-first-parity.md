@@ -20,15 +20,18 @@ Every service runs in Docker. The dev environment is `docker-compose.yml`. The C
 ## Consequences
 
 **Positive.**
+
 - A passing local test that fails in CI is a bug, not an environment issue — the pipelines are byte-identical.
 - New engineers have a one-command onboarding: `docker compose up`.
 - No "works on my machine" class of incidents.
 - Makes ADR-009 (no staging) tolerable.
 
 **Negative.**
+
 - Slower iteration on platforms with poor Docker performance (notoriously macOS on Apple Silicon with old Docker Desktop).
 - Multi-stage builds require more Dockerfile discipline than quick hacks allow.
 
 **Mitigation.**
+
 - Documented recommendations in `docs/dev-environment.md` for macOS users (VirtioFS, cache volumes, etc.).
 - The `dev` Dockerfile target is tuned for fast rebuilds (BuildKit cache mounts, layered dependency install).

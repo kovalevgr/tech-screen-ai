@@ -22,16 +22,16 @@ font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
 ## Scale
 
-| Token | Size | Line height | Use |
-| --- | --- | --- | --- |
-| `text.display` | 32 px | 40 px | Dashboard headline, session title, empty-state hero (the "IT is AI" treatment in `docs/design/references/hellow_page.png`, rendered in `brand.primary` + `font.bold`) |
-| `text.headline` | 24 px | 32 px | Section headers |
-| `text.title` | 20 px | 28 px | Card titles, panel headers |
-| `text.subtitle` | 18 px | 26 px | Sub-section labels, prominent list titles |
-| `text.body` | 16 px | 24 px | Primary reading size, candidate-facing |
-| `text.body-dense` | 14 px | 20 px | Recruiter tables, dense panels |
-| `text.caption` | 13 px | 18 px | Metadata, timestamps, secondary labels |
-| `text.small` | 12 px | 16 px | Chips, badges, tiny meta |
+| Token             | Size  | Line height | Use                                                                                                                                                                   |
+| ----------------- | ----- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `text.display`    | 32 px | 40 px       | Dashboard headline, session title, empty-state hero (the "IT is AI" treatment in `docs/design/references/hellow_page.png`, rendered in `brand.primary` + `font.bold`) |
+| `text.headline`   | 24 px | 32 px       | Section headers                                                                                                                                                       |
+| `text.title`      | 20 px | 28 px       | Card titles, panel headers                                                                                                                                            |
+| `text.subtitle`   | 18 px | 26 px       | Sub-section labels, prominent list titles                                                                                                                             |
+| `text.body`       | 16 px | 24 px       | Primary reading size, candidate-facing                                                                                                                                |
+| `text.body-dense` | 14 px | 20 px       | Recruiter tables, dense panels                                                                                                                                        |
+| `text.caption`    | 13 px | 18 px       | Metadata, timestamps, secondary labels                                                                                                                                |
+| `text.small`      | 12 px | 16 px       | Chips, badges, tiny meta                                                                                                                                              |
 
 Candidate screens use `text.body` as the minimum. Recruiter screens may use `text.body-dense`. Never below `text.caption` in body copy.
 
@@ -39,12 +39,12 @@ Candidate screens use `text.body` as the minimum. Recruiter screens may use `tex
 
 ## Weights
 
-| Token | Value | Use |
-| --- | --- | --- |
-| `font.regular` | 400 | Body |
-| `font.medium` | 500 | Labels, emphasis within body |
-| `font.semibold` | 600 | Titles, CTAs |
-| `font.bold` | 700 | Rare — display only |
+| Token           | Value | Use                          |
+| --------------- | ----- | ---------------------------- |
+| `font.regular`  | 400   | Body                         |
+| `font.medium`   | 500   | Labels, emphasis within body |
+| `font.semibold` | 600   | Titles, CTAs                 |
+| `font.bold`     | 700   | Rare — display only          |
 
 Italic is reserved for Ukrainian quotations and citations. We do not italicise for emphasis; use weight instead.
 

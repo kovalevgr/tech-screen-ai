@@ -199,13 +199,13 @@ For five minutes after `/promote 100`, the operator:
 
 ## When things go wrong mid-promote
 
-| Symptom | Action |
-| --- | --- |
-| Error rate spikes at 10% | `/rollback` immediately. Do not investigate first — the spike is the signal. |
-| p95 latency up, error rate flat | Hold at current %, investigate. Rollback if unresolved in 10 minutes. |
-| LLM cost per session doubled | Hold at 10%, check for a prompt regression. Rollback if confirmed. |
-| Smoke passed but a specific feature broken | `/rollback`. File issue. Do not try to hotfix under traffic. |
-| Candidate session stuck in `SESSION_PAUSED_UPSTREAM` | Check Vertex status dashboard. If Vertex is fine, rollback. |
+| Symptom                                              | Action                                                                       |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Error rate spikes at 10%                             | `/rollback` immediately. Do not investigate first — the spike is the signal. |
+| p95 latency up, error rate flat                      | Hold at current %, investigate. Rollback if unresolved in 10 minutes.        |
+| LLM cost per session doubled                         | Hold at 10%, check for a prompt regression. Rollback if confirmed.           |
+| Smoke passed but a specific feature broken           | `/rollback`. File issue. Do not try to hotfix under traffic.                 |
+| Candidate session stuck in `SESSION_PAUSED_UPSTREAM` | Check Vertex status dashboard. If Vertex is fine, rollback.                  |
 
 The rule: **if in doubt, rollback.** Rollback is a minute; a bad hour under traffic is data loss and candidate-trust loss.
 

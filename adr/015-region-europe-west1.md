@@ -26,12 +26,15 @@ Shortlisted regions:
 ## Consequences
 
 **Positive.**
+
 - ~10–15% ongoing savings on infra vs. central2.
 - Broadest GCP service catalogue — future needs (e.g. Cloud Scheduler, Pub/Sub, Cloud Tasks) are guaranteed available.
 
 **Negative.**
+
 - Text-to-text interview latency includes ~50–70 ms of RTT vs. ~20–30 ms from central2. Imperceptible for text; **potentially material for voice** (Roadmap H2).
 
 **Mitigation.**
+
 - When we reach voice trials, we re-evaluate this ADR. Migrating Cloud SQL and Cloud Run to a new region is a maintenance window of a few hours — not a rewrite.
 - Vertex AI endpoints can be called from different regions if voice work ends up hosted elsewhere, keeping regional decisions decoupled per service.
