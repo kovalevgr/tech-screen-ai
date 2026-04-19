@@ -158,9 +158,6 @@ Rollback: one command — `/rollback` — shifts traffic back to the previous Cl
 
 There is no staging environment — see constitution §8. Full runbook lives in [`docs/engineering/deploy-playbook.md`](./docs/engineering/deploy-playbook.md).
 
-## Licensing and ownership
-
-Internal N-iX project. Not for external distribution.
 
 ## Contact
 
