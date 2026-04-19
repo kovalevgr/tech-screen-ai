@@ -35,11 +35,48 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 
 **Entry criteria:** GCP project + billing approved · GitHub repo created · Google Workspace SSO group ready · Ihor available for one-off bootstraps.
 
+### T00 — Initialize Spec Kit scaffolding
+
+- **agent:** `human` (Ihor — local CLI on his Mac; sandbox has no PyPI/GitHub egress)
+- **parallel:** false (pre-flight; every later task assumes `/specify`, `/plan`, `/tasks`, `/implement` exist)
+- **depends_on:** []
+- **contract:** none
+- **description:**
+  [`CLAUDE.md`](../../CLAUDE.md) and [ADR-017](../../adr/017-spec-driven-github-spec-kit.md) declare Spec Kit as the workflow, but the scaffolding is not in the repo yet. Today only `.specify/memory/constitution.md` exists; the templates, helper scripts, and Claude slash commands do not. This task commits them.
+
+  **One-time, by one person.** The init output is committed to the repo — every other developer just `git pull`s and has `/specify`, `/plan`, `/tasks`, `/implement` available in Claude Code. Do not re-run `specify init` on a clone that already has `.specify/templates/` and `.claude/commands/` populated: `--force` would overwrite the hand-authored constitution and any slash-command customisations. Re-init only as a deliberate upgrade, via a new task `T00-v2` with its own PR.
+
+  The hand-authored `.specify/memory/constitution.md` must be preserved byte-for-byte — `specify init` does not overwrite an existing constitution, but verify with `git diff` before committing.
+
+  Run on the Mac (sandbox is offline to PyPI / GitHub):
+
+  ```bash
+  uvx --from git+https://github.com/github/spec-kit.git specify init --here --ai claude --force
+  ```
+
+  Expected scaffolding after the run:
+  - `.specify/templates/` — `spec-template.md`, `plan-template.md`, `tasks-template.md`, `agent-file-template.md`.
+  - `.specify/scripts/bash/` — helpers invoked by the slash commands (`create-new-feature.sh`, `check-prerequisites.sh`, `setup-plan.sh`, …).
+  - `.claude/commands/` — slash command definitions: `specify.md`, `plan.md`, `tasks.md`, `implement.md`, `clarify.md`, `analyze.md`, `constitution.md`.
+
+  Existing assets that must remain untouched: `.specify/memory/constitution.md`, every file under `.claude/agents/`, every file under `.claude/skills/`. If the init touches any of them, revert that hunk before commit.
+
+  Commit as a separate PR titled `chore: initialize spec kit scaffolding`. No production code in the same PR.
+
+- **acceptance:**
+  - `.specify/templates/` contains at minimum `spec-template.md`, `plan-template.md`, `tasks-template.md`.
+  - `.specify/scripts/bash/` contains at least one helper (e.g. `create-new-feature.sh`).
+  - `.claude/commands/` contains at minimum `specify.md`, `plan.md`, `tasks.md`, `implement.md`.
+  - `.specify/memory/constitution.md` is byte-identical to its pre-init version (`git diff --exit-code`).
+  - `.claude/agents/*` and `.claude/skills/*` are byte-identical to their pre-init versions.
+  - In a fresh Claude Code session inside the repo, `/specify foo bar` is recognised as a slash command (not echoed as plain text).
+- **references:** [`CLAUDE.md`](../../CLAUDE.md) §"How work happens here (Spec Kit)", [ADR-017](../../adr/017-spec-driven-github-spec-kit.md), constitution §17
+
 ### T01 — Monorepo layout + tooling baseline
 
 - **agent:** `orchestrator`
 - **parallel:** false (seeds everything else)
-- **depends_on:** []
+- **depends_on:** [T00]
 - **contract:** none
 - **description:**
   Create `app/backend/`, `app/frontend/`, `alembic/`, `configs/`, `prompts/`, `infra/terraform/`, `docs/`, `.github/workflows/`, `evals/` folders. Commit `.pre-commit-config.yaml` (already in repo) and install hooks. Configure `pyproject.toml` for ruff + mypy; `app/frontend/package.json` for pnpm + eslint + prettier + tsc.
