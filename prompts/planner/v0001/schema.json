@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://techscreen.nix.internal/schemas/planner-output.v1.json",
+  "title": "PlannerOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "plan_version_seed",
+    "expected_minutes",
+    "competencies"
+  ],
+  "properties": {
+    "plan_version_seed": {
+      "type": "string",
+      "const": "planner-v0001"
+    },
+    "expected_minutes": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 90
+    },
+    "competencies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rubric_node_id",
+          "target_level",
+          "minute_budget",
+          "seed_questions"
+        ],
+        "properties": {
+          "rubric_node_id": {
+            "type": "string"
+          },
+          "target_level": {
+            "type": "integer",
+            "enum": [1, 2, 3, 4]
+          },
+          "minute_budget": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 20
+          },
+          "seed_questions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "text_uk", "level"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^q[0-9]+$"
+                },
+                "text_uk": {
+                  "type": "string",
+                  "minLength": 10,
+                  "maxLength": 500
+                },
+                "level": {
+                  "type": "integer",
+                  "enum": [1, 2, 3, 4]
+                },
+                "depth_probes": {
+                  "type": "array",
+                  "maxItems": 2,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["if_candidate_mentions", "follow_up_uk"],
+                    "properties": {
+                      "if_candidate_mentions": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 6,
+                        "items": {
+                          "type": "string",
+                          "minLength": 2
+                        }
+                      },
+                      "follow_up_uk": {
+                        "type": "string",
+                        "minLength": 10,
+                        "maxLength": 400
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
