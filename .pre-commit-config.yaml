@@ -1,0 +1,209 @@
+# TechScreen pre-commit hooks.
+#
+# Install once per clone:  pre-commit install && pre-commit install --hook-type commit-msg
+# Run ad-hoc on all files:   pre-commit run --all-files
+#
+# The reviewer sub-agent runs the same checks in CI; local pre-commit is
+# the fast-feedback path — CI is the backstop.
+
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
+fail_fast: false
+minimum_pre_commit_version: "3.7.0"
+
+repos:
+  # -------------------------------------------------------------------------
+  # House-keeping
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-yaml
+        args: ["--allow-multiple-documents"]
+        exclude: ^(app/frontend/pnpm-lock\.yaml)$
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: ["--markdown-linebreak-ext=md"]
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: detect-private-key
+
+  # -------------------------------------------------------------------------
+  # Secrets — non-negotiable. Constitution §5, §6.
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+
+  # -------------------------------------------------------------------------
+  # Python — ruff (lint + format) + mypy (run in CI, not here, for speed)
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  # -------------------------------------------------------------------------
+  # Frontend — prettier + eslint
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        types_or: [javascript, jsx, ts, tsx, css, json, yaml, markdown]
+        exclude: ^(app/frontend/pnpm-lock\.yaml|.*\.min\..*)$
+
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (frontend)
+        language: system
+        pass_filenames: false
+        files: ^app/frontend/.*\.(ts|tsx|js|jsx)$
+        entry: bash -c 'cd app/frontend && pnpm exec eslint --max-warnings=0 .'
+
+  # -------------------------------------------------------------------------
+  # Shell
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+
+  # -------------------------------------------------------------------------
+  # GitHub Actions
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.1
+    hooks:
+      - id: actionlint
+
+  # -------------------------------------------------------------------------
+  # Terraform
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.96.1
+    hooks:
+      - id: terraform_fmt
+      - id: terraform_validate
+        args:
+          - --hook-config=--retry-once-with-cleanup=true
+
+  # -------------------------------------------------------------------------
+  # YAML content (beyond syntax): lint for consistent formatting.
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args:
+          - "-d"
+          - |
+            extends: default
+            rules:
+              line-length:
+                max: 120
+                level: warning
+              truthy:
+                allowed-values: ["true", "false"]
+              comments:
+                min-spaces-from-content: 1
+              document-start: disable
+        exclude: ^(app/frontend/pnpm-lock\.yaml)$
+
+  # -------------------------------------------------------------------------
+  # Local guardrails — cheap repo-specific checks.
+  # -------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: no-json-service-account-keys
+        name: forbid JSON service-account keys
+        language: pygrep
+        entry: '"type"\s*:\s*"service_account"'
+        files: \.json$
+        exclude: ^\.pre-commit-config\.yaml$
+        # Catches committed JSON service-account keys. Constitution §6, ADR-013.
+
+      - id: no-direct-vertex-import
+        name: forbid direct vertexai imports outside the adapter
+        language: pygrep
+        entry: '^(from|import)\s+vertexai'
+        types: [python]
+        exclude: ^app/backend/llm/vertex\.py$
+        # All Vertex calls go through app/backend/llm/vertex.py.
+
+      - id: no-print-statements
+        name: forbid print() in backend code
+        language: pygrep
+        entry: '^\s*print\('
+        types: [python]
+        files: ^app/backend/.*\.py$
+        exclude: ^app/backend/tests/.*$
+
+      - id: forbid-env-values
+        name: forbid values in .env.example
+        language: pygrep
+        entry: '^\s*[A-Z0-9_]+=\S+.*[A-Za-z0-9].*$'
+        files: ^\.env\.example$
+        # Allow-listed exceptions are bare keys (KEY=) or comments. Anything
+        # that looks like a populated value triggers this hook.
+
+  # -------------------------------------------------------------------------
+  # Visual discipline — keeps the frontend on the Chat-iX baseline.
+  # Values live in docs/design/tokens/*.md → src/design/tokens.ts → Tailwind.
+  # Components never see raw hex, arbitrary pixel values, or dark: variants.
+  # See .claude/agents/frontend-engineer.md ("Baseline Check") and
+  # .claude/agents/reviewer.md ("Visual Discipline checklist").
+  # -------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: no-arbitrary-tailwind
+        name: forbid arbitrary Tailwind bracket values in frontend
+        language: pygrep
+        entry: '\b(bg|text|border|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|rounded|gap|w|h|min-w|min-h|top|bottom|left|right|inset|z|space|leading|tracking)-\[(?![^\]]*\b(ch|ex|vh|vw)\b)'
+        files: ^app/frontend/.*\.(ts|tsx|js|jsx|css)$
+        # No `p-[14px]`, `rounded-[10px]`, `w-[200px]`, `bg-[#abc]`. Values come
+        # from tokens. `max-w-[64ch]` etc. stay legal for readable line length.
+
+      - id: no-hex-outside-tokens
+        name: forbid raw hex colours in frontend (tokens.ts only)
+        language: pygrep
+        entry: '#[0-9a-fA-F]{3}\b|#[0-9a-fA-F]{6}\b'
+        files: ^app/frontend/.*\.(ts|tsx|js|jsx|css)$
+        exclude: ^app/frontend/src/design/tokens\.ts$
+        # Hex strings live only in tokens.ts. Components reference tokens via
+        # semantic class names (bg-surface-muted, text-content-primary, etc.).
+
+      - id: no-dark-variant
+        name: forbid dark; variants (light-theme only at MVP)
+        language: pygrep
+        entry: '\bdark:'
+        files: ^app/frontend/.*\.(ts|tsx|js|jsx|css)$
+        # Dark mode is a deliberate future project, not a silent addition.
+        # Constitution principle §6, tokens/README.md.
+
+      - id: no-shadow-outside-primitives
+        name: forbid shadow classes outside popover/dropdown/tooltip
+        language: pygrep
+        entry: '\bshadow-(sm|md|lg|xl|2xl|inner)\b|\bshadow-\['
+        files: ^app/frontend/.*\.(ts|tsx|js|jsx|css)$
+        exclude: ^app/frontend/src/components/ui/(popover|dropdown-menu|tooltip).*$
+        # Chat-iX baseline defines surface edges with 1-px borders. Shadows
+        # only on true floating overlays (popover, dropdown, tooltip).
+
+      - id: no-decorative-animation
+        name: forbid decorative animation classes
+        language: pygrep
+        entry: '\banimate-(bounce|ping|pulse|spin-slow|wiggle)\b'
+        files: ^app/frontend/.*\.(ts|tsx|js|jsx|css)$
+        exclude: ^app/frontend/src/components/ui/(skeleton|spinner).*$
+        # Motion communicates causation; no decorative or gamified motion.
+        # See docs/design/tokens/motion.md.
