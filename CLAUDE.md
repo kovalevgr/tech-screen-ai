@@ -48,16 +48,25 @@ These are the shortcuts Claude Code is most likely to take that we explicitly fo
 
 ## How work happens here (Spec Kit)
 
-TechScreen uses [GitHub Spec Kit](https://github.com/github/spec-kit) for all non-trivial feature work. The flow is:
+TechScreen uses [GitHub Spec Kit](https://github.com/github/spec-kit) `0.7.4` for all non-trivial feature work. Spec Kit integrates with Claude Code as **skills** under `.claude/skills/speckit-*` — **not as slash commands**. Invoke them by name through the skill picker.
+
+The workflow:
 
 ```
-/specify  → natural-language description of what and why
-/plan     → layered implementation plan with agent assignments
-/tasks    → concrete, ordered task list
-/implement → orchestrator executes, fanning out only where plan says parallel:true
+speckit-specify    → spec.md (what / why)
+speckit-clarify    → iterate on an ambiguous spec (optional)
+speckit-plan       → plan.md with agent / parallel / depends_on fields
+speckit-tasks      → ordered tasks.md
+speckit-analyze    → cross-check spec ↔ plan ↔ tasks (optional)
+speckit-checklist  → pre-merge / pre-implement checklist (optional)
+speckit-implement  → execute tasks; respects `parallel: true` only when set
 ```
 
-Specifications live under `.specify/specs/<slug>/` with `spec.md`, `plan.md`, `tasks.md`. Trivial changes (typos, dependency bumps, formatting) may skip the flow entirely.
+`speckit-constitution` and `speckit-taskstoissues` are also available for the rare cases (constitution edit — always ADR-gated; export `tasks.md` to GitHub issues). Five `speckit-git-*` helpers are installed but `auto_commit: false` in `.specify/extensions/git/git-config.yml` — **we commit manually** so CODEOWNERS, message style, and pre-commit hooks stay in our control. Do not flip `auto_commit` on without a PR that explains why.
+
+Specifications live under `.specify/specs/<slug>/` (`spec.md`, `plan.md`, `tasks.md`, `checklist.md`) and ship as part of the feature PR. Trivial changes (typos, dependency bumps, formatting) skip the flow entirely.
+
+> Older docs (e.g., `docs/engineering/implementation-plan.md`, the cheat sheet below) sometimes say "run `/specify`" or "run `/plan`" — read those as "invoke the corresponding `speckit-*` skill".
 
 **`plan.md` must:**
 
@@ -158,6 +167,6 @@ When in doubt, surface the question rather than assume. A five-minute clarificat
 
 ## Document versioning
 
-- **This file:** v1.0 — 2026-04-18.
+- **This file:** v1.1 — 2026-04-19. (v1.1: Spec Kit section rewritten — skills, not slash commands; auto_commit-off note added.)
 - Update this file when: a new invariant is added, a new sub-agent or skill is introduced, the repository layout materially changes, or a new core workflow is adopted.
 - Keep it under ~250 lines. If it grows beyond that, move details into linked docs.
