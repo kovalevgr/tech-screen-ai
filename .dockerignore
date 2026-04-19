@@ -1,0 +1,74 @@
+# Same spirit as .gitignore but tuned for Docker build context.
+# Goal: a small, deterministic context that never includes secrets.
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*-sa.json
+service-account*.json
+
+# VCS
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+
+# Node
+node_modules/
+.pnpm-store/
+app/frontend/.next/
+app/frontend/out/
+app/frontend/coverage/
+app/frontend/.turbo/
+
+# Docker
+docker-compose.override.yml
+docker-data/
+
+# Terraform / infra
+infra/terraform/.terraform/
+infra/terraform/**/terraform.tfstate*
+infra/terraform/**/*.tfplan
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs / tmp
+*.log
+logs/
+tmp/
+.cache/
+
+# Docs (not needed in runtime images)
+docs/
+adr/
+.specify/
+*.md
+!README.md
+
+# Tests — included in test image, excluded via bind mount in prod build stages
+# (Dockerfiles handle this explicitly).
+
+# Claude Code runtime
+.claude/
+
+# Calibration dataset — not needed in runtime images
+calibration/

@@ -1,0 +1,100 @@
+# ---------------------------------------------------------------------------
+# Secrets — must never leave the machine
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+# JSON service-account keys are forbidden (ADR-013); keep the pattern
+# anyway as a defence in depth.
+*-sa.json
+service-account*.json
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+.env.dev
+
+# uv / poetry
+.uv/
+# lockfiles are committed; caches are not
+
+# ---------------------------------------------------------------------------
+# Node / pnpm / Next.js
+# ---------------------------------------------------------------------------
+node_modules/
+.pnpm-store/
+app/frontend/.next/
+app/frontend/out/
+app/frontend/coverage/
+app/frontend/.turbo/
+# generated OpenAPI client is regenerated on demand; keep it committed
+# so contract drift is visible in PRs — do NOT add app/frontend/src/api/
+
+# ---------------------------------------------------------------------------
+# Docker
+# ---------------------------------------------------------------------------
+.docker-cache/
+*.pid
+# Per-dev compose override allowed; ignore runtime data.
+docker-compose.override.yml
+docker-data/
+
+# ---------------------------------------------------------------------------
+# Terraform
+# ---------------------------------------------------------------------------
+infra/terraform/.terraform/
+infra/terraform/**/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+infra/terraform/**/terraform.tfstate*
+infra/terraform/**/*.tfplan
+infra/terraform/**/crash.log
+infra/terraform/.terraform.lock.hcl.bak
+
+# ---------------------------------------------------------------------------
+# IDE / OS
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ---------------------------------------------------------------------------
+# Logs / temp
+# ---------------------------------------------------------------------------
+*.log
+logs/
+tmp/
+.cache/
+
+# ---------------------------------------------------------------------------
+# Calibration run outputs — reports are committed; intermediate raw dumps
+# and caches are not.
+# ---------------------------------------------------------------------------
+calibration/.cache/
+calibration/runs-raw/
+
+# ---------------------------------------------------------------------------
+# Claude Code runtime
+# ---------------------------------------------------------------------------
+.claude/worktrees/
+.claude/.run/
