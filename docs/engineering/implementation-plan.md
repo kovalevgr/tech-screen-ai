@@ -225,7 +225,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 - **depends_on:** [T01]
 - **contract:** `infra/terraform/` module layout
 - **description:**
-  Two Cloud Run services (`techscreen-backend`, `techscreen-frontend`), Cloud SQL Postgres 15 instance with **pgvector extension enabled at provisioning** (`database_flags { name = "cloudsql.enable_pgvector", value = "on" }` in Terraform), Secret Manager for every key listed in `.env.example`. Workload Identity Federation only — no JSON service-account keys anywhere (§5–6, ADR-013). Two workspaces: `dev`, `prod` (no staging — ADR-009). Cloud Logging + Error Reporting wired.
+  Two Cloud Run services (`techscreen-backend`, `techscreen-frontend`), Cloud SQL Postgres 17 instance with **pgvector extension enabled at provisioning** (`database_flags { name = "cloudsql.enable_pgvector", value = "on" }` in Terraform; verify PG17 + pgvector availability in `europe-west1` during this task and fall back to PG16 only if blocked — see ADR-001 amendment 2026-04-19), Secret Manager for every key listed in `.env.example`. Workload Identity Federation only — no JSON service-account keys anywhere (§5–6, ADR-013). Two workspaces: `dev`, `prod` (no staging — ADR-009). Cloud Logging + Error Reporting wired.
 - **acceptance:**
   - `terraform plan -workspace=dev` clean diff after bootstrap.
   - `gcloud run services describe techscreen-backend` returns the service after `apply`.

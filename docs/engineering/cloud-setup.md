@@ -20,7 +20,7 @@ Related: [ADR-009](../../adr/009-prod-only-topology.md), [ADR-012](../../adr/012
 | -------------------------------------------------- | -------------------------------------------------- | -------------------------------------- |
 | Cloud Run service `techscreen-backend`             | FastAPI API                                        | min 0, max 5 instances, 1 vCPU / 1 GiB |
 | Cloud Run service `techscreen-frontend`            | Next.js SSR                                        | min 0, max 5 instances, 1 vCPU / 1 GiB |
-| Cloud SQL Postgres 15 instance `techscreen-pg`     | App DB + pgvector                                  | `db-f1-micro`, 10 GB SSD, PITR on      |
+| Cloud SQL Postgres 17 instance `techscreen-pg`     | App DB + pgvector                                  | `db-f1-micro`, 10 GB SSD, PITR on      |
 | Cloud SQL database `techscreen`                    | Application schema                                 |                                        |
 | Cloud SQL database `techscreen_shadow`             | Alembic autogenerate target                        |                                        |
 | Secret Manager                                     | All secrets (DB URL, magic-link signing key, etc.) |                                        |

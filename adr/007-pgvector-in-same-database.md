@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-04-18
+- **Amended:** 2026-04-19 — PostgreSQL 15 → 17 (tracks ADR-001 amendment).
 
 ## Context
 
@@ -14,7 +15,7 @@ At MVP scale we expect < 10k embeddings in the first six months. A dedicated vec
 
 ## Decision
 
-All embeddings live in the **same Cloud SQL PostgreSQL 15** instance via the `pgvector` extension. The table `annotated_turn_embedding` stores `vector(768)` column and foreign keys into `turn` / `turn_annotation`.
+All embeddings live in the **same Cloud SQL PostgreSQL 17** instance via the `pgvector` extension. The table `annotated_turn_embedding` stores `vector(768)` column and foreign keys into `turn` / `turn_annotation`.
 
 Index type: `IVFFlat` initially; upgrade to `HNSW` if recall or latency requires it.
 
@@ -36,3 +37,7 @@ Index type: `IVFFlat` initially; upgrade to `HNSW` if recall or latency requires
 
 - The vector access code is isolated behind a `VectorStore` interface. Migrating to Pinecone or Qdrant later is a 2-day job of moving embeddings and swapping the interface implementation — not a rewrite.
 - Monitor recall@k and p95 latency on the RAG query; trigger migration when we cross preset thresholds.
+
+## Amendment — 2026-04-19: PostgreSQL 15 → 17
+
+Tracks ADR-001 amendment of the same date. pgvector behaviour, IVFFlat-then-HNSW upgrade path, and the single-DB rationale all carry over unchanged — pgvector supports PG15/16/17 identically for our `vector(768)` workload. Only the version pin moves from 15 to 17 to extend the EOL runway. Verify pgvector availability on Cloud SQL PG17 in `europe-west1` at provisioning time (T01a); fall back to PG16 only if PG17 + pgvector is blocked there.

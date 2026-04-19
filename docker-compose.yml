@@ -5,7 +5,7 @@
 # (ADR-010); behaviour differences are env-var driven.
 #
 # Services:
-#   postgres     — Postgres 16, data persisted in a named volume.
+#   postgres     — Postgres 17 with pgvector baked in (matches Cloud SQL prod — ADR-001, ADR-007).
 #   vertex-mock  — FastAPI mock standing in for Vertex Gemini.
 #   backend      — FastAPI app, bind-mounted for hot reload during dev.
 #   frontend     — Next.js dev server, bind-mounted for hot reload.
@@ -14,7 +14,7 @@ name: techscreen-dev
 
 services:
   postgres:
-    image: postgres:16-bookworm
+    image: pgvector/pgvector:pg17
     restart: unless-stopped
     environment:
       POSTGRES_USER: techscreen
