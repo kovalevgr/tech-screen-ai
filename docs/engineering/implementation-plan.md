@@ -102,7 +102,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
   PoC scope — request **standard** quotas, not enterprise. Resist the urge to over-provision; we'll re-evaluate before Phase 2 scale.
 
   **Deliverables:**
-  - Region choice: `europe-west4` (Netherlands) — closest regional hub to UA user base with GDPR compliance; confirm both Gemini 2.5 Pro and Flash are available.
+  - Region: `europe-west1` (Belgium) per ADR-015 — do not change here. T01a verifies at quota-request time that Gemini 2.5 Pro and Flash are both available in `europe-west1`; if either is missing, flag back to ADR-015 for a considered amendment rather than silently switching region.
   - Request (via GCP Console → Quotas): `aiplatform.googleapis.com` — `GenerateContentRequestsPerMinutePerProjectPerModel` raised from default to ~60 rpm for both models (enough for 3× concurrent sessions + calibration batch).
   - `docs/engineering/vertex-quota.md` logs: what was requested, what was granted, GCP support-case ID, requested-by, granted-on.
   - **Re-evaluation trigger:** if Phase 2 (post-pilot) targets > 20 concurrent sessions, raise a new task `T01a-v2` to request higher quota before any rollout.
