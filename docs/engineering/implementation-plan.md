@@ -38,15 +38,17 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 ### T00 — Initialize Spec Kit scaffolding
 
 - **agent:** `human` (Ihor — local CLI on his Mac; sandbox has no PyPI/GitHub egress)
-- **parallel:** false (pre-flight; every later task assumes `/specify`, `/plan`, `/tasks`, `/implement` exist)
+- **parallel:** false (pre-flight; every later task assumes Spec Kit commands exist)
 - **depends_on:** []
 - **contract:** none
 - **description:**
-  [`CLAUDE.md`](../../CLAUDE.md) and [ADR-017](../../adr/017-spec-driven-github-spec-kit.md) declare Spec Kit as the workflow, but the scaffolding is not in the repo yet. Today only `.specify/memory/constitution.md` exists; the templates, helper scripts, and Claude slash commands do not. This task commits them.
+  [`CLAUDE.md`](../../CLAUDE.md) and [ADR-017](../../adr/017-spec-driven-github-spec-kit.md) declare Spec Kit as the workflow, but the scaffolding is not in the repo yet. Today only `.specify/memory/constitution.md` exists; the templates, helper scripts, and Claude skills (`speckit-specify`, `speckit-plan`, `speckit-tasks`, `speckit-implement`, …) do not. This task commits them.
 
-  **One-time, by one person.** The init output is committed to the repo — every other developer just `git pull`s and has `/specify`, `/plan`, `/tasks`, `/implement` available in Claude Code. Do not re-run `specify init` on a clone that already has `.specify/templates/` and `.claude/commands/` populated: `--force` would overwrite the hand-authored constitution and any slash-command customisations. Re-init only as a deliberate upgrade, via a new task `T00-v2` with its own PR.
+  **One-time, by one person.** The init output is committed to the repo — every other developer just `git pull`s and has the Spec Kit skills available in Claude Code. Do not re-run `specify init` on a clone that already has `.specify/templates/` populated: `--force` would overwrite the hand-authored constitution and any customisations. Re-init only as a deliberate upgrade, via a new task `T00-v2` with its own PR.
 
   The hand-authored `.specify/memory/constitution.md` must be preserved byte-for-byte — `specify init` does not overwrite an existing constitution, but verify with `git diff` before committing.
+
+  Spec Kit `0.7.4` uses a **skills-based** integration for Claude (`.claude/skills/speckit-*`), not slash commands in `.claude/commands/`. The user invokes `speckit-specify`, `speckit-plan`, `speckit-tasks`, `speckit-implement`, `speckit-clarify`, `speckit-analyze`, `speckit-constitution`, `speckit-checklist`, `speckit-taskstoissues` via the skill picker. Every later task in this plan that says "run `/specify`" or "run `/plan`" refers to invoking the corresponding skill.
 
   Run on the Mac (sandbox is offline to PyPI / GitHub):
 
@@ -55,21 +57,26 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
   ```
 
   Expected scaffolding after the run:
-  - `.specify/templates/` — `spec-template.md`, `plan-template.md`, `tasks-template.md`, `agent-file-template.md`.
-  - `.specify/scripts/bash/` — helpers invoked by the slash commands (`create-new-feature.sh`, `check-prerequisites.sh`, `setup-plan.sh`, …).
-  - `.claude/commands/` — slash command definitions: `specify.md`, `plan.md`, `tasks.md`, `implement.md`, `clarify.md`, `analyze.md`, `constitution.md`.
+  - `.specify/templates/` — `spec-template.md`, `plan-template.md`, `tasks-template.md`, `checklist-template.md`, `constitution-template.md`.
+  - `.specify/scripts/bash/` — helpers (`create-new-feature.sh`, `check-prerequisites.sh`, `setup-plan.sh`, `common.sh`).
+  - `.specify/extensions/git/` — git automation extension; `auto_commit.default: false` at install, so no silent commits.
+  - `.specify/extensions.yml`, `.specify/integration.json`, `.specify/init-options.json`, `.specify/integrations/*.manifest.json`, `.specify/workflows/` — Spec Kit CLI metadata. Commit as a set.
+  - `.claude/skills/speckit-*` — 14 skills: 9 workflow (specify, plan, tasks, implement, clarify, analyze, constitution, checklist, taskstoissues) + 5 git helpers (initialize, feature, commit, remote, validate).
 
-  Existing assets that must remain untouched: `.specify/memory/constitution.md`, every file under `.claude/agents/`, every file under `.claude/skills/`. If the init touches any of them, revert that hunk before commit.
+  Existing assets that must remain untouched: `.specify/memory/constitution.md`, every file under `.claude/agents/`, and the pre-existing skills (`vertex-call`, `agent-prompt-edit`, `rubric-yaml`, `calibration-run`). If the init touches any of them, revert that hunk before commit.
+
+  **Trim before commit:** init appends a generic `<!-- SPECKIT START --> ... <!-- SPECKIT END -->` block to `CLAUDE.md`. Remove it — our `CLAUDE.md` already has a richer "How work happens here (Spec Kit)" section. The marker comments let future init re-add it idempotently; we delete it again.
 
   Commit as a separate PR titled `chore: initialize spec kit scaffolding`. No production code in the same PR.
 
 - **acceptance:**
   - `.specify/templates/` contains at minimum `spec-template.md`, `plan-template.md`, `tasks-template.md`.
-  - `.specify/scripts/bash/` contains at least one helper (e.g. `create-new-feature.sh`).
-  - `.claude/commands/` contains at minimum `specify.md`, `plan.md`, `tasks.md`, `implement.md`.
+  - `.specify/scripts/bash/` contains at least `create-new-feature.sh` and `check-prerequisites.sh`.
+  - `.claude/skills/` contains at minimum `speckit-specify`, `speckit-plan`, `speckit-tasks`, `speckit-implement`.
   - `.specify/memory/constitution.md` is byte-identical to its pre-init version (`git diff --exit-code`).
-  - `.claude/agents/*` and `.claude/skills/*` are byte-identical to their pre-init versions.
-  - In a fresh Claude Code session inside the repo, `/specify foo bar` is recognised as a slash command (not echoed as plain text).
+  - `.claude/agents/*` and the pre-existing `.claude/skills/{vertex-call,agent-prompt-edit,rubric-yaml,calibration-run}` are byte-identical.
+  - `CLAUDE.md` has no `<!-- SPECKIT … -->` block.
+  - In a fresh Claude Code session inside the repo, the `speckit-specify` skill appears in the skill picker and executes when invoked.
 - **references:** [`CLAUDE.md`](../../CLAUDE.md) §"How work happens here (Spec Kit)", [ADR-017](../../adr/017-spec-driven-github-spec-kit.md), constitution §17
 
 ### T01 — Monorepo layout + tooling baseline
