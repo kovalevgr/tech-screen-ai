@@ -1,0 +1,28 @@
+[project]
+name = "techscreen"
+version = "0.0.0"
+description = "TechScreen — internal AI technical interview system (backend)"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "ruff>=0.7,<1",
+  "mypy>=1.13,<2",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = [".venv", "node_modules", "app/frontend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+# Target directory is passed on the CLI (see contracts/dev-commands.md Command 1);
+# declaring `files` here would make an empty target error because mypy treats an
+# explicit `files` list as "must find these". Leaving it implicit lets the CLI
+# argument drive discovery so an empty `app/backend/` still exits 0.
