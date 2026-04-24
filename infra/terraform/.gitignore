@@ -1,0 +1,10 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Local variable overrides (keep terraform.tfvars — it's project-wide defaults;
+# .terraform.lock.hcl MUST be committed to pin provider versions across machines / CI)
+*.auto.tfvars
