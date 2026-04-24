@@ -47,6 +47,25 @@ pnpm --dir app/frontend lint
 
 Run these from the repo root. Internet access to PyPI and the pnpm/npm registry is required for the one-time bootstrap; afterwards the check commands are fully local.
 
+### Backend dev loop
+
+The backend skeleton (T02) ships a FastAPI app with a `GET /health` endpoint, a structlog-based logger that redacts candidate PII before logs leave the process, and a committed OpenAPI contract. See [`specs/003-t02-fastapi-skeleton/contracts/backend-contract.md`](./specs/003-t02-fastapi-skeleton/contracts/backend-contract.md) for the stable interface.
+
+```bash
+# Run the backend locally (port 8000, auto-reload)
+uv run uvicorn app.backend.main:app --reload
+
+# Run the backend test suite (health smoke, PII redaction, OpenAPI drift)
+uv run pytest app/backend/tests/
+
+# Regenerate the committed OpenAPI contract after changing routes or schemas
+uv run python -m app.backend.generate_openapi
+#   …or detect drift without overwriting the file (exits 1 on mismatch):
+uv run python -m app.backend.generate_openapi --check
+```
+
+The OpenAPI drift check also runs as part of the pytest suite — you will see a test failure if the committed `app/backend/openapi.yaml` disagrees with the live FastAPI app, with a unified-diff head in the failure message.
+
 ## What this repository is for
 
 - Source of truth for architecture, rubrics, prompts, infra, and tests

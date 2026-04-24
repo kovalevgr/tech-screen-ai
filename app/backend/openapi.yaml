@@ -1,0 +1,48 @@
+components:
+  schemas:
+    HealthResponse:
+      description: Response body for ``GET /health`` — stable across revisions.
+      properties:
+        service:
+          const: techscreen-backend
+          title: Service
+          type: string
+        status:
+          const: ok
+          title: Status
+          type: string
+        version:
+          title: Version
+          type: string
+      required:
+      - status
+      - service
+      - version
+      title: HealthResponse
+      type: object
+info:
+  title: TechScreen Backend
+  version: 0.0.0
+openapi: 3.1.0
+paths:
+  /health:
+    get:
+      description: 'Liveness probe.
+
+
+        Unauthenticated and dependency-free. Cloud Run readiness probes hit
+
+        this endpoint anonymously; dependency-aware readiness belongs to a
+
+        future ``/ready`` added by the first task that introduces a
+
+        dependency (T04 Vertex, T05 Postgres).'
+      operationId: health_health_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+          description: Successful Response
+      summary: Health
