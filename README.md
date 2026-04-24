@@ -6,6 +6,47 @@ TechScreen conducts structured technical interviews with candidates, evaluates a
 
 > **Status:** MVP planning phase. No production code yet. See `docs/specs/mvp-scope.docx` for the current scope.
 
+## Developer setup
+
+Once per machine, install the prerequisites:
+
+- **Python 3.12** — `brew install python@3.12` on macOS.
+- **Node 20 LTS** — install via your Node version manager of choice (nvm, asdf, mise). The image and CI use Node 20; your local can be newer but you will see an engine warning.
+- **pnpm 9** via corepack (ships with Node) — `corepack enable pnpm && corepack prepare pnpm@9.12.0 --activate`.
+- **uv** (Python dep manager) — `brew install uv` or `curl -LsSf https://astral.sh/uv/install.sh | sh`.
+- **pre-commit ≥ 3.7.0** — `pipx install pre-commit` or `brew install pre-commit`.
+
+Once per clone, bootstrap the two toolchains and activate the guardrail hooks:
+
+```bash
+# Python dev deps (ruff, mypy) into .venv
+uv sync --dev
+
+# Frontend dev deps (eslint, prettier, typescript, @types/node) into app/frontend/node_modules
+pnpm --dir app/frontend install --frozen-lockfile
+
+# Git hooks: pre-commit + commit-msg
+pre-commit install
+pre-commit install --hook-type commit-msg
+```
+
+### Check commands
+
+Three commands validate the repo before you push. All three are also what CI runs; all three exit 0 on a clean tree. See [`specs/001-t01-monorepo-baseline/contracts/dev-commands.md`](./specs/001-t01-monorepo-baseline/contracts/dev-commands.md) for the stable contract.
+
+```bash
+# Guardrails (secrets, YAML/JSON/TOML, merge-conflict, project-local hooks)
+pre-commit run --all-files
+
+# Backend — ruff + mypy over app/backend/
+uv run ruff check app/backend && uv run mypy app/backend
+
+# Frontend — ESLint + tsc --noEmit over app/frontend/
+pnpm --dir app/frontend lint
+```
+
+Run these from the repo root. Internet access to PyPI and the pnpm/npm registry is required for the one-time bootstrap; afterwards the check commands are fully local.
+
 ## What this repository is for
 
 - Source of truth for architecture, rubrics, prompts, infra, and tests
