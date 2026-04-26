@@ -1,16 +1,42 @@
 # syntax=docker/dockerfile:1.7
-# TechScreen frontend image (Next.js App Router, pnpm, standalone output).
-# Same image runs in dev, CI, and prod (ADR-010).
+# TechScreen frontend image (Next.js App Router, pnpm).
+# Same image runs in dev, CI, and prod (constitution §7 / ADR-010).
+#
+# Stages: base → deps → dev → build → runtime.
+#   base    — Node 20 + pnpm 9 via corepack. Shared parent for dev / build.
+#   deps    — pnpm install --frozen-lockfile (cached on package.json + lock).
+#   dev     — full source bind-mounted by docker-compose; `pnpm dev` with HMR.
+#             Targeted by docker-compose.yml (local) + docker-compose.test.yml
+#             (Jest, lint, tsc). Never deployed.
+#   build   — `pnpm build` produces .next/ (NOT standalone — see research §7).
+#   runtime — minimal Node 20 base + corepack pnpm; copies .next/, public/,
+#             node_modules/, package.json from build; runs `pnpm start`.
+#             T06 wires Cloud Run on top of this stage.
+#
+# Build context is the repo root; paths below are repo-relative.
 
 # ---------------------------------------------------------------------------
-# Stage 1 — deps: resolve pnpm deps with good caching.
+# Stage 1 — base: Node 20 LTS + pnpm 9 via corepack. Shared parent.
+# WORKDIR mirrors the canonical on-host path (<repo>/app/frontend) so the
+# token generator's REPO_ROOT computation (script walks ../../.. from
+# scripts/) resolves correctly inside the container — `<repo-root>` is
+# `/`, `docs/design/tokens` is at `/docs/design/tokens` (mounted by the
+# test compose), source is at `/app/frontend/src/...`. The Dockerfile
+# itself is run from the repo-root build context, so paths in COPY
+# directives stay repo-relative.
 # ---------------------------------------------------------------------------
-FROM node:20-bookworm-slim AS deps
+FROM node:20-bookworm-slim AS base
 
-ENV PNPM_HOME=/usr/local/bin
+ENV PNPM_HOME=/usr/local/bin \
+    NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
-WORKDIR /app
+WORKDIR /app/frontend
+
+# ---------------------------------------------------------------------------
+# Stage 2 — deps: resolve pnpm deps with good layer caching.
+# ---------------------------------------------------------------------------
+FROM base AS deps
 
 COPY app/frontend/package.json app/frontend/pnpm-lock.yaml ./
 
@@ -18,20 +44,34 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
 # ---------------------------------------------------------------------------
-# Stage 2 — build: produce the Next.js standalone output.
+# Stage 3 — dev: full source + dev deps; `pnpm dev` with HMR. Targeted by
+# docker-compose.yml (local hot-reload via bind-mount) and
+# docker-compose.test.yml (Jest, lint, tsc, tokens:check). Never deployed
+# to Cloud Run — production always uses `runtime`.
 # ---------------------------------------------------------------------------
-FROM node:20-bookworm-slim AS build
+FROM deps AS dev
 
-ENV PNPM_HOME=/usr/local/bin \
-    NEXT_TELEMETRY_DISABLED=1
-RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
+COPY app/frontend/ ./
 
-WORKDIR /app
+EXPOSE 3000
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY app/frontend ./
+CMD ["pnpm", "dev", "--hostname", "0.0.0.0", "--port", "3000"]
 
-# Public env must be available at build time for Next.js to inline.
+# ---------------------------------------------------------------------------
+# Stage 4 — build: produce the Next.js production build (.next/).
+# ---------------------------------------------------------------------------
+FROM deps AS build
+
+COPY app/frontend/ ./
+
+# `public/` is optional in Next.js but the runtime COPY below assumes it
+# exists. Create the directory if the repo doesn't ship one yet (T03
+# close: no static assets); later tasks may populate it freely.
+RUN mkdir -p public
+
+# Public env must be available at build time for Next.js to inline into
+# the client bundle. Defaulted to safe values; overridden by compose ARG
+# at build time.
 ARG NEXT_PUBLIC_API_BASE_URL
 ARG NEXT_PUBLIC_APP_ENV=prod
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL} \
@@ -40,34 +80,40 @@ ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL} \
 RUN pnpm build
 
 # ---------------------------------------------------------------------------
-# Stage 3 — runtime: minimal Node runtime with the standalone server.
+# Stage 5 — runtime: minimal Node 20 + pnpm; runs `pnpm start`.
+# Standalone output is rejected at T03 (research §7 alternatives) — it
+# breaks bind-mount-based dev hot-reload and complicates the dev/runtime
+# split. T06 may migrate to standalone as a Cloud Run image-size tuning.
 # ---------------------------------------------------------------------------
 FROM node:20-bookworm-slim AS runtime
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    PNPM_HOME=/usr/local/bin
 
-# tini for signal forwarding + zombie reaping under Cloud Run.
+# tini for signal forwarding + zombie reaping under Cloud Run; pnpm via
+# corepack so `pnpm start` resolves at runtime.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tini ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && corepack enable && corepack prepare pnpm@9.12.0 --activate
 
-# Non-root user.
+# Non-root user. Cloud Run runs as root by default but we refuse to.
 RUN groupadd --system --gid 10001 techscreen \
  && useradd --system --uid 10001 --gid techscreen --create-home techscreen
 
-WORKDIR /app
+WORKDIR /app/frontend
 
-# Next.js standalone output is self-contained.
-COPY --from=build --chown=techscreen:techscreen /app/.next/standalone ./
-COPY --from=build --chown=techscreen:techscreen /app/.next/static ./.next/static
-COPY --from=build --chown=techscreen:techscreen /app/public ./public
+COPY --from=build --chown=techscreen:techscreen /app/frontend/.next ./.next
+COPY --from=build --chown=techscreen:techscreen /app/frontend/public ./public
+COPY --from=build --chown=techscreen:techscreen /app/frontend/node_modules ./node_modules
+COPY --from=build --chown=techscreen:techscreen /app/frontend/package.json ./package.json
 
 USER techscreen
 
 EXPOSE 3000
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["node", "server.js"]
+CMD ["pnpm", "start"]

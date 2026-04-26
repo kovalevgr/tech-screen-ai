@@ -14,6 +14,7 @@ service-account*.json
 # VCS
 .git/
 .gitignore
+.github/
 
 # Python
 __pycache__/
@@ -57,10 +58,11 @@ logs/
 tmp/
 .cache/
 
-# Docs (not needed in runtime images)
+# Docs / specs (not needed in runtime images)
 docs/
 adr/
 .specify/
+specs/
 *.md
 !README.md
 

@@ -4,21 +4,57 @@
   "version": "0.0.0",
   "description": "TechScreen — Next.js admin + interviewer frontend.",
   "engines": {
-    "node": "20.x",
+    "node": ">=20.0.0",
     "pnpm": "9.x"
   },
   "packageManager": "pnpm@9.12.0",
   "scripts": {
-    "lint": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0 --no-error-on-unmatched-pattern && tsc --noEmit",
-    "format": "prettier --write ."
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "lint": "ESLINT_USE_FLAT_CONFIG=true eslint . --max-warnings=0 --no-error-on-unmatched-pattern && tsc --noEmit",
+    "format": "prettier --write .",
+    "test": "jest",
+    "tokens:generate": "tsx scripts/generate-tokens.ts",
+    "tokens:check": "tsx scripts/generate-tokens.ts --check",
+    "lint:visual-discipline": "bash scripts/check-visual-discipline.sh"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-label": "^2.1.8",
+    "@radix-ui/react-popover": "^1.1.15",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "autoprefixer": "^10.4",
+    "class-variance-authority": "^0.7",
+    "clsx": "^2.1",
+    "lucide-react": "^0.460",
+    "next": ">=15.0.0 <16.0.0",
+    "postcss": "^8.4",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "tailwind-merge": "^2.5",
+    "tailwindcss": ">=3.4.0 <4.0.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6",
+    "@testing-library/react": "^16.0",
+    "@testing-library/user-event": "^14.5",
+    "@types/jest": "^29.5",
     "@types/node": "^20.14.0",
+    "@types/react": "^18.3",
+    "@types/react-dom": "^18.3",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^8.57.0",
+    "eslint-config-next": ">=15.0.0 <16.0.0",
     "eslint-config-prettier": "^9.1.0",
+    "jest": "^29.7",
+    "jest-environment-jsdom": "^29.7",
     "prettier": "^3.3.3",
+    "ts-node": "^10.9",
+    "tsx": "^4.19",
     "typescript": "^5.5.0"
   }
 }

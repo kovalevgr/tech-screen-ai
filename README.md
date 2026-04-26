@@ -83,6 +83,45 @@ The OpenAPI drift check also runs as part of the pytest suite — you will see a
 
 > **Native `uv run` is intentionally undocumented.** Editor / IDE integrations (mypy daemon, ruff in your editor) may still use the host-side `uv sync --dev` venv — that's a tooling convenience, not a documented dev path. The canonical commands above are what CI runs and what every PR description references.
 
+### Frontend dev loop (Docker-first)
+
+Constitution §7 (Docker parity dev → CI → prod) is non-negotiable. **All frontend run/test/regen workflows happen inside the same multi-stage image that CI and production use.** No native `pnpm --dir app/frontend …` for the canonical loop — Docker Desktop (or any Docker Engine) is the only contributor prerequisite for this layer.
+
+`Dockerfile.frontend` has five stages: `base` (Node 20 + pnpm 9 via corepack), `deps` (`pnpm install --frozen-lockfile`), `dev` (full source + dev deps; default for local + CI), `build` (`pnpm build`), `runtime` (lean image deployed to Cloud Run). `docker-compose.yml` builds `dev` for `--profile web`; `docker-compose.test.yml` builds `dev` and runs Jest, lint, and the token-drift check; only Cloud Run gets `runtime` (T06+).
+
+The frontend skeleton (T03) ships the admin shell chrome, a token generator with drift detection, the nine shadcn/ui primitives, and a visual-discipline guardrail. See [`specs/006-t03-nextjs-skeleton/contracts/frontend-contract.md`](./specs/006-t03-nextjs-skeleton/contracts/frontend-contract.md) for the stable interface.
+
+```bash
+# Run the frontend (port 3000, hot reload via bind-mount).
+docker compose --profile web up -d frontend && open http://127.0.0.1:3000
+#   …or rebuild then run if package.json or pnpm-lock.yaml changed:
+docker compose --profile web up --build -d frontend
+```
+
+```bash
+# Run the frontend test suite (Jest + RTL — admin-shell smoke + token drift).
+docker compose -f docker-compose.test.yml run --rm frontend pnpm test
+```
+
+```bash
+# Regenerate the committed design tokens after editing docs/design/tokens/*.md.
+docker compose -f docker-compose.test.yml run --rm frontend pnpm tokens:generate
+#   …or detect drift without overwriting (exits 1 on mismatch).
+docker compose -f docker-compose.test.yml run --rm frontend pnpm tokens:check
+```
+
+The `tokens-drift` pre-commit hook calls `pnpm tokens:check` automatically before every `git commit`; the `visual-discipline` pre-commit hook scans `app/frontend/src/` for raw hex outside the token file and for `dark:` Tailwind variants. Both fail the commit on any drift; both are also part of `pre-commit run --all-files`.
+
+> **Native `pnpm --dir app/frontend …` is intentionally undocumented as the canonical path** — Docker is canonical (constitution §7). Editor / IDE integrations (TypeScript server, ESLint in your editor) may still use the host-side `pnpm --dir app/frontend install` `node_modules` — that's a tooling convenience, not a documented dev path.
+
+#### Notes on host vs container Node, and supply-chain audit
+
+- **Host Node**: `engines.node` is set to `>=20.0.0`. The canonical container always runs Node 20 LTS; the host can be on 20 or 22 (LTS lines). pnpm install warnings about "wanted" mismatches are expected on Node 22 hosts and harmless — production parity is enforced by the container image.
+- **Supply-chain audit**: `pnpm --dir app/frontend audit --audit-level=high` exits 0 on the post-T03 lockfile (no HIGH or CRITICAL CVEs). Two known low-impact advisories at T03 close, both deferred:
+  - `postcss@8.4.31` (MODERATE — XSS via unescaped `</style>` in CSS Stringify) — bundled inside `next@15.5.x`, not our direct dep. Realisation requires processing untrusted CSS, which T03 never does. Resolves when Next.js bumps its bundled postcss in a patch release.
+  - `@tootallnate/once@2.0.0` (LOW — Incorrect Control Flow Scoping) — transitive 4 levels deep under `jest-environment-jsdom`, dev/test toolchain only; the production `runtime` Dockerfile stage never executes it.
+- **shadcn CLI**: pinned at major `pnpm dlx shadcn@2 add …` (NOT `@latest`) so future shadcn 3.x template changes do not silently land. Bumping the major is its own ADR-discussed task.
+
 ## What this repository is for
 
 - Source of truth for architecture, rubrics, prompts, infra, and tests

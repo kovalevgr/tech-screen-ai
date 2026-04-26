@@ -76,6 +76,20 @@ repos:
         files: ^app/frontend/.*\.(ts|tsx|js|jsx)$
         entry: bash -c 'cd app/frontend && pnpm exec eslint --max-warnings=0 .'
 
+      - id: tokens-drift
+        name: tokens drift (frontend)
+        language: system
+        pass_filenames: false
+        files: ^(docs/design/tokens/.*\.md|app/frontend/src/design/tokens\.ts|app/frontend/src/app/globals\.css|app/frontend/scripts/generate-tokens\.ts)$
+        entry: bash -c 'cd app/frontend && pnpm tokens:check'
+
+      - id: visual-discipline
+        name: visual discipline (frontend)
+        language: system
+        pass_filenames: false
+        files: ^app/frontend/src/.*\.(ts|tsx|js|jsx|css|scss)$
+        entry: bash app/frontend/scripts/check-visual-discipline.sh
+
   # -------------------------------------------------------------------------
   # GitHub Actions — validator, does not rewrite files.
   # -------------------------------------------------------------------------
@@ -151,8 +165,14 @@ repos:
         language: pygrep
         entry: '\b(bg|text|border|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|rounded|gap|w|h|min-w|min-h|top|bottom|left|right|inset|z|space|leading|tracking)-\[(?![^\]]*\b(ch|ex|vh|vw)\b)'
         files: ^app/frontend/.*\.(ts|tsx|js|jsx|css)$
+        exclude: ^app/frontend/src/components/ui/.*$
         # No `p-[14px]`, `rounded-[10px]`, `w-[200px]`, `bg-[#abc]`. Values come
         # from tokens. `max-w-[64ch]` etc. stay legal for readable line length.
+        # Vendored shadcn primitives (`components/ui/*`) carved out: they ship
+        # with arbitrary positioning values (e.g. `translate-x-[-50%]`) that
+        # are part of the upstream template. Per design principle §7 we do
+        # not fork the primitive — consumers override via `className` when
+        # the shadcn default conflicts with Chat-iX baseline.
 
       - id: no-hex-outside-tokens
         name: forbid raw hex colours in frontend (tokens.ts only)
@@ -172,13 +192,19 @@ repos:
         # Constitution principle §6, tokens/README.md.
 
       - id: no-shadow-outside-primitives
-        name: forbid shadow classes outside popover/dropdown/tooltip
+        name: forbid shadow classes outside vendored shadcn primitives
         language: pygrep
         entry: '\bshadow-(sm|md|lg|xl|2xl|inner)\b|\bshadow-\['
         files: ^app/frontend/.*\.(ts|tsx|js|jsx|css)$
-        exclude: ^app/frontend/src/components/ui/(popover|dropdown-menu|tooltip).*$
+        exclude: ^app/frontend/src/components/ui/.*$
         # Chat-iX baseline defines surface edges with 1-px borders. Shadows
-        # only on true floating overlays (popover, dropdown, tooltip).
+        # only on true floating overlays (popover, dropdown, tooltip, dialog)
+        # — and shadcn templates ship with `shadow-sm` on button/input too.
+        # Vendored primitives (`components/ui/*`) carved out per principle §7
+        # (do not fork the primitive). Our own code and screen components
+        # MUST NOT introduce shadow utilities; if a recruiter screen really
+        # needs depth, override at the consumer site via `className` and
+        # justify in the screen spec.
 
       - id: no-decorative-animation
         name: forbid decorative animation classes
