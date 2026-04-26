@@ -30,7 +30,7 @@ _(empty — per Clarifications 2026-04-26, no quota request was filed for 2.5 GA
 
 ## Smoke-test records
 
-_(none yet — first bullet appended in Phase 6 once `infra/scripts/vertex-smoke.sh` executes against the granted quota. The contract requires this section be present and ordered, but its contents are deferred until evidence exists.)_
+- 2026-04-26 — runner=local-adc-impersonation, model=gemini-2.5-flash, region=europe-west1, latency_ms=612, status=pass
 
 ## Follow-ups
 

@@ -19,10 +19,10 @@ project_number = "463244185014"
 
 # N-iX billing account ID, format "XXXXXX-XXXXXX-XXXXXX".
 # Obtain from GCP Console → Billing → Account management → Billing account ID.
-billing_account = "<FILL-IN: N-iX billing account ID>"
+billing_account = "01FD59-751466-B7F7A5"
 
 # Budget-alert recipient.
 # MVP: Ihor's personal N-iX mailbox (Clarifications 2026-04-24 Q1).
 # Swap to a shared group alias here once N-iX IT provisions one — see
 # Follow-ups in docs/engineering/vertex-quota.md.
-ops_email = "<FILL-IN: Ihor's N-iX mailbox, e.g. ihor.lastname@n-ix.com>"
+ops_email = "ikovalov@n-ix.com"

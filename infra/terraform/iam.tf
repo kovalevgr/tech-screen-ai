@@ -46,5 +46,5 @@ resource "google_project_iam_member" "techscreen_backend_aiplatform_user" {
 resource "google_service_account_iam_member" "techscreen_backend_tokens_for_owner" {
   service_account_id = google_service_account.techscreen_backend.name
   role               = "roles/iam.serviceAccountTokenCreator"
-  member             = "user:FILL-IN-OWNER-PRINCIPAL@n-ix.com"
+  member             = "user:ikovalov@n-ix.com"
 }

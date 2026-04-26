@@ -29,18 +29,22 @@ resource "google_monitoring_notification_channel" "ops_email" {
 
 resource "google_billing_budget" "project_wide" {
   billing_account = var.billing_account
-  display_name    = "techscreen / project-wide $50"
+  display_name    = "techscreen / project-wide PLN 200 (≈ $50)"
 
   budget_filter {
     projects = ["projects/${var.project_number}"]
     # No `services` filter — covers all GCP services in the project.
     # This is the constitution §12 hard cap for total monthly spend.
+    # Currency note: billing account 01FD59-751466-B7F7A5 is denominated in PLN
+    # (Polish złoty), so budgets MUST be PLN. 200 PLN ≈ $50 USD at ~4 PLN/USD —
+    # the constitution §12 cap interpreted as "approximately $50". See
+    # specs/003-vertex-quota-region/spec.md Clarifications 2026-04-26 Q (currency).
   }
 
   amount {
     specified_amount {
-      currency_code = "USD"
-      units         = "50"
+      currency_code = "PLN"
+      units         = "200"
     }
   }
 
@@ -65,7 +69,7 @@ resource "google_billing_budget" "project_wide" {
 
 resource "google_billing_budget" "vertex_only" {
   billing_account = var.billing_account
-  display_name    = "techscreen / vertex-only $20"
+  display_name    = "techscreen / vertex-only PLN 80 (≈ $20)"
 
   budget_filter {
     projects = ["projects/${var.project_number}"]
@@ -74,8 +78,10 @@ resource "google_billing_budget" "vertex_only" {
 
   amount {
     specified_amount {
-      currency_code = "USD"
-      units         = "20"
+      # PLN-denominated per billing account currency; 80 PLN ≈ $20 USD.
+      # See Clarifications 2026-04-26 Q (currency) in spec.md.
+      currency_code = "PLN"
+      units         = "80"
     }
   }
 

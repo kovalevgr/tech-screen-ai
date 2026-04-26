@@ -51,8 +51,8 @@ For the MVP pilot volume (≤ 50 completed sessions / month):
 
 **Two budget alerts** are configured (T01a, declared in `infra/terraform/billing.tf`):
 
-1. **Project-wide budget — $50/mo** (constitution §12 hard cap), with notifications at 50 / 90 / 100 %.
-2. **Vertex-only budget — $20/mo** scoped to `aiplatform.googleapis.com` (Clarifications 2026-04-24 Q5 — early warning that isolates LLM-side spikes from general infra drift), with notifications at 50 / 90 / 100 %.
+1. **Project-wide budget — PLN 200/mo (≈ $50)** (constitution §12 hard cap, interpreted as "approximately $50" because the billing account is denominated in PLN — see `specs/003-vertex-quota-region/spec.md` Clarifications 2026-04-26 Q on currency), with notifications at 50 / 90 / 100 %.
+2. **Vertex-only budget — PLN 80/mo (≈ $20)** scoped to `aiplatform.googleapis.com` (Clarifications 2026-04-24 Q5 — early warning that isolates LLM-side spikes from general infra drift), with notifications at 50 / 90 / 100 %.
 
 Both budgets target a single Cloud Monitoring email channel: **Ihor's personal N-iX mailbox** (the value of `ops_email` in `infra/terraform/terraform.tfvars`). This is the MVP arrangement per Clarifications 2026-04-24 Q1; see Follow-ups in [`vertex-quota.md`](./vertex-quota.md) for the swap-to-group-alias item.
 
