@@ -31,7 +31,7 @@ Related: [ADR-009](../../adr/009-prod-only-topology.md), [ADR-012](../../adr/012
 | Cloud Logging                                      | All services                                       | 30-day retention                       |
 | IAM Workload Identity Pool `github-actions`        | CI auth via OIDC                                   |                                        |
 
-Vertex AI is accessed as a managed API (no dedicated resource is provisioned).
+Vertex AI is accessed as a managed API (no dedicated resource is provisioned). Granted per-model rate quotas, region verification, and the smoke-test record live in [`docs/engineering/vertex-quota.md`](./vertex-quota.md), seeded by T01a.
 
 ---
 
@@ -46,10 +46,15 @@ For the MVP pilot volume (≤ 50 completed sessions / month):
 | Artifact Registry storage              | negligible     |
 | Cloud Storage (state + assets)         | < $1           |
 | Secret Manager                         | < $1           |
-| Vertex AI (Gemini 2.5 Flash/Pro)       | $4 – $10       |
-| Total                                  | **~$20 – $25** |
+| Vertex AI (Gemini 2.5 Flash/Pro)       | $4 – $10       | (full quota state in [`vertex-quota.md`](./vertex-quota.md)) |
+| Total                                  | **~$20 – $25** | |
 
-Monthly budget alert at $50 (constitution §12). Alerts at 50 / 90 / 100 % of budget fire to the ops inbox.
+**Two budget alerts** are configured (T01a, declared in `infra/terraform/billing.tf`):
+
+1. **Project-wide budget — $50/mo** (constitution §12 hard cap), with notifications at 50 / 90 / 100 %.
+2. **Vertex-only budget — $20/mo** scoped to `aiplatform.googleapis.com` (Clarifications 2026-04-24 Q5 — early warning that isolates LLM-side spikes from general infra drift), with notifications at 50 / 90 / 100 %.
+
+Both budgets target a single Cloud Monitoring email channel: **Ihor's personal N-iX mailbox** (the value of `ops_email` in `infra/terraform/terraform.tfvars`). This is the MVP arrangement per Clarifications 2026-04-24 Q1; see Follow-ups in [`vertex-quota.md`](./vertex-quota.md) for the swap-to-group-alias item.
 
 ---
 
