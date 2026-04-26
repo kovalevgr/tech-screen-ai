@@ -10,24 +10,21 @@ process.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import cast
 
+import pytest
 import structlog
 from structlog.typing import EventDict
 
+from app.backend.logging import PII_FIELDS, pii_redaction_processor
+
 CANDIDATE_EMAIL = "x@y.com"
+CYRILLIC_EMAIL = "студент@приклад.укр"
 
 
 def _serialise(record: EventDict) -> str:
     """Best-effort stringification covering every key/value in the record."""
-    parts: list[str] = []
-    for key, value in record.items():
-        parts.append(str(key))
-        if isinstance(value, str):
-            parts.append(value)
-        else:
-            parts.append(json.dumps(value, default=str))
-    return "\n".join(parts)
+    return json.dumps(record, sort_keys=True, default=str, ensure_ascii=False)
 
 
 def test_candidate_email_redacted_in_field_and_freetext(
@@ -52,14 +49,59 @@ def test_candidate_email_redacted_in_field_and_freetext(
     assert plain_record.get("port") == 8000, plain_record
 
 
-def test_pii_redactor_is_pure(captured_logs: list[EventDict]) -> None:
-    """Belt-and-suspenders: verify the processor does not mutate input shape."""
-    # Pretend the caller holds a dict reference and logs it; the redactor
-    # must not reach back and edit the caller's dict.
-    payload: dict[str, Any] = {
-        "candidate_email": CANDIDATE_EMAIL,
-        "other": 42,
-    }
-    structlog.get_logger("purity").info("caller keeps payload", **payload)
-    assert payload["candidate_email"] == CANDIDATE_EMAIL
-    assert payload["other"] == 42
+def test_cyrillic_idn_email_redacted_in_freetext(
+    captured_logs: list[EventDict],
+) -> None:
+    """Constitution §11 implies Ukrainian inputs; the redactor must follow."""
+    structlog.get_logger("idn").info(f"contact {CYRILLIC_EMAIL} please")
+
+    assert len(captured_logs) == 1
+    blob = _serialise(captured_logs[0])
+    assert CYRILLIC_EMAIL not in blob, f"Cyrillic email leaked: {blob!r}"
+    assert "приклад.укр" not in blob, blob
+    assert "<REDACTED_EMAIL>" in captured_logs[0]["message"], captured_logs[0]
+
+
+def test_pii_redactor_does_not_mutate_input() -> None:
+    """Pure transform: redactor returns a new dict and never edits its argument."""
+    original: EventDict = cast(
+        EventDict,
+        {
+            "event": f"hello {CANDIDATE_EMAIL}",
+            "candidate_email": CANDIDATE_EMAIL,
+            "other": 42,
+        },
+    )
+    snapshot = dict(original)
+
+    out = pii_redaction_processor(
+        cast(structlog.typing.WrappedLogger, None),
+        "info",
+        original,
+    )
+
+    assert original == snapshot, f"input dict was mutated: {original!r}"
+    assert out is not original, "redactor must return a new dict"
+    assert out["candidate_email"] == "<REDACTED>"
+    assert out["event"] == "hello <REDACTED_EMAIL>"
+    assert out["other"] == 42, "non-PII fields preserved"
+
+
+@pytest.mark.parametrize("field", sorted(PII_FIELDS))
+def test_every_pii_field_in_allow_list_is_redacted(
+    field: str, captured_logs: list[EventDict]
+) -> None:
+    """Adding a key to ``PII_FIELDS`` automatically gets coverage here.
+
+    The allow-list extension procedure in ``backend-contract.md`` says
+    new fields land alongside an explicit assertion. This parametrised
+    test removes the "did the contributor remember to add a test" risk
+    by enumerating ``PII_FIELDS`` at collection time.
+    """
+    structlog.get_logger("allow_list").info("ok", **{field: "leak@example.com"})
+
+    assert len(captured_logs) == 1
+    record = captured_logs[0]
+    blob = _serialise(record)
+    assert "leak@example.com" not in blob, f"{field} leaked: {blob!r}"
+    assert record[field] == "<REDACTED>", f"{field} not redacted: {record!r}"

@@ -28,10 +28,15 @@ with matching assertions in the same PR. Removal requires an ADR that
 supersedes constitution §15.
 """
 
-_EMAIL_PATTERN: Final[re.Pattern[str]] = re.compile(
-    r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"
-)
-"""Permissive email regex — false-positives over false-negatives."""
+_EMAIL_PATTERN: Final[re.Pattern[str]] = re.compile(r"[\w.+%-]+@[\w.-]+\.[\w-]{2,}")
+"""Permissive Unicode-aware email regex — false-positives over false-negatives.
+
+``\\w`` matches Latin, Cyrillic, Greek, etc. word characters in Python 3
+(the default ``re.UNICODE`` mode for ``str`` patterns), so IDN-style
+addresses such as ``студент@приклад.укр`` are redacted alongside ASCII
+emails. Punycode-encoded variants (``student@xn--p1ai``) are matched by
+the same pattern because the TLD class allows hyphens.
+"""
 
 _REDACTED: Final[str] = "<REDACTED>"
 _REDACTED_EMAIL: Final[str] = "<REDACTED_EMAIL>"

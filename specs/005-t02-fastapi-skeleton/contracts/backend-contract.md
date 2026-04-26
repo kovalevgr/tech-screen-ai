@@ -124,7 +124,8 @@ PII_FIELDS: frozenset[str] = frozenset({"candidate_email"})
 ### Free-text redaction
 
 - Applied to the `event`/`message` string of every log record.
-- Pattern: `r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"` (email regex, permissive).
+- Pattern: `r"[\w.+%-]+@[\w.-]+\.[\w-]{2,}"` (Unicode-aware email regex).
+- `\w` defaults to `re.UNICODE` for `str` patterns in Python 3, so the redactor catches Latin (`x@y.com`), Cyrillic IDN (`студент@приклад.укр`), and Punycode (`student@xn--p1ai`) variants alike.
 - Replacement: the literal string `<REDACTED_EMAIL>`.
 - False-positive posture: a commit hash or synthetic string that happens to match the email regex will be redacted. This is intentional — PII safety beats logging fidelity.
 
