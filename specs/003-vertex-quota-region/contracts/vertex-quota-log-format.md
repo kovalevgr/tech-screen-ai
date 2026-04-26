@@ -23,6 +23,8 @@ The file MUST contain exactly the following top-level sections, in this order, w
 <preamble paragraphs>
 ## Re-evaluation trigger
 <one paragraph naming condition + action + owner>
+## Quota observed defaults
+<Markdown table; see §3a>
 ## Quota requests
 <Markdown table; see §3>
 ## Region verification
@@ -33,7 +35,29 @@ The file MUST contain exactly the following top-level sections, in this order, w
 <Markdown bullet list; see §6>
 ```
 
-Additional second-level headings are forbidden. Third-level headings are permitted only inside "Follow-ups" for grouping long-lived items.
+Additional second-level headings are forbidden. Third-level headings are permitted only inside "Follow-ups" for grouping long-lived items. The "Quota observed defaults" section was added 2026-04-26 after live observation revealed Gemini 2.5 GA models use TPM (not RPM) quotas with multi-billion defaults — see Clarifications 2026-04-26 in `spec.md`.
+
+## 3a. "Quota observed defaults" table — schema (added 2026-04-26)
+
+The "Quota observed defaults" section MUST contain exactly one Markdown table with the following columns:
+
+```markdown
+| date | model | metric | scope | observed_default | floor | floor_met | source |
+| ---- | ----- | ------ | ----- | ---------------- | ----- | --------- | ------ |
+```
+
+Column rules:
+
+- **`date`** — ISO 8601 (`YYYY-MM-DD`) of the observation.
+- **`model`** — the `base_model` dimension value as it appears in the GCP quota response (e.g. `gemini-2.5-flash-ga`, `gemini-2.5-pro-ga`). NOTE: this is **not** identical to the public model ID used in API paths (`gemini-2.5-flash`, `gemini-2.5-pro`); the `-ga` suffix is a quota-system artefact.
+- **`metric`** — full GCP metric name, including the `aiplatform.googleapis.com/` prefix.
+- **`scope`** — `global` or a specific region. For 2.5 TPM metrics this is typically `global`; for any future 1.x or RPM observations it would be `europe-west1`.
+- **`observed_default`** — integer with units suffix (e.g. `10000000000 TPM`, `5 RPM`). Live value at observation date — not extrapolated.
+- **`floor`** — integer with units, per FR-002a (e.g. `1000000 TPM`).
+- **`floor_met`** — `yes` if `observed_default ≥ floor`; `no` otherwise. If `no`, T01a is blocked and FR-002 re-engages (file a quota request via the channel in research §R2).
+- **`source`** — short citation, typically the gcloud command + flag list used (e.g. `gcloud alpha services quota list --filter=metric=…`).
+
+**Append-only discipline.** A row is added per (model, metric, observation-date) tuple. Re-observations on later dates produce new rows, not edits. Typos in a row may be fixed in the same commit; once on main, the row is frozen.
 
 ## 3. "Quota requests" table — schema
 
@@ -48,7 +72,7 @@ Column rules:
 
 - **`date`** — ISO 8601 (`YYYY-MM-DD`). The date the support case was submitted. Required.
 - **`model`** — Vertex publisher model ID, lowercase, kebab-case. Allowed values while ADR-003 holds: `gemini-2.5-flash`, `gemini-2.5-pro`. A different value requires an ADR amendment.
-- **`metric`** — GCP quota metric. For T01a: `GenerateContentRequestsPerMinutePerProjectPerModel`. Different metrics need different rows.
+- **`metric`** — GCP quota metric (full name including `aiplatform.googleapis.com/` prefix). NOTE (2026-04-26): the previously documented `GenerateContentRequestsPerMinutePerProjectPerModel` form was inaccurate — the correct snake_case form is `aiplatform.googleapis.com/generate_content_requests_per_minute_per_project_per_base_model`, AND it does **not** cover Gemini 2.5 GA models. For 2.5, see "Quota observed defaults" §3a (TPM-based). The "Quota requests" table is currently expected to be empty for 2.5-era T01a; it re-activates if any future model returns to RPM-based quotas or a TPM raise becomes necessary.
 - **`default`** — integer requests-per-minute as observed on the target project **at request time**. Not a hard-coded value from documentation.
 - **`requested`** — integer rpm; the target raise.
 - **`granted`** — integer rpm. Empty string `""` while `status = pending`. Must be filled for any non-`pending` status.
@@ -134,12 +158,19 @@ This is the single source of truth for TechScreen's Vertex AI quota state: what 
 
 If projected or realised concurrent interview sessions exceed **20** — the Phase 2 threshold in the implementation plan — the `infra-engineer` (with the project owner) MUST raise a new Spec Kit feature named `T01a-v2` to request higher quota **before** that rollout. Triggers sourced from constitution §12 and `docs/engineering/implementation-plan.md` T01a.
 
+## Quota observed defaults
+
+| date | model | metric | scope | observed_default | floor | floor_met | source |
+| ---- | ----- | ------ | ----- | ---------------- | ----- | --------- | ------ |
+| 2026-04-26 | gemini-2.5-flash-ga | aiplatform.googleapis.com/global_generate_content_input_tokens_per_minute_per_base_model | global | 10000000000 TPM | 1000000 TPM | yes | gcloud alpha services quota list --service=aiplatform.googleapis.com --consumer=projects/tech-screen-493720 |
+| 2026-04-26 | gemini-2.5-pro-ga | aiplatform.googleapis.com/global_generate_content_input_tokens_per_minute_per_base_model | global | 1000000000 TPM | 100000 TPM | yes | gcloud alpha services quota list --service=aiplatform.googleapis.com --consumer=projects/tech-screen-493720 |
+
 ## Quota requests
 
 | date | model | metric | default | requested | granted | case_id | requester | status | notes |
 | ---- | ----- | ------ | ------- | --------- | ------- | ------- | --------- | ------ | ----- |
-| 2026-04-24 | gemini-2.5-flash | GenerateContentRequestsPerMinutePerProjectPerModel | <observed> | 60 | | | project-owner (Ihor) | pending | initial T01a request |
-| 2026-04-24 | gemini-2.5-pro | GenerateContentRequestsPerMinutePerProjectPerModel | <observed> | 60 | | | project-owner (Ihor) | pending | initial T01a request |
+
+_(empty — per Clarifications 2026-04-26, no quota request was filed for 2.5 GA models because their TPM defaults exceed PoC need by ~5 orders of magnitude. This table re-engages if any future model returns to RPM quotas or a TPM raise becomes necessary.)_
 
 ## Region verification
 

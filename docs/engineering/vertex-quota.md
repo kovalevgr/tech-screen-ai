@@ -10,16 +10,23 @@ The file conforms to the contract pinned at [`specs/003-vertex-quota-region/cont
 
 If projected or realised concurrent interview sessions exceed **20** — the Phase 2 threshold in [`docs/engineering/implementation-plan.md`](./implementation-plan.md) T01a — the `infra-engineer` (with the project owner) MUST raise a new Spec Kit feature named `T01a-v2` to request higher quota **before** that rollout, not after. Triggers sourced from constitution §12 and the original T01a description.
 
+## Quota observed defaults
+
+| date | model | metric | scope | observed_default | floor | floor_met | source |
+| ---- | ----- | ------ | ----- | ---------------- | ----- | --------- | ------ |
+| 2026-04-26 | gemini-2.5-flash-ga | aiplatform.googleapis.com/global_generate_content_input_tokens_per_minute_per_base_model | global | 10000000000 TPM | 1000000 TPM | yes | `gcloud alpha services quota list --service=aiplatform.googleapis.com --consumer=projects/tech-screen-493720 --filter="metric=aiplatform.googleapis.com/global_generate_content_input_tokens_per_minute_per_base_model"` |
+| 2026-04-26 | gemini-2.5-pro-ga | aiplatform.googleapis.com/global_generate_content_input_tokens_per_minute_per_base_model | global | 1000000000 TPM | 100000 TPM | yes | (same command as above) |
+
 ## Quota requests
 
 | date | model | metric | default | requested | granted | case_id | requester | status | notes |
 | ---- | ----- | ------ | ------- | --------- | ------- | ------- | --------- | ------ | ----- |
-| <FILL-IN: YYYY-MM-DD> | gemini-2.5-flash | GenerateContentRequestsPerMinutePerProjectPerModel | <observed by T012> | 60 | | <filled by T013> | project-owner (Ihor) | pending | initial T01a request |
-| <FILL-IN: YYYY-MM-DD> | gemini-2.5-pro | GenerateContentRequestsPerMinutePerProjectPerModel | <observed by T012> | 60 | | <filled by T013> | project-owner (Ihor) | pending | initial T01a request |
+
+_(empty — per Clarifications 2026-04-26, no quota request was filed for 2.5 GA models because their TPM defaults exceed PoC need by ~5 orders of magnitude. See "Quota observed defaults" above. This table re-engages if any future model returns to RPM quotas or a TPM raise becomes necessary.)_
 
 ## Region verification
 
-_(none yet — first bullet appended in Phase 3 once Vertex Model Garden availability is verified for `europe-west1`. The contract requires this section be present and ordered, but its contents are deferred until evidence exists.)_
+- 2026-04-26 — gemini-2.5-flash, gemini-2.5-pro, region=europe-west1 — verified via REST functional probe `POST https://europe-west1-aiplatform.googleapis.com/v1/projects/tech-screen-493720/locations/europe-west1/publishers/google/models/{model}:generateContent` (both returned HTTP 200 with valid `generateContent` payloads, `finishReason: MAX_TOKENS`, `promptTokenCount: 1`). Verified by project-owner (Ihor) via Owner-impersonation ADC token. Cost: ~$0.0000003.
 
 ## Smoke-test records
 
