@@ -76,6 +76,13 @@ repos:
         files: ^app/frontend/.*\.(ts|tsx|js|jsx)$
         entry: bash -c 'cd app/frontend && pnpm exec eslint --max-warnings=0 .'
 
+      - id: tokens-drift
+        name: tokens drift (frontend)
+        language: system
+        pass_filenames: false
+        files: ^(docs/design/tokens/.*\.md|app/frontend/src/design/tokens\.ts|app/frontend/src/app/globals\.css|app/frontend/scripts/generate-tokens\.ts)$
+        entry: bash -c 'cd app/frontend && pnpm tokens:check'
+
   # -------------------------------------------------------------------------
   # GitHub Actions — validator, does not rewrite files.
   # -------------------------------------------------------------------------
