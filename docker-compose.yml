@@ -97,7 +97,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-      target: build
+      target: dev
       args:
         NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
         NEXT_PUBLIC_APP_ENV: dev
@@ -109,12 +109,18 @@ services:
       NEXT_PUBLIC_APP_ENV: dev
     ports:
       - "127.0.0.1:3000:3000"
+    # Frontend boots without the backend (FR-003). When `--profile full`
+    # brings the backend up, compose will start it first; when only
+    # `--profile web` is active, `required: false` lets the frontend
+    # come up alone.
     depends_on:
-      - backend
+      backend:
+        condition: service_started
+        required: false
     volumes:
-      - ./app/frontend:/app
-      - frontend-node-modules:/app/node_modules
-    working_dir: /app
+      - ./app/frontend:/app/frontend
+      - frontend-node-modules:/app/frontend/node_modules
+    working_dir: /app/frontend
     command: ["pnpm", "dev", "--hostname", "0.0.0.0", "--port", "3000"]
 
 volumes:

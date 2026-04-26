@@ -84,22 +84,43 @@ services:
         pytest --maxfail=1 --strict-markers -ra app/backend/tests
 
   frontend:
-    profiles: ["e2e", "full"]
+    # No profile — the canonical T03 commands invoke this service
+    # directly via `docker compose -f docker-compose.test.yml run --rm
+    # frontend <cmd>` (e.g., `pnpm test`, `pnpm tokens:check`,
+    # `pnpm exec eslint . && tsc --noEmit`). Mirrors the `backend`
+    # block convention (no profile, `dev` target).
     build:
       context: .
       dockerfile: Dockerfile.frontend
-      target: runtime
+      target: dev
       args:
         NEXT_PUBLIC_API_BASE_URL: http://backend:8000
         NEXT_PUBLIC_APP_ENV: test
     environment:
-      NODE_ENV: production
-      PORT: "3000"
-      HOSTNAME: 0.0.0.0
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_API_BASE_URL: http://backend:8000
       NEXT_PUBLIC_APP_ENV: test
-    depends_on:
-      - backend
+      CI: "1"
+    working_dir: /app/frontend
+    volumes:
+      # Source bind-mount at /app/frontend — matches the dev-image
+      # WORKDIR. Gives `pnpm test`, `pnpm tokens:check`, etc. live
+      # access to source edits. The dev image's
+      # /app/frontend/node_modules is preserved by the anonymous-volume
+      # carve-out below.
+      - ./app/frontend:/app/frontend
+      - /app/frontend/node_modules
+      # The token generator computes REPO_ROOT by walking three levels
+      # up from `app/frontend/scripts/generate-tokens.ts`. Inside the
+      # container that lands at `/`, so the markdown source must live
+      # at /docs/design/tokens. Read-only — tokens are source-of-truth
+      # and tests must not mutate them.
+      - ./docs:/docs:ro
+    # No long-running command. Services here run on-demand via
+    # `run --rm frontend <cmd>`. Matches the backend block's pattern
+    # of staying idle until the runner activates it.
+    command: ["tail", "-f", "/dev/null"]
 
   e2e:
     profiles: ["e2e"]
