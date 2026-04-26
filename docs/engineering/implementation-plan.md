@@ -147,14 +147,15 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 - **agent:** `backend-engineer`
 - **parallel:** false (blocks T17, T18, T20, T21 — all LLM-touching tasks)
 - **depends_on:** [T02, T01a]
-- **contract:** none (internal module `app/backend/llm/vertex.py`)
+- **contract:** none (internal package `app/backend/llm/`; public entry point re-exported from `app/backend/llm/__init__.py`)
 - **description:**
-  Single entry-point `call(model, prompt, *, response_schema, timeout_s=30, max_output_tokens=4096, session_id)` wrapping Vertex AI Model Garden. Must: enforce §12 hard caps, retry on 5xx / schema-miss with tenacity (max 2 retries, exponential backoff), record `turn_trace` fields (prompt, raw, parsed, tokens, latency, cost, model, agent_type, session_id), raise typed errors (`VertexTimeoutError`, `VertexSchemaError`). Pre-commit hook `no-direct-vertex-import` enforces that all callers import from this module only.
+  Single async entry-point `call_model(request, *, sink, ledger, settings)` exported from the `app/backend/llm/` package (re-exported from `vertex.py`). Wraps Vertex AI via the `google-genai` async client. Must: enforce §12 hard caps via Pydantic field validators, retry on transient upstream failures (uniform 3-attempt budget; `DeadlineExceeded` excluded) with tenacity exponential backoff under a 30-s wall-clock cap, write a `TraceRecord` synchronously before returning (sink failure → `TraceWriteError`; auditability §1 trumps the otherwise-OK call), raise typed errors (`ModelCallConfigError`, `VertexTimeoutError`, `VertexUpstreamUnavailableError`, `VertexSchemaError`, `SessionBudgetExceeded`, `TraceWriteError`). Schema-miss raises `VertexSchemaError` immediately — per-agent retry policies live in agent modules (T18–T21). Pre-commit hook `no-provider-sdk-imports` (script: `scripts/check-no-provider-sdk-imports.sh`) enforces that no module outside the `_real_backend.py` / `_mock_backend.py` allowlist imports a model-provider SDK.
 - **acceptance:**
   - Smoke test hits Gemini 2.5 Flash and returns parsed JSON conforming to a supplied schema.
-  - Unit tests cover: timeout >30s raises `VertexTimeoutError`; schema miss retries then raises `VertexSchemaError`; cost recorded via injected tracker.
+  - Unit tests cover: timeout >30s raises `VertexTimeoutError`; schema miss raises `VertexSchemaError` immediately; per-agent retry policies live in agent modules; cost recorded via injected tracker.
   - `ruff` + `mypy --strict` pass.
 - **references:** ADR-006, ADR-013, constitution §12, docs/engineering/vertex-integration.md
+- **note:** Schema-miss policy reconciled per `specs/007-t04-vertex-client-wrapper/spec.md` Clarifications 2026-04-26 — the wrapper raises immediately; Assessor / Planner / Interviewer each apply their own retry / fallback / escalation in T18–T21.
 
 ### T05 — DB schema v0 + Alembic baseline + append-only enforcement
 

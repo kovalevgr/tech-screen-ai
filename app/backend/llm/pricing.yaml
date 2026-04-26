@@ -1,0 +1,16 @@
+# Vertex AI price table (USD per 1k tokens, region europe-west1).
+#
+# Authoritative source for per-call cost computation in app/backend/llm/pricing.py.
+# Per ADR-003 (model choice) + ADR-015 (region). Constitution §16 (configs as code).
+#
+# Prices are quoted as STRINGS to preserve Decimal precision through pyyaml.
+# An unknown model identifier is a configuration error (FR-010) — never
+# treated as a zero price.
+
+gemini-2.5-flash:
+  input_per_1k_tokens: "0.000075"
+  output_per_1k_tokens: "0.000300"
+
+gemini-2.5-pro:
+  input_per_1k_tokens: "0.00125"
+  output_per_1k_tokens: "0.00500"
