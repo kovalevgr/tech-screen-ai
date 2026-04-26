@@ -104,7 +104,7 @@ At least one `status=pass` bullet is required for T01a acceptance; at least one 
 A Markdown bullet list of live follow-ups the log tracks until they close. Minimum initial content:
 
 ```markdown
-- Swap the MVP budget-alert recipient (Ihor's personal N-iX mailbox) for a shared group alias once N-iX IT provisions one. One-line `envs/prod/terraform.tfvars` edit + `terraform apply`.
+- Swap the MVP budget-alert recipient (Ihor's personal N-iX mailbox) for a shared group alias once N-iX IT provisions one. One-line `terraform.tfvars` edit + `terraform apply`.
 ```
 
 Additional bullets may be added (e.g. "probe Model Garden quarterly for Gemini 2.6 GA"). When a follow-up closes, strike it through and annotate with the resolution date rather than deleting it.
@@ -151,7 +151,7 @@ _(none yet — first bullet appended in Phase 6 once `infra/scripts/vertex-smoke
 
 ## Follow-ups
 
-- Swap the MVP budget-alert recipient (Ihor's personal N-iX mailbox) for a shared group alias once N-iX IT provisions one. One-line `envs/prod/terraform.tfvars` edit + `terraform apply`.
+- Swap the MVP budget-alert recipient (Ihor's personal N-iX mailbox) for a shared group alias once N-iX IT provisions one. One-line `terraform.tfvars` edit + `terraform apply`.
 ```
 
 ## 9. Consumers

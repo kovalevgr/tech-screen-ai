@@ -15,7 +15,11 @@ description: "Task list for T01a — Vertex AI quota + region request"
 
 ## Note on the T01a IAM seed
 
-T01a commits **two** resource files under `infra/terraform/`: `billing.tf` (the budgets + notification channel — see Phase 5) and `iam.tf` (the seed runtime-SA slice — see Phase 6). Both are described in [`plan.md`](./plan.md) §Project Structure and §"Structure Decision", and the rationale for why `iam.tf` is part of T01a (FR-006 smoke test impersonation requirement; spec Assumption + Clarifications Q4) is in [`research.md`](./research.md) §R6. The `iam.tf` content T01a commits is strictly three resources: the `techscreen-backend@` SA, its `roles/aiplatform.user` binding, and a `roles/iam.serviceAccountTokenCreator` binding on that SA for the Owner principal that runs the smoke. T06 will later **extend the same file** with additional role bindings (Cloud SQL, Secret Manager, logging, monitoring) — additive, no rewrite.
+T01a commits **two** new resource files under `infra/terraform/`: `billing.tf` (the budgets + notification channel — see Phase 5) and `iam.tf` (the seed runtime-SA slice — see Phase 6). Both are described in [`plan.md`](./plan.md) §Project Structure and §"Structure Decision", and the rationale for why `iam.tf` is part of T01a (FR-006 smoke test impersonation requirement; spec Assumption + Clarifications Q4) is in [`research.md`](./research.md) §R6. The `iam.tf` content T01a commits is strictly three resources: the `techscreen-backend@` SA, its `roles/aiplatform.user` binding, and a `roles/iam.serviceAccountTokenCreator` binding on that SA for the Owner principal that runs the smoke. T06 will later **extend the same file** with additional role bindings (Cloud SQL, Secret Manager, logging, monitoring) — additive, no rewrite.
+
+## Post-rebase note (2026-04-26)
+
+Between `/speckit-tasks` and `/speckit-implement`, **PR #2 (`002-terraform-backend-bootstrap`)** landed on main and seeded `infra/terraform/` with `provider.tf` + `versions.tf` + `backend.tf` (hardcoded bucket) + root `terraform.tfvars` + `.gitignore` + `.terraform.lock.hcl` (provider `~> 6.0`). On rebase, T01a's tasks **T002–T005** were marked **superseded by PR #2** — Ihor does not re-do them. **T006** was reframed from "create `envs/prod/terraform.tfvars` with placeholder values" to "extend root `terraform.tfvars` with three additional values" — a smaller edit on top of PR #2's baseline. **T015 / T016 / T020** had their `terraform plan` invocations simplified (no `-backend-config=`, no `-var-file=`; `terraform.tfvars` is auto-loaded from the working directory). The merged result was committed as `feat(T01a): seed Terraform billing + IAM, smoke script, quota log skeleton` after rebase (commit `c76476c`).
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -25,7 +29,7 @@ T01a commits **two** resource files under `infra/terraform/`: `billing.tf` (the 
 
 ## Path Conventions
 
-- Terraform HCL: `infra/terraform/*.tf` (root module) and `infra/terraform/envs/prod/`.
+- Terraform HCL: `infra/terraform/*.tf` (flat root module — PR #2 baseline + T01a additions; no `envs/prod/` split per the post-rebase note above).
 - Smoke script: `infra/scripts/vertex-smoke.sh` (first inhabitant of a new `infra/scripts/` folder).
 - Quota log: `docs/engineering/vertex-quota.md` (new file, conforms to [contracts/vertex-quota-log-format.md](./contracts/vertex-quota-log-format.md)).
 - Doc edits: `docs/engineering/cloud-setup.md`, `docs/engineering/directory-map.md`.
@@ -46,11 +50,11 @@ T01a commits **two** resource files under `infra/terraform/`: `billing.tf` (the 
 
 **⚠️ CRITICAL**: Phases 3–6 cannot begin until this phase is complete.
 
-- [X] T002 [P] Create `infra/terraform/providers.tf` declaring the `hashicorp/google` provider `~> 5.30` with `region = var.region` and `project = var.project_id`. Add `terraform { required_version = ">= 1.5" required_providers { google = { source = "hashicorp/google", version = "~> 5.30" } } }`. No `google-beta` for T01a. Reference: [research.md](./research.md) §R3, §R6. **Done 2026-04-26.**
-- [X] T003 [P] Create `infra/terraform/variables.tf` declaring: `project_id` (string, no default), `project_number` (string, no default — sourced from `gcloud projects describe` per `infra/bootstrap.sh`), `billing_account` (string, no default), `region` (string, default `"europe-west1"`), `ops_email` (string, no default). Each variable has a one-line `description`. No `sensitive = true` flags — all five values are identifiers/addresses, not secrets (per FR-008 + ADR-022). **Done 2026-04-26.**
-- [X] T004 [P] Create `infra/terraform/backend.tf` — empty `terraform { backend "gcs" {} }` block. The concrete bucket + prefix live under `envs/prod/backend.hcl` so the same root module can later support additional envs if ADR-009 is ever revised (not planned, but the hook is free). **Done 2026-04-26.**
-- [X] T005 [P] Create `infra/terraform/envs/prod/backend.hcl` with the GCS backend configuration: `bucket = "<project-id>-tfstate"` (matches `infra/bootstrap.sh` default `TF_STATE_BUCKET`), `prefix = "terraform/state"`. This file is not referenced directly by the root module; it is passed via `terraform init -backend-config=envs/prod/backend.hcl`. **Done 2026-04-26.** Bucket placeholder `techscreen-prod-tfstate` follows bootstrap.sh's `${PROJECT_ID}-tfstate` pattern; if Ihor used a different `TF_STATE_BUCKET` at bootstrap time, this file needs a one-line update before `terraform init`.
-- [X] T006 [P] Create `infra/terraform/envs/prod/terraform.tfvars` with the concrete prod values: `project_id = "<techscreen-prod project id>"`, `project_number = "463244185014"` (per [`docs/engineering/cloud-setup.md`](../../docs/engineering/cloud-setup.md) line 11), `billing_account = "<N-iX billing account ID>"`, `region = "europe-west1"`, `ops_email = "<Ihor's N-iX mailbox>"`. Do **not** invent placeholder values — the file lands with real values filled in by the Owner before `terraform apply`. Before commit, run the T01 `gitleaks` + `detect-secrets` hooks over this file (FR-008, SC-006). **Done 2026-04-26 (with explicit `<FILL-IN: …>` placeholders for `project_id`, `billing_account`, `ops_email`).** Ihor MUST replace those placeholders before T016 `terraform plan` — Phase 5/6 will fail with `Error: variables not set` until done. `project_number` and `region` carry their canonical committed values.
+- [X] ~~T002 [P] Create `infra/terraform/providers.tf`...~~ **Superseded by PR #2 (`002-terraform-backend-bootstrap`).** PR #2 ships `provider.tf` (singular) + `versions.tf` (separate, provider `~> 6.0`). T01a takes that as baseline.
+- [X] ~~T003 [P] Create `infra/terraform/variables.tf` declaring 5 vars...~~ **Superseded + extended.** PR #2's `variables.tf` declares `project_id` + `region`. T01a appends `project_number`, `billing_account`, `ops_email` to the same file. **Done 2026-04-26 (post-rebase).**
+- [X] ~~T004 [P] Create `infra/terraform/backend.tf` — empty `terraform { backend "gcs" {} }` block...~~ **Superseded by PR #2.** PR #2's `backend.tf` has hardcoded `bucket = "tech-screen-493720-tf-state"`, `prefix = "terraform/state"` — no `-backend-config=` indirection. T01a takes that as-is.
+- [X] ~~T005 [P] Create `infra/terraform/envs/prod/backend.hcl`...~~ **Removed by rebase.** PR #2's flat layout has no `envs/prod/`; backend bucket is hardcoded inline.
+- [X] T006 [P] **Reframed by rebase.** PR #2 ships `infra/terraform/terraform.tfvars` (in repo root, not `envs/prod/`) with `project_id = "tech-screen-493720"` + `region = "europe-west1"` (real values). T01a appends three more values to the same file: `project_number = "463244185014"` (canonical, committed), `billing_account = "<FILL-IN: N-iX billing account ID>"`, `ops_email = "<FILL-IN: Ihor's N-iX mailbox>"`. **Done 2026-04-26 (post-rebase).** Ihor MUST replace the two `<FILL-IN: …>` placeholders before Phase 5 `terraform plan` — apply will fail with "variables not set" until done. `project_id`, `region`, `project_number` carry their canonical committed values.
 - [X] T007 [P] Create `docs/engineering/vertex-quota.md` using the exact starter template from [contracts/vertex-quota-log-format.md](./contracts/vertex-quota-log-format.md) §8. The file MUST contain the six fixed top-level sections in order (`# TechScreen — Vertex AI Quota Log`, `## Re-evaluation trigger`, `## Quota requests`, `## Region verification`, `## Smoke-test records`, `## Follow-ups`). Section contents at T007 commit time:
     - **Re-evaluation trigger**: filled in (the canonical "> 20 concurrent sessions → raise T01a-v2" paragraph).
     - **Quota requests**: header row + two `status = pending` rows (one per model). The `default`, `case_id`, and `granted` columns carry placeholders — `<observed>` / empty — to be filled by T012, T013, T014.
@@ -108,7 +112,7 @@ T01a commits **two** resource files under `infra/terraform/`: `billing.tf` (the 
 
 **Goal**: Two `google_billing_budget` resources (project-wide $50/mo and Vertex-only $20/mo) with 50/90/100 % thresholds, both routing to a single `google_monitoring_notification_channel` pointed at Ihor's N-iX mailbox. Configured in Terraform so future rotations are diff-reviewable.
 
-**Independent Test**: Run `terraform -chdir=infra/terraform plan -var-file=envs/prod/terraform.tfvars` and confirm exactly three resources to add, zero to change, zero to destroy. After `terraform apply`, trigger a test notification in GCP Console → Billing → Budgets & Alerts and confirm it arrives in the mailbox.
+**Independent Test**: Run `terraform -chdir=infra/terraform plan` (after PR #2's `terraform init` is in state — `terraform.tfvars` auto-loads from the working dir) and confirm exactly three resources to add, zero to change, zero to destroy. After `terraform apply`, trigger a test notification in GCP Console → Billing → Budgets & Alerts and confirm it arrives in the mailbox.
 
 ### Implementation for User Story 2
 
@@ -121,8 +125,8 @@ T01a commits **two** resource files under `infra/terraform/`: `billing.tf` (the 
     ```bash
     cd infra/terraform
     gcloud auth application-default login   # if not already
-    terraform init -backend-config=envs/prod/backend.hcl
-    terraform plan -var-file=envs/prod/terraform.tfvars -out=tfplan-phase5
+    terraform init                          # backend bucket is hardcoded in backend.tf (PR #2)
+    terraform plan -out=tfplan-phase5       # terraform.tfvars auto-loads from the working dir
     ```
   Expected summary: **3 to add**, 0 to change, 0 to destroy (channel + 2 budgets). Paste the summary into the PR description per [`docs/engineering/cloud-setup.md`](../../docs/engineering/cloud-setup.md) §"How to apply a change". If the plan shows any other resource, STOP — investigate drift before applying.
 - [ ] T017 [US2] (Human — Ihor) Apply the Phase-5 plan: `terraform apply tfplan-phase5`. On success, in GCP Console → Billing → Budgets & Alerts, open each of the two budgets and trigger the email test notification at the 50 % threshold. Confirm both test emails arrive in the mailbox within the same minute. If either does not arrive within 5 minutes, investigate (common cause: mailbox forwarding rules) and do not merge until resolved.
@@ -152,7 +156,7 @@ T01a commits **two** resource files under `infra/terraform/`: `billing.tf` (the 
     - On HTTP 200 **and** latency < 10 000 ms: print one line exactly matching the contract schema from [contracts/vertex-quota-log-format.md](./contracts/vertex-quota-log-format.md) §5 — **comma-separated key=value pairs**: `runner=local-adc-impersonation, model=${MODEL}, region=${REGION}, latency_ms=<N>, status=pass`. Exit 0.
     - On any non-200 response or timeout: print the same comma-separated line with `status=fail` and an optional trailing `, notes=<short-token>` (e.g. `, notes=http429`), exit 1. `notes` value MUST NOT contain a comma (commas terminate parsing per contract §5).
     - Keep the script under ~50 lines. No jq dependency.
-- [ ] T020 [US4] (Human — Ihor, from an Owner-authenticated machine) Apply the Phase-6 delta: `cd infra/terraform && terraform plan -var-file=envs/prod/terraform.tfvars -out=tfplan-phase6 && terraform apply tfplan-phase6`. Expected new resources: 1 service account + 1 project-level IAM binding + 1 SA-level IAM binding. Budget resources from Phase 5 remain unchanged.
+- [ ] T020 [US4] (Human — Ihor, from an Owner-authenticated machine) Apply the Phase-6 delta: `cd infra/terraform && terraform plan -out=tfplan-phase6 && terraform apply tfplan-phase6`. Expected new resources: 1 service account + 1 project-level IAM binding + 1 SA-level IAM binding. Budget resources from Phase 5 remain unchanged.
 - [ ] T021 [US4] (Human — Ihor) Execute the smoke script against prod: `PROJECT_ID=<prod-project-id> bash infra/scripts/vertex-smoke.sh`. Expect exit 0 and a single stdout line containing `status=pass` and `latency_ms < 10000`, in the comma-separated format defined by contract §5. **Append** the first real bullet to the "Smoke-test records" section of `docs/engineering/vertex-quota.md` of the form `- YYYY-MM-DD — <stdout line>` (prepend today's ISO date and the em-dash separator; copy the script's stdout line **verbatim** — no re-formatting, since the script already emits commas) **and remove** the deferred-placeholder italic line that T007 committed. The git commit for T021 is the first one to record smoke evidence — the placeholder removal and the bullet append happen in the same commit. If the script exits non-zero, debug using [quickstart.md](./quickstart.md) §Troubleshooting; append a `status=fail` bullet *as well as* the eventual `status=pass` bullet (append-only discipline, contract §5 — both bullets remain in the log permanently).
 
 **Checkpoint**: Smoke-test record with `status=pass, latency_ms < 10000, runner=local-adc-impersonation` is committed. Spec FR-006 and SC-004 are satisfied for T01a merge. T11 will later append the `runner=cloud-run-revision-<id>` bullet (FR-006a) — out of scope here.
@@ -214,15 +218,11 @@ T01a commits **two** resource files under `infra/terraform/`: `billing.tf` (the 
 
 ## Parallel Example: Phase 2 Foundational
 
-All eight Phase-2 tasks touch disjoint files and can be authored in any order. A typical orchestrator open sequence:
+After the rebase onto PR #2, Phase 2 shrunk from 8 disjoint authoring tasks to 4 (T002–T005 superseded by PR #2; T006 became a small append to PR #2's `terraform.tfvars`). The remaining four touch disjoint files and can be authored in any order:
 
 ```bash
-# No dependency between these eight files — any order works.
-Task: "T002 — write infra/terraform/providers.tf"
-Task: "T003 — write infra/terraform/variables.tf"
-Task: "T004 — write infra/terraform/backend.tf"
-Task: "T005 — write infra/terraform/envs/prod/backend.hcl"
-Task: "T006 — write infra/terraform/envs/prod/terraform.tfvars"
+# No dependency between these four files — any order works.
+Task: "T006 — append three values to infra/terraform/terraform.tfvars (root, on top of PR #2)"
 Task: "T007 — write docs/engineering/vertex-quota.md"
 Task: "T008 — edit docs/engineering/directory-map.md"
 Task: "T009 — edit docs/engineering/cloud-setup.md"

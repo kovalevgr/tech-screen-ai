@@ -1,7 +1,9 @@
 # Implementation Plan: Vertex AI quota + region request (T01a)
 
-**Branch**: `003-vertex-quota-region` | **Date**: 2026-04-24 | **Spec**: [spec.md](./spec.md)
+**Branch**: `003-vertex-quota-region` | **Date**: 2026-04-24 (post-rebase amendment 2026-04-26) | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `specs/003-vertex-quota-region/spec.md`
+
+> **POST-REBASE NOTE (2026-04-26).** Between `/speckit-plan` and `/speckit-implement`, **PR #2 (`002-terraform-backend-bootstrap`, commit `a4ed063`)** landed on main. PR #2 seeded `infra/terraform/` first — with `provider.tf` (singular) + `versions.tf` (separate, provider `~> 6.0`) + `backend.tf` (hardcoded GCS bucket `tech-screen-493720-tf-state`) + `terraform.tfvars` in repo root (no `envs/prod/`) + `.gitignore` + lockfile. T01a was rebased onto that baseline. The Project Structure tree below and the Structure Decision were corrected to reflect the rebased reality; the rest of the plan (Constitution Check, Phase outlines) is unchanged. See `research.md` POST-REBASE NOTE and §R6 for the same amendment from a research-doc angle.
 
 ## Summary
 
@@ -117,19 +119,19 @@ After T01a merges, the repo delta looks like this. Bold entries are created or e
 │   ├── bootstrap.sh                      # pre-existing, unchanged
 │   ├── scripts/                          # NEW folder (T01a — first inhabitant; .gitkeep not needed since vertex-smoke.sh is inside)
 │   │   └── vertex-smoke.sh               # NEW — minimal Bash smoke-test runner (ADC impersonation → Gemini 2.5 Flash in europe-west1 → latency report)
-│   └── terraform/                        # seeded by T01a (first HCL under this tree)
-│       ├── backend.tf                    # NEW — GCS backend pointing at bootstrap-created state bucket
-│       ├── providers.tf                  # NEW — google provider pinned to europe-west1; provider version constraint
-│       ├── variables.tf                  # NEW — project_id, billing_account, ops_email, region (plus defaults where safe)
-│       ├── billing.tf                    # NEW — google_monitoring_notification_channel + 2× google_billing_budget
-│       ├── iam.tf                        # NEW — google_service_account techscreen_backend + roles/aiplatform.user + roles/iam.serviceAccountTokenCreator on the Owner principal (smoke-impersonation grant). T06 extends with Cloud SQL/Secret Manager/logging/monitoring bindings.
-│       └── envs/
-│           └── prod/
-│               ├── backend.tf            # NEW — backend bucket + prefix for prod
-│               └── terraform.tfvars      # NEW — concrete prod values (project_id, billing_account, ops_email, region)
+│   └── terraform/                        # PR #2 seeded the root module; T01a layered billing + iam on top
+│       ├── backend.tf                    # PR #2 (unchanged) — hardcoded GCS bucket "tech-screen-493720-tf-state"
+│       ├── provider.tf                   # PR #2 (unchanged) — google provider config
+│       ├── versions.tf                   # PR #2 (unchanged) — terraform>=1.5, provider hashicorp/google ~> 6.0
+│       ├── variables.tf                  # MERGED — PR #2's project_id + region; T01a added project_number, billing_account, ops_email
+│       ├── terraform.tfvars              # MERGED — PR #2's project_id + region (real values); T01a added project_number value + billing_account/ops_email placeholders (Ihor fills before apply)
+│       ├── .gitignore                    # PR #2 (unchanged) — terraform state + plan ignores
+│       ├── .terraform.lock.hcl           # PR #2 (unchanged) — provider 6.50.0
+│       ├── billing.tf                    # T01a NEW — google_monitoring_notification_channel + 2× google_billing_budget
+│       └── iam.tf                        # T01a NEW — google_service_account techscreen_backend + roles/aiplatform.user + roles/iam.serviceAccountTokenCreator on the Owner principal (smoke-impersonation grant). T06 extends with Cloud SQL/Secret Manager/logging/monitoring bindings.
 ```
 
-**Structure Decision**: T01a is the first task to place HCL under `infra/terraform/`. The directory-map already lists `infra/terraform/` as owned by T06 ("Cloud Run + Cloud SQL + Secret Manager + Identity Platform + budget alerts"), so T01a explicitly takes **two** narrow slices of that ownership early: (1) the *billing alerts* slice (`billing.tf` + the notification channel) and (2) the *runtime-SA seed* slice (`iam.tf` — only the `techscreen-backend@` SA, its `roles/aiplatform.user` binding, and the `serviceAccountTokenCreator` binding for the Owner that runs the smoke). The runtime-SA slice is the minimum required for the FR-006 smoke test to impersonate the intended runtime identity from a developer laptop without a JSON key, and is sanctioned by the spec's Assumption that the SA "has `roles/aiplatform.user` either by T01a time or by T06 time" combined with Clarifications Q4 (T01a does not block on T06). All other slices (Cloud Run, Cloud SQL, Secret Manager, logging, monitoring, plus additional SA bindings) remain T06's. T01a's HCL is deliberately minimal (providers + backend + two resource files) so T06 extends `iam.tf` additively and adds the rest — never renames or splits an existing file. The `envs/prod/` split matches what [`docs/engineering/cloud-setup.md`](../../docs/engineering/cloud-setup.md) already anticipates. No `envs/dev/` is introduced — per constitution §8.
+**Structure Decision (post-rebase)**: PR #2 (`002-terraform-backend-bootstrap`) was the first task to place HCL under `infra/terraform/` and chose a flat root layout (no `envs/prod/` split, hardcoded backend bucket, separate `provider.tf` + `versions.tf`). T01a was rebased onto that baseline and adopted PR #2's conventions wholesale, adding only what T01a uniquely needs: extra variables in `variables.tf` (`project_number`, `billing_account`, `ops_email`), placeholder values in `terraform.tfvars`, and two new resource files — `billing.tf` (the *billing alerts* slice) and `iam.tf` (the *runtime-SA seed* slice — only the `techscreen-backend@` SA, its `roles/aiplatform.user` binding, and the `serviceAccountTokenCreator` binding for the Owner that runs the smoke). The runtime-SA slice is the minimum required for the FR-006 smoke test to impersonate the intended runtime identity from a developer laptop without a JSON key, and is sanctioned by the spec's Assumption that the SA "has `roles/aiplatform.user` either by T01a time or by T06 time" combined with Clarifications Q4 (T01a does not block on T06). T06 will later extend `iam.tf` additively (more bindings on the same SA) and add `sql.tf`, `cloud_run.tf`, `artifact_registry.tf`, `secrets.tf`, `monitoring.tf`, `network.tf`. The directory-map row for `infra/terraform/` is updated to reflect this layered ownership (PR #2 baseline + T01a additions + T06 extensions). No `envs/dev/` is introduced — per constitution §8.
 
 The `infra/scripts/` folder is new; the smoke-test runner is its first inhabitant. This is a deliberately small addition (one file) — placing the script under `infra/` keeps it near the Terraform that provisions the thing it exercises, and `bash` is the only sensible runtime (no Python packaging required). The script is self-documenting with a usage comment, matches the `bootstrap.sh` style, and re-runs at T11 against a deployed Cloud Run revision (FR-006a).
 

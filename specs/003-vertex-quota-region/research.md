@@ -1,8 +1,10 @@
 # Phase 0 — Research: Vertex AI quota + region request (T01a)
 
-**Branch**: `003-vertex-quota-region` · **Date**: 2026-04-24 · **Input**: [plan.md](./plan.md)
+**Branch**: `003-vertex-quota-region` · **Date**: 2026-04-24 (post-rebase amendment 2026-04-26) · **Input**: [plan.md](./plan.md)
 
 This document resolves the implementation-detail questions raised in `plan.md` §Phase 0. Each section records the **Decision**, **Rationale**, and **Alternatives considered**. Sources are cited inline so a reviewer can follow up without rediscovering them.
+
+> **POST-REBASE NOTE (2026-04-26).** Between T01a's `/speckit-plan` and `/speckit-implement`, **PR #2 (`002-terraform-backend-bootstrap`, commit `a4ed063`)** landed on main. PR #2 seeded `infra/terraform/` with a different convention than R6 originally proposed: `provider.tf` (singular, provider-only), `versions.tf` (separate, terraform{} block, **provider pinned to `~> 6.0`** not `~> 5.30`), `backend.tf` (hardcoded bucket `tech-screen-493720-tf-state`, no `-backend-config=` indirection), `terraform.tfvars` in repo root (no `envs/prod/` split), `.gitignore`. T01a was rebased onto that baseline; the active layout is the rebased one. Decisions R3 and R6 below are **amended in place** to reflect the rebased reality; the original wording is preserved by intent (decisions stand) but file/path/version specifics are corrected. The rationale and alternatives sections still describe the original reasoning.
 
 ---
 
@@ -52,7 +54,7 @@ This is the same command committed in the quickstart so the log's `default` valu
 - `threshold_rules` — three per budget at `0.5`, `0.9`, `1.0` of `CURRENT_SPEND` (the spend-based threshold, not forecasted).
 - `all_updates_rule.monitoring_notification_channels` — one channel reference, described in R4.
 
-Provider constraint: `hashicorp/google` `~> 5.30` (current as of 2026-04 — `google_billing_budget` is GA). Terraform `>= 1.5`.
+Provider constraint: `hashicorp/google` **`~> 6.0`** (set by PR #2's `versions.tf`). Terraform `>= 1.5`. `google_billing_budget` is GA in 5.x and 6.x; T01a HCL was validated under provider 6.50.0 (the version pinned in `.terraform.lock.hcl` after rebase).
 
 **Rationale.** Two `google_billing_budget` resources is the minimum footprint that expresses the two-budget decision from Clarifications Q5. Using `budget_filter.services` rather than a label-based filter matches GCP's documented rate-limit-by-service pattern for Vertex spend. Current-spend thresholds (not forecast) avoid early false positives while still firing well before the hard cap.
 
@@ -66,7 +68,7 @@ Provider constraint: `hashicorp/google` `~> 5.30` (current as of 2026-04 — `go
 
 ## R4 — `google_monitoring_notification_channel` for email
 
-**Decision.** A single `google_monitoring_notification_channel` resource of `type = "email"` with `labels.email_address` pointing at Ihor's N-iX mailbox (value supplied via `var.ops_email` from `envs/prod/terraform.tfvars`). Both budgets reference this single channel via `all_updates_rule.monitoring_notification_channels`. GCP email channels are created declaratively with no verification handshake for Google-hosted addresses (Workspace-delegated N-iX mailboxes qualify) — the channel is immediately usable after apply.
+**Decision.** A single `google_monitoring_notification_channel` resource of `type = "email"` with `labels.email_address` pointing at Ihor's N-iX mailbox (value supplied via `var.ops_email` from `infra/terraform/terraform.tfvars` — root tfvars after rebase, see POST-REBASE NOTE). Both budgets reference this single channel via `all_updates_rule.monitoring_notification_channels`. GCP email channels are created declaratively with no verification handshake for Google-hosted addresses (Workspace-delegated N-iX mailboxes qualify) — the channel is immediately usable after apply.
 
 **Rationale.** Terraform-managed email channels are supported as first-class resources by the `google` provider and require no manual step. One channel, two budgets is the minimum deduplication. Using a Terraform variable for the email value means rotating the recipient (e.g. later swap to `techscreen-alerts@n-ix.com`) is a one-line tfvars change, which is exactly the follow-up the clarifications call for.
 
@@ -102,11 +104,11 @@ The 8-token output cap keeps the call below $0.0001, so the script is safe to re
 
 ## R6 — Terraform root layout (T01a-seeded, T06-extended)
 
-**Decision.** T01a creates a flat root module at `infra/terraform/` with **one file per concern**: `backend.tf`, `providers.tf`, `variables.tf`, `billing.tf`, **and a minimal `iam.tf`**. The `envs/prod/` directory holds `backend.tf` (backend bucket + prefix) and `terraform.tfvars` (concrete values). T06 will later add `sql.tf`, `cloud_run.tf`, `artifact_registry.tf`, `secrets.tf`, `monitoring.tf`, `network.tf` as new files, **and extend `iam.tf` additively** (more role bindings on the same `techscreen-backend@` SA — Cloud SQL client, Secret Manager accessor, logging writer, monitoring writer), reusing `providers.tf` and `variables.tf` unchanged.
+**Decision (post-rebase).** The flat root module at `infra/terraform/` was seeded by **PR #2** with: `provider.tf` (provider config only — no `terraform{}` block), `versions.tf` (terraform-version + provider-version pin, `~> 6.0`), `backend.tf` (hardcoded GCS bucket `tech-screen-493720-tf-state`, prefix `terraform/state` — no `-backend-config=` indirection), `variables.tf` (with `project_id`, `region`), `terraform.tfvars` (root, with real values for the same), `.gitignore`, `.terraform.lock.hcl`. **T01a layered on top**: extra variables in `variables.tf` (`project_number`, `billing_account`, `ops_email`), placeholder values in root `terraform.tfvars`, plus two new resource files: `billing.tf` (notification channel + 2 budgets) and a minimal `iam.tf` (runtime SA + 2 IAM bindings). T06 will later add `sql.tf`, `cloud_run.tf`, `artifact_registry.tf`, `secrets.tf`, `monitoring.tf`, `network.tf` as new files, **and extend `iam.tf` additively** (more role bindings on the same `techscreen-backend@` SA — Cloud SQL client, Secret Manager accessor, logging writer, monitoring writer), reusing `provider.tf` / `versions.tf` / `variables.tf` / `backend.tf` unchanged.
 
 The reason `iam.tf` is in T01a's slice (and not deferred to T06) is the FR-006 smoke test: it impersonates `techscreen-backend@<project>` via `gcloud auth print-access-token --impersonate-service-account=…`, which requires (a) the SA to exist, (b) `roles/aiplatform.user` to be bound to it, and (c) `roles/iam.serviceAccountTokenCreator` on that SA for the human Owner identity that runs the smoke. The spec's Assumption explicitly permits T01a to own this slice ("the runtime SA has `roles/aiplatform.user` either by T01a time or by T06 time"); Clarifications Q4 closed the choice to "T01a time" (T01a does not block on T06). T01a's `iam.tf` is strictly these three resources — anything else is T06's.
 
-**Rationale.** This mirrors exactly the layout already anticipated in [`docs/engineering/cloud-setup.md`](../../docs/engineering/cloud-setup.md) §"Terraform layout". Introducing the layout *now* — with only `billing.tf` and a seed `iam.tf` as real resource files — means T06 slots in by adding files (Cloud SQL, Cloud Run, Secret Manager, monitoring, network) and *extending* `iam.tf` additively, never by renaming or splitting an existing file. The `envs/prod/` pattern leaves the door open for a T01a-v2 / T06 `envs/*` evolution without relitigating.
+**Rationale.** PR #2 chose a simpler convention than the original R6 proposal: no `envs/prod/` split, hardcoded backend bucket, separate `provider.tf` + `versions.tf`. Since constitution §8 forbids long-lived non-prod environments anyway, the `envs/prod/` indirection had no concrete near-term consumer. Adopting PR #2's flatter shape removed two files (`envs/prod/backend.hcl`, `envs/prod/terraform.tfvars`) and one indirection (`-backend-config=`) without changing what T01a delivers. T06 still slots in by adding files (Cloud SQL, Cloud Run, Secret Manager, monitoring, network) and *extending* `iam.tf` additively, never by renaming or splitting an existing file.
 
 **Alternatives considered.**
 

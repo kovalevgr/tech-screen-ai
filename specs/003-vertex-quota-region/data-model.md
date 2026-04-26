@@ -84,7 +84,7 @@ Each entity below lists: its **physical form** (where the row actually lives), i
 |-------|---------------|--------------------------|
 | `display_name` | string | `"TechScreen budget alerts (MVP recipient)"` |
 | `type` | string (GCP channel type) | `"email"` |
-| `labels.email_address` | string | `var.ops_email`, resolved from `envs/prod/terraform.tfvars` |
+| `labels.email_address` | string | `var.ops_email`, resolved from `terraform.tfvars` |
 | `enabled` | boolean | `true` |
 
 **Lifecycle.**

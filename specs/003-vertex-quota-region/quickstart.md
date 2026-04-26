@@ -50,8 +50,8 @@ From the repo root:
 
 ```bash
 cd infra/terraform
-terraform init -backend-config=envs/prod/backend.hcl   # first-time only
-terraform plan -var-file=envs/prod/terraform.tfvars -out=tfplan-phase5
+terraform init                       # first-time only; backend bucket is hardcoded in backend.tf (PR #2 baseline)
+terraform plan -out=tfplan-phase5    # terraform.tfvars is auto-loaded from the working dir
 ```
 
 Verify the Phase 5 plan summary against `tasks.md` T016 expectations:
@@ -62,14 +62,14 @@ Verify the Phase 5 plan summary against `tasks.md` T016 expectations:
 - [ ] The Vertex-only budget's `amount.specified_amount.units = "20"`, `currency_code = "USD"`, and `budget_filter.services = ["services/aiplatform.googleapis.com"]` (Clarifications 2026-04-24 Q5).
 - [ ] Both budgets have exactly three `threshold_rules` at `0.5`, `0.9`, `1.0`.
 - [ ] Both budgets reference the same `monitoring_notification_channels` (single shared channel).
-- [ ] The notification channel `type = "email"` and the email address is the MVP recipient named in the clarifications — sanity-check against `envs/prod/terraform.tfvars`.
+- [ ] The notification channel `type = "email"` and the email address is the MVP recipient named in the clarifications — sanity-check against `terraform.tfvars`.
 
 ### Step 3b — Phase 6 plan (runtime SA + IAM bindings)
 
 After (or alongside) Step 3a, generate the Phase 6 plan:
 
 ```bash
-terraform plan -var-file=envs/prod/terraform.tfvars -out=tfplan-phase6
+terraform plan -out=tfplan-phase6
 ```
 
 If Step 3a's apply has already been executed, this plan shows only the IAM delta. If Step 3a has *not* yet been applied, this plan shows all six resources together — both interpretations are valid; what matters is the union below.
@@ -147,7 +147,7 @@ After merge, the orchestrator (or Ihor) pencils the T11 Tier-1 checkpoint note t
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| `terraform plan` fails on `billing_account` unknown | `envs/prod/terraform.tfvars` missing or wrong billing ID | Obtain billing ID from GCP Console (Billing → Settings); update `tfvars`; re-run plan. |
+| `terraform plan` fails on `billing_account` unknown | `terraform.tfvars` missing or wrong billing ID | Obtain billing ID from GCP Console (Billing → Settings); update `tfvars`; re-run plan. |
 | Smoke script exits non-zero with HTTP 403 | `techscreen-backend@` SA missing `roles/aiplatform.user`, or the reviewer lacks permission to impersonate it | Check `cloud-setup.md` §IAM — runtime SA has the role; reviewer uses an Owner or `roles/iam.serviceAccountTokenCreator` identity. |
 | Smoke script exits non-zero with HTTP 429 | Quota grant didn't land yet | Re-check the "Quota requests" table — all rows should be `granted` or `partial`, none `pending`. |
 | `latency_ms` between 8 000 and 9 999 | Cold Vertex endpoint or slow local network — borderline | Re-run the smoke 3× and take the median. If median still ≥ 10 000, block merge and investigate. |
