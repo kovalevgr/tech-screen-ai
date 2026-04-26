@@ -20,7 +20,7 @@ No GCP credentials, no Vertex access, no Postgres, no Docker required for T02 â€
 
 ```bash
 git fetch origin
-git switch 003-t02-fastapi-skeleton
+git switch 005-t02-fastapi-skeleton
 git status --short            # expect: clean tree
 
 uv sync --dev                 # installs fastapi/uvicorn/structlog/pyyaml + pytest/httpx
@@ -143,7 +143,7 @@ app/backend/tests/conftest.py                   (NEW)
 app/backend/tests/test_health.py                (NEW)
 app/backend/tests/test_logging_pii.py           (NEW)
 app/backend/tests/test_openapi_regeneration.py  (NEW)
-specs/003-t02-fastapi-skeleton/**               (spec-kit artefacts)
+specs/005-t02-fastapi-skeleton/**               (spec-kit artefacts)
 ```
 
 **Not expected** (FR-011 scope fence): any Alembic migration, any `app/backend/llm/**`, any `app/backend/db/**`, any auth/CORS middleware, any new route besides `/health`, any change to `.pre-commit-config.yaml`, any change to `Dockerfile*`, any change to `docker-compose*.yml`, any change to `CLAUDE.md`, any change to `adr/`.

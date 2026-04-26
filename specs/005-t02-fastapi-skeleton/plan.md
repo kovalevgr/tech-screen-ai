@@ -1,7 +1,7 @@
 # Implementation Plan: FastAPI Skeleton (T02)
 
-**Branch**: `003-t02-fastapi-skeleton` | **Date**: 2026-04-24 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `specs/003-t02-fastapi-skeleton/spec.md`
+**Branch**: `005-t02-fastapi-skeleton` | **Date**: 2026-04-24 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `specs/005-t02-fastapi-skeleton/spec.md`
 
 ## Summary
 
@@ -86,7 +86,7 @@ T02 is a thin skeleton with carefully limited scope. Every invariant listed belo
 ### Documentation (this feature)
 
 ```text
-specs/003-t02-fastapi-skeleton/
+specs/005-t02-fastapi-skeleton/
 ├── spec.md                         # Feature spec (written in /speckit-specify)
 ├── plan.md                         # This file
 ├── research.md                     # Phase 0 — design-altitude decisions
@@ -178,7 +178,7 @@ See [contracts/backend-contract.md](./contracts/backend-contract.md). A single c
 - The logging/PII contract (field allow-list, free-text redaction patterns, how later tasks extend it without breaking T02's tests).
 - The pytest-based drift-detection mechanism (since a runtime OpenAPI spec that can silently drift is a contract, not a constraint).
 
-The actual OpenAPI YAML artefact lives at `app/backend/openapi.yaml` after T02 lands — it is not duplicated into `specs/003-t02-fastapi-skeleton/contracts/` because that would create two sources of truth that the drift-check test could not reconcile. The contract doc references the runtime path.
+The actual OpenAPI YAML artefact lives at `app/backend/openapi.yaml` after T02 lands — it is not duplicated into `specs/005-t02-fastapi-skeleton/contracts/` because that would create two sources of truth that the drift-check test could not reconcile. The contract doc references the runtime path.
 
 ### Quickstart
 

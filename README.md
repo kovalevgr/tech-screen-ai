@@ -49,7 +49,7 @@ Run these from the repo root. Internet access to PyPI and the pnpm/npm registry 
 
 ### Backend dev loop
 
-The backend skeleton (T02) ships a FastAPI app with a `GET /health` endpoint, a structlog-based logger that redacts candidate PII before logs leave the process, and a committed OpenAPI contract. See [`specs/003-t02-fastapi-skeleton/contracts/backend-contract.md`](./specs/003-t02-fastapi-skeleton/contracts/backend-contract.md) for the stable interface.
+The backend skeleton (T02) ships a FastAPI app with a `GET /health` endpoint, a structlog-based logger that redacts candidate PII before logs leave the process, and a committed OpenAPI contract. See [`specs/005-t02-fastapi-skeleton/contracts/backend-contract.md`](./specs/005-t02-fastapi-skeleton/contracts/backend-contract.md) for the stable interface.
 
 ```bash
 # Run the backend locally (port 8000, auto-reload)

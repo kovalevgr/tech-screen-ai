@@ -49,7 +49,7 @@ T02 introduces no persistent data (no tables, no files storing candidate/session
 | Field                   | Value                                                                                                                                                                         |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Definition              | The committed YAML file describing every backend endpoint, generated deterministically from the `FastAPI` instance.                                                           |
-| File                    | `app/backend/openapi.yaml` — this **is** the contract; no duplicate lives under `specs/003-t02-fastapi-skeleton/contracts/`.                                                  |
+| File                    | `app/backend/openapi.yaml` — this **is** the contract; no duplicate lives under `specs/005-t02-fastapi-skeleton/contracts/`.                                                  |
 | Producer                | `app/backend/generate_openapi.py` — `uv run python -m app.backend.generate_openapi` writes; `--check` exits non-zero on drift.                                                |
 | Serialisation contract  | `yaml.safe_dump(..., sort_keys=True, allow_unicode=True, default_flow_style=False)`. Byte-deterministic across runs and machines.                                             |
 | Contents at T02 close   | One path (`/health`), one operation (`GET`), one response schema (`HealthResponse`). Info block populated from the `FastAPI(title=..., version=...)` constructor.              |

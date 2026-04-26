@@ -4,7 +4,7 @@ description: "Task list for T02 — FastAPI Skeleton"
 
 # Tasks: FastAPI Skeleton (T02)
 
-**Input**: Design documents from [`specs/003-t02-fastapi-skeleton/`](./)
+**Input**: Design documents from [`specs/005-t02-fastapi-skeleton/`](./)
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md), [research.md](./research.md), [data-model.md](./data-model.md), [contracts/backend-contract.md](./contracts/backend-contract.md), [quickstart.md](./quickstart.md)
 
 **Tests**: Generated. The spec's acceptance criteria pin three committed tests — the `/health` smoke (FR-009), the PII-redaction test (FR-010, validating constitution §15), and the OpenAPI regeneration drift check (FR-005). Tests are part of the T02 acceptance gate, not an optional TDD overlay.
@@ -33,7 +33,7 @@ description: "Task list for T02 — FastAPI Skeleton"
 
 **Purpose**: Verify the workspace is ready to receive T02 changes. No source files created yet.
 
-- [X] T001 Verify the current branch is `003-t02-fastapi-skeleton` with a clean working tree and `.specify/feature.json` points at `specs/003-t02-fastapi-skeleton` (run `git rev-parse --abbrev-ref HEAD`, `git status --short`, `cat .specify/feature.json`). If any check fails, stop and investigate before continuing.
+- [X] T001 Verify the current branch is `005-t02-fastapi-skeleton` with a clean working tree and `.specify/feature.json` points at `specs/005-t02-fastapi-skeleton` (run `git rev-parse --abbrev-ref HEAD`, `git status --short`, `cat .specify/feature.json`). If any check fails, stop and investigate before continuing.
 
 ---
 

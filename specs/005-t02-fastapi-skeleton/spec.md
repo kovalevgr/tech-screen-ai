@@ -1,6 +1,6 @@
 # Feature Specification: FastAPI Skeleton (T02)
 
-**Feature Branch**: `003-t02-fastapi-skeleton`
+**Feature Branch**: `005-t02-fastapi-skeleton`
 **Created**: 2026-04-24
 **Status**: Draft
 **Input**: User description: "T02 — FastAPI skeleton" (from `docs/engineering/implementation-plan.md`, Tier 1 / W1–W2)

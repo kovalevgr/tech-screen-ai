@@ -12,7 +12,7 @@ This is a single consolidated contract covering the four surfaces T02 commits to
 
 ### Location
 
-`app/backend/openapi.yaml` — committed. This is the canonical file. No duplicate lives in `specs/003-t02-fastapi-skeleton/contracts/` because that would create two sources of truth that the drift-check test could not reconcile.
+`app/backend/openapi.yaml` — committed. This is the canonical file. No duplicate lives in `specs/005-t02-fastapi-skeleton/contracts/` because that would create two sources of truth that the drift-check test could not reconcile.
 
 ### Producer
 
