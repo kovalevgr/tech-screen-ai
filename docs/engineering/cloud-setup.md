@@ -59,7 +59,7 @@ A chicken-and-egg problem: Terraform needs a GCS bucket for state, and service-a
 
 `infra/bootstrap.sh` handles all of this idempotently. It:
 
-1. Enables required APIs: `cloudresourcemanager`, `iam`, `iamcredentials`, `serviceusage`, `storage`, `sts`.
+1. Enables required APIs: `cloudresourcemanager`, `iam`, `iamcredentials`, `serviceusage`, `storage`, `sts` (Terraform-itself prerequisites), plus `aiplatform`, `billingbudgets`, `monitoring` (needed by T01a's Vertex smoke test, billing-budget resources, and notification channels — see `specs/003-vertex-quota-region/`).
 2. Creates the GCS state bucket `<project>-tfstate` with versioning on and a 30-day delete lifecycle on old versions.
 3. Creates the `terraform` service account with `roles/owner` (MVP — to be tightened after the project stabilises).
 4. Creates a Workload Identity Pool `github-actions` and an OIDC provider with attribute condition `attribute.repository == '<owner>/<repo>'`.
