@@ -27,7 +27,8 @@ The tree mirrors [CLAUDE.md](../../CLAUDE.md) "Where to find things". Do not rem
 | `docs/specs/` | *(pre-existing)* | Canonical product specs (`.docx`) for humans/stakeholders. | Pre-existing; updated when product scope changes. |
 | `evals/` | T04+ / calibration | Evaluation datasets and harnesses for the Assessor/Interviewer (calibration, regression, prompt tests). | Later tiers (calibration-run skill, prompt-engineer flows). Currently empty (`.gitkeep`). |
 | `infra/` | *(pre-existing)* | Infrastructure entry points — `bootstrap.sh` for one-time GCP bootstrap. | Pre-existing. |
-| `infra/terraform/` | T06 | Managed GCP infrastructure: Cloud Run services, Cloud SQL, Secret Manager, Identity Platform, budget alerts. | T06 (Cloud Run + Cloud SQL + Secret Manager), T07 (Identity Platform), T06a (deploy/rollback workflows reference Terraform outputs). Currently empty (`.gitkeep`). |
+| `infra/scripts/` | T01a | One-shot operational scripts (smoke tests, ad-hoc infra probes). Bash-first, no language runtime required beyond `gcloud` + `curl`. | T01a (`vertex-smoke.sh`, the FR-006 smoke runner). Future ad-hoc operational scripts append here without further directory-map edits. |
+| `infra/terraform/` | T06 | Managed GCP infrastructure: Cloud Run services, Cloud SQL, Secret Manager, Identity Platform, budget alerts, runtime IAM. | T002 (`002-terraform-backend-bootstrap`) seeded the Terraform root module: `provider.tf`, `versions.tf`, `backend.tf` (hardcoded GCS bucket), `variables.tf`, `terraform.tfvars`, `.gitignore`, `.terraform.lock.hcl` (provider `hashicorp/google ~> 6.0`). T01a layered on top: extra variables (`project_number`, `billing_account`, `ops_email`) + placeholder values; `billing.tf` (notification channel + 2 budgets); minimal `iam.tf` (runtime SA `techscreen-backend@` + `roles/aiplatform.user` + Owner `serviceAccountTokenCreator` binding only — see `specs/003-vertex-quota-region/research.md` §R6). T06 extends `iam.tf` additively (Cloud SQL/Secret Manager/logging/monitoring bindings) and adds `sql.tf`, `cloud_run.tf`, `artifact_registry.tf`, `secrets.tf`, `monitoring.tf`, `network.tf`. T07 adds Identity Platform; T06a's deploy/rollback workflows reference Terraform outputs. |
 | `prompts/` | *(pre-existing)* | Versioned agent system prompts: `interviewer/`, `assessor/`, `planner/`, `shared/`. Edits flow through the `agent-prompt-edit` skill. | Pre-existing structure; new versions added by `prompt-engineer`. |
 | `specs/` | *(per-feature)* | Spec Kit feature folders (`spec.md`, `plan.md`, `tasks.md`, `checklists/`, optionally `research.md`/`data-model.md`/`contracts/`/`quickstart.md`). | Created per feature by `/speckit-specify`. T01 itself lives at `specs/001-t01-monorepo-baseline/`. |
 
@@ -45,6 +46,7 @@ For completeness — these files are at the repo root and are expected by the tr
 | `Dockerfile`, `Dockerfile.frontend`, `Dockerfile.vertex-mock` | *(pre-existing)* | Docker build definitions (ADR-010 Docker parity). |
 | `docker-compose.yml`, `docker-compose.test.yml` | *(pre-existing)* | Dev + CI Docker stacks. T09 extends with services as they're added. |
 | `pyproject.toml`, `uv.lock` | T01 | Python tooling + dep manifest at repo root (consumed by `Dockerfile`). |
+| `docs/engineering/vertex-quota.md` | T01a | Canonical Vertex AI quota log (region, granted quotas, verification, smoke-test records, follow-ups). Append-only by convention; format pinned at `specs/003-vertex-quota-region/contracts/vertex-quota-log-format.md`. |
 
 ## Rules
 
