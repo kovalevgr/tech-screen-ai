@@ -46,6 +46,23 @@ PROJECT_NUMBER=$(gcloud projects describe "${PROJECT_ID}" --format="value(projec
 echo "    project number: ${PROJECT_NUMBER}"
 
 # -------- 1. Enable bootstrap APIs ------------------------------------------
+# These cover both:
+#   (a) the absolute minimum Terraform itself needs to run (resourcemanager,
+#       iam, iamcredentials, serviceusage, storage, sts)
+#   (b) APIs that any subsequent terraform apply will require, so Ihor does not
+#       hit "API not enabled" mid-apply on a fresh project. Enabling here is
+#       idempotent and free.
+#
+# T01a-required additions (specs/003-vertex-quota-region/):
+#   - aiplatform.googleapis.com    Vertex AI (smoke test + every later LLM call;
+#                                  spec Assumption explicitly relies on this)
+#   - billingbudgets.googleapis.com  google_billing_budget resources (Phase 5)
+#   - monitoring.googleapis.com    google_monitoring_notification_channel +
+#                                  later observability work (T38+)
+#
+# T06+ will append more APIs (run, sqladmin, secretmanager, artifactregistry,
+# identitytoolkit) when those resources actually land. Each addition is
+# documented in the same spirit: name the resource that needs it.
 echo "==> Enabling bootstrap APIs"
 gcloud services enable \
   cloudresourcemanager.googleapis.com \
@@ -53,7 +70,10 @@ gcloud services enable \
   iamcredentials.googleapis.com \
   serviceusage.googleapis.com \
   storage.googleapis.com \
-  sts.googleapis.com
+  sts.googleapis.com \
+  aiplatform.googleapis.com \
+  billingbudgets.googleapis.com \
+  monitoring.googleapis.com
 
 # -------- 2. GCS bucket for Terraform state ---------------------------------
 if gsutil ls -b "gs://${TF_STATE_BUCKET}" >/dev/null 2>&1; then
