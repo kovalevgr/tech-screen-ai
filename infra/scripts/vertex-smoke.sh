@@ -12,19 +12,22 @@
 # "Smoke-test records" section of docs/engineering/vertex-quota.md.
 #
 # Prerequisites:
-#   - gcloud installed and you are authenticated as a principal with
-#     roles/iam.serviceAccountTokenCreator on the runtime SA (granted by
+#   - gcloud + python3 + curl installed; you are authenticated as a principal
+#     with roles/iam.serviceAccountTokenCreator on the runtime SA (granted by
 #     iam.tf during T020).
 #   - The runtime SA exists with roles/aiplatform.user (also iam.tf, T020).
-#   - The Vertex quota for gemini-2.5-flash in europe-west1 is granted
-#     (Phase 4 of T01a — vertex-quota.md "Quota requests" terminal row).
+#   - Vertex AI for gemini-2.5-flash in europe-west1 is reachable. Per
+#     Clarifications 2026-04-26, 2.5 GA models use a global TPM quota with
+#     defaults ~5 orders of magnitude above PoC need — see
+#     docs/engineering/vertex-quota.md §"Quota observed defaults" for the
+#     observed values; no quota-raise request is needed for 2.5.
 #
 # Usage:
-#   PROJECT_ID=techscreen-prod \
+#   PROJECT_ID=tech-screen-493720 \
 #     bash infra/scripts/vertex-smoke.sh
 #
 #   # Optional overrides:
-#   RUNTIME_SA=techscreen-backend@techscreen-prod.iam.gserviceaccount.com \
+#   RUNTIME_SA=techscreen-backend@tech-screen-493720.iam.gserviceaccount.com \
 #   REGION=europe-west1 \
 #   MODEL=gemini-2.5-flash \
 #     bash infra/scripts/vertex-smoke.sh
@@ -38,7 +41,7 @@
 set -euo pipefail
 
 # -------- Config (override via env) -----------------------------------------
-PROJECT_ID="${PROJECT_ID:?PROJECT_ID env var is required, e.g. techscreen-prod}"
+PROJECT_ID="${PROJECT_ID:?PROJECT_ID env var is required, e.g. tech-screen-493720}"
 REGION="${REGION:-europe-west1}"
 MODEL="${MODEL:-gemini-2.5-flash}"
 RUNTIME_SA="${RUNTIME_SA:-techscreen-backend@${PROJECT_ID}.iam.gserviceaccount.com}"
@@ -47,8 +50,22 @@ RUNTIME_SA="${RUNTIME_SA:-techscreen-backend@${PROJECT_ID}.iam.gserviceaccount.c
 LATENCY_LIMIT_MS=10000
 
 # -------- Preflight ---------------------------------------------------------
-command -v gcloud >/dev/null || { echo "ERROR: gcloud not installed" >&2; exit 1; }
-command -v curl   >/dev/null || { echo "ERROR: curl not installed"   >&2; exit 1; }
+command -v gcloud  >/dev/null || { echo "ERROR: gcloud not installed"  >&2; exit 1; }
+command -v curl    >/dev/null || { echo "ERROR: curl not installed"    >&2; exit 1; }
+command -v python3 >/dev/null || { echo "ERROR: python3 not installed" >&2; exit 1; }
+
+# Portable wall-clock millisecond timestamp.
+# `date +%s%N` is GNU-only — BSD `date` (stock macOS) returns a literal `N`
+# instead of nanoseconds and breaks integer arithmetic. python3 is universally
+# available on every contributor machine + CI image and yields the same value
+# regardless of OS.
+now_ms() { python3 -c 'import time; print(int(time.time() * 1000))'; }
+
+# Per-run temp file for the response body, auto-cleaned on EXIT (success OR
+# failure). `mktemp -t` avoids the previous /tmp/vertex-smoke.body race when
+# two operators ran on the same host.
+BODY_FILE="$(mktemp -t vertex-smoke.XXXXXX)"
+trap 'rm -f "${BODY_FILE}"' EXIT
 
 # -------- Get short-lived access token via impersonation --------------------
 # This is the §6-safe path: no JSON key, token lives ~1h, scoped to the SA.
@@ -65,20 +82,20 @@ ENDPOINT="https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/
 PAYLOAD='{"contents":[{"role":"user","parts":[{"text":"ok"}]}],"generationConfig":{"maxOutputTokens":8,"temperature":0}}'
 
 # -------- Bracket-measure wall-clock latency around the curl ----------------
-T0_MS=$(($(date +%s%N) / 1000000))
+T0_MS=$(now_ms)
 
 # `curl --max-time 15` aborts after 15s wall-clock; we still enforce a tighter
 # 10000ms post-hoc check below.
 HTTP_CODE=$(curl -sS \
   --max-time 15 \
-  -o /tmp/vertex-smoke.body \
+  -o "${BODY_FILE}" \
   -w '%{http_code}' \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -X POST "${ENDPOINT}" \
   -d "${PAYLOAD}" || echo "000")
 
-T1_MS=$(($(date +%s%N) / 1000000))
+T1_MS=$(now_ms)
 LATENCY_MS=$((T1_MS - T0_MS))
 
 # -------- Decide pass/fail and emit contract-§5 line ------------------------
@@ -102,8 +119,5 @@ LINE="runner=local-adc-impersonation, model=${MODEL}, region=${REGION}, latency_
 [[ -n "${NOTES}" ]] && LINE="${LINE}, notes=${NOTES}"
 
 echo "${LINE}"
-
-# Cleanup
-rm -f /tmp/vertex-smoke.body
 
 [[ "${STATUS}" == "pass" ]] && exit 0 || exit 1

@@ -10,10 +10,11 @@
 # terraform.tfvars `ops_email` and re-applying — no resource
 # replacement needed.
 #
-# Provider note: google_billing_budget went GA in `hashicorp/google` ~5.x;
-# attribute names below match provider 5.30+. If you bump the provider,
-# verify `disable_default_iam_recipients` is still supported on
-# all_updates_rule.
+# Provider: `hashicorp/google ~> 6.0` (pinned by PR #2's versions.tf).
+# `google_billing_budget` is GA in 5.x and 6.x; attribute names below were
+# validated against provider 6.50.0 (current lock-file pin). If you bump the
+# provider major, verify `disable_default_iam_recipients` and
+# `enable_project_level_recipients` still resolve on `all_updates_rule`.
 # =============================================================================
 
 resource "google_monitoring_notification_channel" "ops_email" {
@@ -62,8 +63,14 @@ resource "google_billing_budget" "project_wide" {
   }
 
   all_updates_rule {
+    # All four attributes set explicitly. Provider would otherwise default
+    # `enable_project_level_recipients` to false and `schema_version` to "1.0";
+    # making the defaults visible avoids plan/HCL drift confusion for future
+    # readers (per L7 in PR #3 review).
     monitoring_notification_channels = [google_monitoring_notification_channel.ops_email.id]
     disable_default_iam_recipients   = true
+    enable_project_level_recipients  = false
+    schema_version                   = "1.0"
   }
 }
 
@@ -99,7 +106,13 @@ resource "google_billing_budget" "vertex_only" {
   }
 
   all_updates_rule {
+    # All four attributes set explicitly. Provider would otherwise default
+    # `enable_project_level_recipients` to false and `schema_version` to "1.0";
+    # making the defaults visible avoids plan/HCL drift confusion for future
+    # readers (per L7 in PR #3 review).
     monitoring_notification_channels = [google_monitoring_notification_channel.ops_email.id]
     disable_default_iam_recipients   = true
+    enable_project_level_recipients  = false
+    schema_version                   = "1.0"
   }
 }

@@ -104,12 +104,42 @@ infra/terraform/
 
 Only `prod` exists. No `envs/dev/` or `envs/staging/` will be added without an ADR reversing §8.
 
+### Operator pre-flight (one-time per laptop)
+
+These steps were tribal knowledge through T01a's debug cycle and are captured here so future operators do not repeat them. Required only the **first** time you run `terraform apply` from a developer machine; once they're done they persist in your `gcloud` config until you clear it.
+
+1. **Authenticate ADC with the right scopes.** Bare `gcloud auth application-default login` defaults to a minimal scope set that does **not** include `cloud-billing` — a `google_billing_budget` apply against this state will fail with `Error 400 INVALID_ARGUMENT` and a misleading "userinfo.email scope?" hint in the debug log. Always pass the full scope list:
+
+   ```bash
+   gcloud auth application-default login \
+     --scopes=https://www.googleapis.com/auth/userinfo.email,\
+   https://www.googleapis.com/auth/cloud-platform,\
+   https://www.googleapis.com/auth/cloud-billing
+   ```
+
+2. **Set the ADC quota project.** Without this, GCP routes API quota usage to whatever Workspace project your account defaults to (we observed `projects/764086051850`), which makes `billingbudgets.googleapis.com` look "disabled" even though it is enabled on `tech-screen-493720`:
+
+   ```bash
+   gcloud auth application-default set-quota-project tech-screen-493720
+   ```
+
+3. **`terraform apply` env-vars.** The Terraform `google` provider also needs the user-project override at command time (the ADC quota-project is necessary but not sufficient for billing-account-scoped resources). The two env-vars to prepend on every `terraform plan` / `apply`:
+
+   ```bash
+   export GOOGLE_BILLING_PROJECT=tech-screen-493720
+   export USER_PROJECT_OVERRIDE=true
+   ```
+
+   Or pass inline: `GOOGLE_BILLING_PROJECT=… USER_PROJECT_OVERRIDE=true terraform -chdir=infra/terraform apply …`.
+
 ### How to apply a change
+
+⚠️ **Run `terraform apply` ONLY from the branch checkout that contains the HCL you intend to apply.** The Terraform GCS state is shared across all worktrees and checkouts of this repo. If you `terraform apply` from a checkout whose `infra/terraform/*.tf` is *missing* a resource that exists in state, Terraform sees "config has 0, state has 1 → destroy". This happened once during T01a — the recovery was easy but you do not want to re-do it. Concrete rule: if you are reviewing a PR branch, check it out before applying, never apply from `main` while the PR is open.
 
 1. Branch from `main`.
 2. Edit the HCL.
 3. `terraform -chdir=infra/terraform init -upgrade` (once per clone).
-4. `terraform -chdir=infra/terraform plan -var-file=envs/prod/terraform.tfvars`.
+4. `terraform -chdir=infra/terraform plan` — `terraform.tfvars` is auto-loaded from the working dir; backend bucket is hardcoded in `backend.tf` so no `-backend-config=` or `-var-file=` flag is needed.
 5. Paste the plan summary into the PR description.
 6. On merge, CI runs `terraform apply -auto-approve` against `prod`, authenticated via WIF.
 

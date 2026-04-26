@@ -4,13 +4,15 @@ region     = "europe-west1"
 # -----------------------------------------------------------------------------
 # T01a additions (specs/003-vertex-quota-region/).
 #
-# IMPORTANT: Before running `terraform apply` for the first time after the
-# T01a PR merges, replace every "<FILL-IN ...>" placeholder below with the
-# real value. Apply will fail with "variables not set" until done.
+# All three values below are organizational identifiers, not credentials,
+# per ADR-022 (project numbers, billing account IDs, email addresses).
+# Committed to the repo intentionally; the T01 gitleaks + detect-secrets
+# hooks scan this file on every commit.
 #
-# None of these are secrets per ADR-022 (project numbers, billing account IDs,
-# email addresses are organizational identifiers, not credentials). The T01
-# gitleaks + detect-secrets hooks scan this file on every commit.
+# To rotate any value (e.g. swap `ops_email` for a group alias once N-iX IT
+# provisions one): edit here, then run the apply procedure documented in
+# docs/engineering/cloud-setup.md §"How to apply a change" (which now also
+# covers the cloud-billing ADC scope and env-var setup needed for budgets).
 # -----------------------------------------------------------------------------
 
 # Numeric project number, as quoted in docs/engineering/cloud-setup.md (463244185014).

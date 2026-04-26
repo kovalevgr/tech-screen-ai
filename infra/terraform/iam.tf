@@ -39,10 +39,12 @@ resource "google_project_iam_member" "techscreen_backend_aiplatform_user" {
 #     --impersonate-service-account=techscreen-backend@${PROJECT_ID}.iam.gserviceaccount.com
 # This is the FR-006 smoke-test path (no JSON key, short-lived token).
 #
-# IMPORTANT: replace the `member` placeholder with the operator's real GCP
-# principal (typically `user:first.last@n-ix.com`) before `terraform apply`.
-# A future cleanup is to bind a group instead — see B1 in the analyze report
-# tracked in specs/003-vertex-quota-region/.
+# Single-person dependency: the binding targets `user:ikovalov@n-ix.com`
+# specifically. To let another operator run the smoke, either rotate this
+# value (HCL edit + apply) OR — the documented follow-up — switch to a group
+# principal once N-iX IT provisions one (e.g. `group:techscreen-owners@n-ix.com`).
+# See B1 in the analyze report tracked in `specs/003-vertex-quota-region/` and
+# Follow-ups in `docs/engineering/vertex-quota.md`.
 resource "google_service_account_iam_member" "techscreen_backend_tokens_for_owner" {
   service_account_id = google_service_account.techscreen_backend.name
   role               = "roles/iam.serviceAccountTokenCreator"
