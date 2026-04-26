@@ -58,7 +58,7 @@ repos:
   # in vendor paths we excluded, so these effectively run on app/backend/**).
   # -------------------------------------------------------------------------
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+    rev: v0.15.11
     hooks:
       - id: ruff
         args: ["--fix"]
@@ -129,8 +129,17 @@ repos:
         language: pygrep
         entry: '^(from|import)\s+vertexai'
         types: [python]
-        exclude: ^app/backend/llm/vertex\.py$
+        exclude: ^app/backend/llm/(vertex|_real_backend|_mock_backend)\.py$
         # All Vertex calls go through app/backend/llm/vertex.py.
+
+      - id: no-provider-sdk-imports
+        name: no provider SDK imports outside wrapper (backend)
+        language: system
+        pass_filenames: false
+        files: ^app/backend/.*\.py$
+        entry: bash scripts/check-no-provider-sdk-imports.sh
+        # Spec FR-014 / constitution §12 / ADR-002. Allowlist:
+        # app/backend/llm/_real_backend.py and _mock_backend.py only.
 
       - id: no-print-statements
         name: forbid print() in backend code

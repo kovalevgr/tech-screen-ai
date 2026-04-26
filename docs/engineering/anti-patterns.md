@@ -144,7 +144,7 @@ Things we have explicitly decided not to do, with the reason. Each entry is shor
 
 **Why.** Models produce creative JSON under stress. Silent acceptance of malformed output corrupts downstream data.
 
-**Do instead.** Vertex JSON mode + Pydantic schema validation in the adapter. Schema failure raises `LLMSchemaError`.
+**Do instead.** Vertex JSON mode + Pydantic schema validation in the wrapper. Schema failure raises `VertexSchemaError` immediately (per Clarifications 2026-04-26 the wrapper does not retry on schema failures; per-agent retry / fallback / escalation lives in the agent module).
 
 ### Embedding the full rubric in the Assessor prompt
 

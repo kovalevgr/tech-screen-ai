@@ -83,6 +83,34 @@ The OpenAPI drift check also runs as part of the pytest suite — you will see a
 
 > **Native `uv run` is intentionally undocumented.** Editor / IDE integrations (mypy daemon, ruff in your editor) may still use the host-side `uv sync --dev` venv — that's a tooling convenience, not a documented dev path. The canonical commands above are what CI runs and what every PR description references.
 
+#### Vertex wrapper
+
+Every model-provider call goes through the wrapper at [`app/backend/llm/`](./app/backend/llm/) — the single sanctioned doorway for the lifetime of the product (constitution §12, ADR-006). Bypass attempts are blocked by the `no-provider-sdk-imports` pre-commit hook and the matching CI step (FR-014). See [`specs/007-t04-vertex-client-wrapper/`](./specs/007-t04-vertex-client-wrapper/) for the full spec, contract, and quickstart.
+
+```python
+from app.backend.llm import call_model, ModelCallRequest
+from app.backend.llm.trace import InMemoryTraceSink
+from app.backend.llm.cost_ledger import InMemoryCostLedger
+from app.backend.settings import Settings
+
+result = await call_model(
+    ModelCallRequest(
+        agent="assessor",
+        system_prompt="You are an assessor. Return JSON.",
+        user_payload="Evaluate this answer: ...",
+        json_schema={"type": "object", "required": ["concepts_covered"]},
+        session_id=session_id,
+    ),
+    sink=InMemoryTraceSink(),
+    ledger=InMemoryCostLedger(),
+    settings=Settings(),
+)
+```
+
+- **Mock backend is the default in dev and CI.** `LLM_BACKEND=mock` (the `.env.example` default) routes every call to the deterministic, prompt-keyed mock under [`app/backend/llm/_mock_backend.py`](./app/backend/llm/_mock_backend.py). No GCP credentials needed for `pytest`, `docker compose up`, or any local development.
+- **Production refuses to start in mock mode.** `Settings.assert_safe_for_environment()` runs at module init in `app/backend/main.py`; an `APP_ENV=prod` worker with `LLM_BACKEND=mock` exits non-zero before the first request (FR-007). `APP_ENV` is the canonical runtime selector already set by `Dockerfile` and every `docker-compose*.yml`. The same check refuses `LLM_BUDGET_PER_SESSION_USD > $5.00` in production (constitution §12).
+- **Fixtures live under [`app/backend/tests/fixtures/llm_responses/<agent>/<sha>.json`](./app/backend/tests/fixtures/llm_responses/).** Filename is the SHA-256 of the canonical prompt envelope (see [`app/backend/llm/_mock_backend.py`](./app/backend/llm/_mock_backend.py) for the recipe). When a test prompt has no fixture, the mock writes the unseen envelope to `_unrecorded/<sha>.json` and raises `RuntimeError` so the developer can edit the captured file and `mv` it into the agent directory to "promote" it. The full flow is documented in [`app/backend/tests/fixtures/llm_responses/README.md`](./app/backend/tests/fixtures/llm_responses/README.md).
+
 ### Frontend dev loop (Docker-first)
 
 Constitution §7 (Docker parity dev → CI → prod) is non-negotiable. **All frontend run/test/regen workflows happen inside the same multi-stage image that CI and production use.** No native `pnpm --dir app/frontend …` for the canonical loop — Docker Desktop (or any Docker Engine) is the only contributor prerequisite for this layer.

@@ -1,0 +1,7 @@
+{
+  "text": "{\"message_uk\": \"Доброго дня! Розкажіть, будь ласка, про ваш досвід роботи з Python.\", \"intent\": \"open_scoping\", \"next_topic_hint\": \"python_experience\", \"end_of_phase\": false}",
+  "input_tokens": 132,
+  "output_tokens": 87,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}

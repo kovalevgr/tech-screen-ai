@@ -1,0 +1,7 @@
+{
+  "text": "{\"concepts_covered\": [\"tcp_basic\"], \"concepts_missing\": [\"three_way_handshake\"], \"red_flags\": []}",
+  "input_tokens": 138,
+  "output_tokens": 42,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}

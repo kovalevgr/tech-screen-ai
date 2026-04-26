@@ -8,7 +8,7 @@ Related: [ADR-002](../../adr/002-llm-provider-vertex-ai.md), [ADR-003](../../adr
 
 ## Scope
 
-Everything that talks to a large language model goes through the Vertex adapter at `app/backend/llm/vertex.py`. Application code never:
+Everything that talks to a large language model goes through the Vertex wrapper package at `app/backend/llm/`. The single sanctioned entry point is `app.backend.llm.call_model` (re-exported from `vertex.py`); the package's private leaves `_real_backend.py` (google-genai async client) and `_mock_backend.py` (in-process fixture stub) are the only modules in the codebase allowed to import a model-provider SDK — the `scripts/check-no-provider-sdk-imports.sh` guardrail (pre-commit + CI) enforces this. Application code never:
 
 - Calls Google AI Studio, Anthropic, or OpenAI APIs directly.
 - Embeds API keys or credentials in source (constitution §5).
@@ -20,14 +20,23 @@ Everything that talks to a large language model goes through the Vertex adapter 
 ## Layer structure
 
 ```
-services/*        business-facing API, takes domain objects
+services/*                business-facing API, takes domain objects
     ↓ calls
-llm/agents/*      one module per agent (interviewer, assessor, planner)
-                  owns prompt assembly, response parsing, schema validation
+llm/agents/*              one module per agent (interviewer, assessor, planner)
+                          owns prompt assembly, response parsing, schema validation
     ↓ calls
-llm/vertex.py     the adapter — retries, timeouts, cost tracking, tracing
+llm/                      the wrapper package — `call_model` orchestrates retry,
+  ├── vertex.py           timeout, cost tracking, tracing, schema validation
+  ├── errors.py           typed error hierarchy (WrapperError + 6 children)
+  ├── trace.py            TraceRecord + TraceSink protocol + InMemoryTraceSink
+  ├── cost_ledger.py      CostLedger protocol + InMemoryCostLedger
+  ├── pricing.py          PricingTable loader (pricing.yaml)
+  ├── models_config.py    per-agent model selection (configs/models.yaml)
+  ├── _backend_protocol.py
+  ├── _real_backend.py    Vertex SDK adapter — google-genai async client
+  └── _mock_backend.py    in-process deterministic stub (fixture-keyed)
     ↓ calls
-Vertex AI API     via google-cloud-aiplatform SDK
+Vertex AI API             via the google-genai SDK (Vertex mode)
 ```
 
 Services never see a prompt string. Agent modules never see an HTTP response.
@@ -89,22 +98,19 @@ The adapter does **not** own:
 
 ## Retry policy
 
-The adapter retries on this set of errors only:
+> **Note:** Reconciled per `specs/007-t04-vertex-client-wrapper/spec.md` Clarifications 2026-04-26 to a single uniform 3-attempt budget across every retryable error class. The earlier per-error-type table conflicted with the wrapper's actual `tenacity.AsyncRetrying` configuration.
 
-| Error                                           | Retries | Backoff                 |
-| ----------------------------------------------- | ------- | ----------------------- |
-| `google.api_core.exceptions.ServiceUnavailable` | 3       | 0.5s, 1s, 2s (jittered) |
-| `google.api_core.exceptions.DeadlineExceeded`   | 1       | 2s                      |
-| `google.api_core.exceptions.ResourceExhausted`  | 2       | 4s, 8s                  |
-| Connection errors / timeouts at the HTTP layer  | 3       | 0.5s, 1s, 2s            |
+The adapter applies a uniform **3-attempt total** budget (1 initial + 2 retries) with exponential backoff and jitter:
 
-The adapter does **not** retry on:
+| Error class                                                                                                                                                                          | Attempts | Notes                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------- |
+| `google.api_core.exceptions.ServiceUnavailable`<br>`google.api_core.exceptions.InternalServerError`<br>`google.api_core.exceptions.ResourceExhausted`<br>Connection errors (refused, reset, HTTP-layer timeouts) | 3        | Exponential backoff with jitter; total wall clock still bounded by the 30-s `asyncio.wait_for` cap (constitution §12). |
+| `google.api_core.exceptions.DeadlineExceeded`                                                                                                                                        | 1        | **No retry** — the timeout already fired; repeating it only burns the remaining 30-s budget.                          |
+| `google.api_core.exceptions.InvalidArgument`<br>`google.api_core.exceptions.PermissionDenied`                                                                                        | 1        | **No retry** — request is malformed or auth is broken; re-raised as `ModelCallConfigError`.                           |
 
-- `InvalidArgument` — the request is malformed; retrying will not help.
-- `PermissionDenied` — auth is broken; log and escalate.
-- Schema validation failures (these are thrown by the agent module, not the adapter).
+Schema validation failures are **never** retried by the adapter — the wrapper raises `VertexSchemaError` immediately with `raw_payload` attached. Per-agent retry / fallback / escalation policies live in the agent modules (Assessor, Planner, Interviewer in T18–T21) and are described under "JSON mode" below.
 
-Total time across retries is still bounded by `timeout_s` on the call.
+Total time across retries is still bounded by `timeout_s` on the call (default 30 s).
 
 ---
 
@@ -114,7 +120,7 @@ When `json_schema` is provided the adapter:
 
 1. Uses Vertex's native JSON output mode (`response_mime_type = "application/json"` + `response_schema`).
 2. Validates the result against the schema using `pydantic.TypeAdapter`.
-3. On validation failure, raises `LLMSchemaError` with the raw text attached for debugging — the adapter itself does not retry on schema failures.
+3. On validation failure, raises `VertexSchemaError` with the raw text attached for debugging — the adapter itself does not retry on schema failures.
 
 Agent modules decide whether to retry on schema failure. Typically:
 
@@ -154,16 +160,15 @@ This row is the basis for cost analysis, calibration replay (ADR-018), and regre
 
 ## Vertex mock for dev and tests
 
-In `docker-compose.yml` a `vertex-mock` service runs a minimal HTTP stub that returns deterministic responses keyed on the SHA of the input prompt. The mock:
+The mock backend (`app/backend/llm/_mock_backend.py`) is **in-process** — no separate HTTP service, no docker-compose entry, no network I/O. The wrapper selects it via the runtime `LLM_BACKEND` env var (`mock` in dev/CI, `vertex` in prod). Production refuses to start with `LLM_BACKEND=mock` (FR-007 enforced by `Settings.assert_safe_for_environment()` at `app/backend/main.py` boot).
 
-- Lives at `app/backend/llm/_mock_server.py`.
-- Is reachable at `http://vertex-mock:8080` inside the compose network.
-- Uses fixture files under `app/backend/tests/fixtures/llm_responses/` — one JSON file per (agent, prompt-hash) pair.
-- Records any unseen prompt hash into `tests/fixtures/llm_responses/_unrecorded/` so a developer can promote it into a proper fixture.
+The mock:
 
-A helper script `scripts/llm/record-fixture.sh` replays a given session id through a real Vertex call and writes the response as a new fixture.
+- Computes a canonical SHA-256 of `{system_prompt, user_payload, json_schema, agent, model}` (sorted JSON encoding) — including the schema in the SHA prevents stale-fixture bugs across schema changes.
+- Looks up `app/backend/tests/fixtures/llm_responses/<agent>/<sha256-hex>.json`. Each fixture envelope is `{text, input_tokens, output_tokens, model, model_version}`.
+- On miss, writes the request envelope to `app/backend/tests/fixtures/llm_responses/_unrecorded/<sha>.json` and raises `RuntimeError("fixture missing for prompt SHA <hex>; see _unrecorded/<sha>.json")` so the developer can inspect what was asked, craft the desired response, and `git mv` it into the agent directory.
 
-The adapter chooses `vertex-mock` vs real Vertex based on `LLM_BACKEND` env var: `mock` in dev/CI, `vertex` in prod. Production refuses to start with `LLM_BACKEND=mock`.
+The promotion flow is documented in `app/backend/tests/fixtures/llm_responses/README.md`.
 
 ---
 

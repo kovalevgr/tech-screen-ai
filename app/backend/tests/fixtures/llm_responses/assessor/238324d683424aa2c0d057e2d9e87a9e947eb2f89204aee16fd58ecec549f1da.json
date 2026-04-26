@@ -1,0 +1,7 @@
+{
+  "text": "{\"concepts_covered\": [\"recursion\", \"function_call\"], \"concepts_missing\": [\"base_case\", \"stack_depth\"], \"red_flags\": [], \"level_estimate\": \"junior\", \"confidence\": 0.6}",
+  "input_tokens": 145,
+  "output_tokens": 64,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}

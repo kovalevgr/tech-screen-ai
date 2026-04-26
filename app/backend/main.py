@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from app.backend.logging import configure_logging
+from app.backend.settings import Settings
 
 _SERVICE_NAME: Final[Literal["techscreen-backend"]] = "techscreen-backend"
 
@@ -35,6 +36,7 @@ class HealthResponse(BaseModel):
 
 
 configure_logging()
+Settings().assert_safe_for_environment()
 
 app = FastAPI(title="TechScreen Backend", version=_project_version())
 
