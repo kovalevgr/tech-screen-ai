@@ -1,19 +1,24 @@
 # TechScreen — CI / integration-test stack.
 #
-# Same services as dev, but:
-#   - Postgres data lives in a tmpfs (ephemeral, fast).
-#   - Backend runs the built image without bind-mounts (prod-shape parity,
-#     ADR-010). Reload is off.
-#   - Frontend is not run by default; E2E Playwright brings it up through
-#     a separate profile when needed.
-#   - vertex-mock is always present.
+# Same image shape as dev (Dockerfile `dev` target — pytest, ruff, mypy
+# bundled). Postgres + vertex-mock are profile-gated so today's T02 test
+# run can do `docker compose -f docker-compose.test.yml run --rm backend
+# pytest app/backend/tests` with no DB. T05 lights up the `db` profile
+# and reactivates the `alembic upgrade head` step in the default command.
 #
-# Invoked by CI: `docker compose -f docker-compose.test.yml up --build --abort-on-container-exit`.
+# Profiles:
+#   (default)        — `backend` only.
+#   --profile db     — adds Postgres (T05+).
+#   --profile llm    — adds Vertex mock (T04+).
+#   --profile e2e    — adds frontend + Playwright runner (post-T03).
+#
+# Invoked by CI (T10): `docker compose -f docker-compose.test.yml run --rm --build backend pytest app/backend/tests`.
 
 name: techscreen-test
 
 services:
   postgres:
+    profiles: ["db", "full"]
     image: postgres:16-bookworm
     environment:
       POSTGRES_USER: techscreen
@@ -29,6 +34,7 @@ services:
       retries: 15
 
   vertex-mock:
+    profiles: ["llm", "full"]
     build:
       context: .
       dockerfile: Dockerfile.vertex-mock
@@ -46,12 +52,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: runtime
+      target: dev
     environment:
       APP_ENV: test
       LLM_BACKEND: mock
       LOG_FORMAT: json
       LOG_LEVEL: info
+      # Used only when their profile is active:
       DATABASE_URL: postgresql+asyncpg://techscreen:techscreen@postgres:5432/techscreen_test
       VERTEX_MOCK_URL: http://vertex-mock:8080
       MAGIC_LINK_SIGNING_KEY: test-signing-key-not-a-real-secret
@@ -59,20 +66,25 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
       vertex-mock:
         condition: service_healthy
-    # Run migrations, then tests. CI uses --abort-on-container-exit to
-    # propagate this exit code.
+        required: false
+    # T02: tests do not need a DB; alembic step lands with T05 (it would
+    # fail today because `alembic/` only carries a placeholder). Override
+    # the command from CLI when needed: `docker compose -f
+    # docker-compose.test.yml run --rm backend pytest -k smoke`.
     command:
       - sh
       - -c
       - |
         set -eu
-        alembic upgrade head
+        # TODO(T05): re-enable once Alembic migrations land.
+        # alembic upgrade head
         pytest --maxfail=1 --strict-markers -ra app/backend/tests
 
   frontend:
-    profiles: ["e2e"]
+    profiles: ["e2e", "full"]
     build:
       context: .
       dockerfile: Dockerfile.frontend

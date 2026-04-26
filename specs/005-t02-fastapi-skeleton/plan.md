@@ -30,20 +30,20 @@ No endpoints beyond `/health`. No database, no Alembic, no Vertex client, no aut
 - `httpx` ≥ 0.27, < 0.29 — pinned to a version `fastapi.testclient.TestClient` is compatible with.
 
 **Storage**: N/A — T02 does not touch any DB. Postgres arrives with T05.
-**Testing**: pytest + `fastapi.testclient.TestClient` (which wraps `httpx`). Tests live under `app/backend/tests/` so mypy and ruff skip them where the config says so, and the `no-print-statements` pre-commit hook already excludes this path.
-**Target Platform**: Linux container (`python:3.12-slim-bookworm`) for CI and prod; macOS / Linux dev machines for local `uvicorn --reload`.
+**Testing**: pytest + `fastapi.testclient.TestClient` (which wraps `httpx`). Tests live under `app/backend/tests/` so mypy and ruff skip them where the config says so, and the `no-print-statements` pre-commit hook already excludes this path. **Test invocation is Docker-only** (constitution §7): `docker compose -f docker-compose.test.yml run --rm backend pytest app/backend/tests/`; the host-side `uv run pytest` path is intentionally undocumented.
+**Target Platform**: `python:3.12-slim-bookworm` Linux container for dev, CI, and prod (constitution §7 Docker parity). Multi-stage Dockerfile: `builder` → `dev` (default for local + CI; ships pytest, ruff, mypy) → `runtime` (lean image, deployed to Cloud Run only).
 **Project Type**: Monorepo web — backend slice only in this PR. Frontend (T03) is developed in parallel on a separate branch and consumes this PR's committed OpenAPI file.
 **Performance Goals**:
 
-- `GET /health` p99 < 50 ms on a single uvicorn worker running locally (no I/O, no DB).
-- `uv run pytest app/backend/tests/` wall time < 30 s (SC-002).
-- `uv run python -m app.backend.generate_openapi` wall time < 10 s (SC-003).
+- `GET /health` p99 < 50 ms on a single uvicorn worker inside the dev container (no I/O, no DB).
+- `docker compose -f docker-compose.test.yml run --rm backend pytest app/backend/tests/` wall time < 30 s (SC-002), excluding image build (build is cached after the first run).
+- `docker compose -f docker-compose.test.yml run --rm backend python -m app.backend.generate_openapi` wall time < 10 s (SC-003), excluding image build.
 
 **Constraints**:
 
 - **§15 PII** — zero raw candidate email values may appear in serialised log output. FR-010 test enforces.
 - **§14 Contract-first** — `app/backend/openapi.yaml` must be committed **in this PR** (not a follow-up). T03, T04, T05, T06, T07, T09 all reference it.
-- **§7 Docker parity** — the Dockerfile already `COPY app/backend ./app/backend` then `CMD ["uvicorn", "app.backend.main:app", ...]`. The runtime deps and entry point declared by T02 must match what that image expects; no dev-only paths.
+- **§7 Docker parity** — runtime deps land in `[project].dependencies` so the same image runs in dev, CI, and prod. T02 adds a `dev` stage to the Dockerfile (extends `builder` with dev deps) used by both `docker-compose.yml` (local hot-reload) and `docker-compose.test.yml` (CI pytest in container); production keeps using `runtime`. **No host-side `uv run` is part of the canonical workflow** — README documents only the Docker commands.
 - **§10 Forward-only migrations** — N/A at T02 (no migrations), but none of T02's scaffolding may make a later migration harder.
 - **No secret at boot** (FR-003) — zero `os.environ[...]` required-key lookups in the T02 startup path. Env vars may be consulted for optional knobs (log level, log format) but must have safe defaults.
 - **Pre-commit guardrails from T01** — `ruff --fix` + `ruff-format` + `gitleaks` + `detect-secrets` + `no-print-statements` + `no-direct-vertex-import` all pass on every T02-introduced file.
@@ -64,7 +64,7 @@ T02 is a thin skeleton with carefully limited scope. Every invariant listed belo
 | 4   | Immutable rubric snapshots                     | No rubric code.                                                                                                                                      | N/A    |
 | 5   | No plaintext secrets                           | Yes — zero new secrets, no `.env` values added, `gitleaks` + `detect-secrets` hooks run green on every new file. FR-003 also forbids boot-time secret loading. | Pass   |
 | 6   | Workload Identity Federation only              | No SA keys touched.                                                                                                                                  | N/A    |
-| 7   | Docker parity dev → CI → prod                  | Yes — runtime deps declared in `[project].dependencies`, so `uv sync --frozen --no-dev` (Dockerfile line 40) installs them identically in dev, CI, and prod. `uvicorn app.backend.main:app` is both the Dockerfile CMD and the documented local-dev command. | Pass   |
+| 7   | Docker parity dev → CI → prod                  | Yes — runtime deps in `[project].dependencies` install in every stage; new `dev` stage in the Dockerfile shares the prod base layers and only adds dev deps (pytest, ruff, mypy, httpx, types-PyYAML). `docker-compose.yml` and `docker-compose.test.yml` both target `dev`; `runtime` is reserved for Cloud Run. README documents Docker-only workflows; native `uv run` is intentionally excluded. | Pass   |
 | 8   | Production-only topology                       | No deploy in T02.                                                                                                                                    | N/A    |
 | 9   | Dark launch by default                         | No user-visible behaviour shipped. `/health` is operational surface, not candidate surface.                                                          | N/A    |
 | 10  | Migration approval                             | No migrations.                                                                                                                                       | N/A    |
@@ -106,13 +106,19 @@ Every bold/`NEW`/`EDITED` entry is touched by T02. Pre-existing files (from T01 
 ```text
 .
 ├── pyproject.toml                          # EDITED — add [project].dependencies (fastapi, uvicorn, structlog, pyyaml)
-│                                           #          and dev-group additions (pytest, httpx)
+│                                           #          and dev-group additions (pytest, httpx, types-PyYAML)
 ├── uv.lock                                 # EDITED — regenerated by `uv lock` after the manifest edit
-├── README.md                               # EDITED — "Developer setup" section gains 3 backend subsections
-│                                           #          (run the app, run the tests, regenerate openapi.yaml)
+├── README.md                               # EDITED — "Backend dev loop (Docker-first)" subsection
+│                                           #          documents docker compose run / test / regen openapi
 ├── .pre-commit-config.yaml                 # UNCHANGED — existing hooks already cover new T02 files
-├── Dockerfile                              # UNCHANGED — CMD already expects app.backend.main:app
-├── docker-compose.yml                      # UNCHANGED — backend service already builds from Dockerfile
+├── Dockerfile                              # EDITED — adds `dev` stage (builder + dev deps); fixes
+│                                           #          two pre-existing bugs (uv install path + missing
+│                                           #          alembic.ini COPY); runtime stage unchanged
+├── docker-compose.yml                      # EDITED — backend uses `target: dev`, profiles gate
+│                                           #          postgres/vertex-mock/frontend, `.env` no longer
+│                                           #          required for T02-only `up backend`
+├── docker-compose.test.yml                 # EDITED — backend uses `target: dev`; alembic step gated
+│                                           #          on T05; pytest runs in container today
 ├── app/
 │   └── backend/
 │       ├── __init__.py                     # UNCHANGED — empty file from T01

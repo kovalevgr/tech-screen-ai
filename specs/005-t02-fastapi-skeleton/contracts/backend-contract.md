@@ -16,10 +16,19 @@ This is a single consolidated contract covering the four surfaces T02 commits to
 
 ### Producer
 
+Constitution §7 requires every documented backend command to run inside the canonical container:
+
 ```bash
-uv run python -m app.backend.generate_openapi           # writes app/backend/openapi.yaml
-uv run python -m app.backend.generate_openapi --check   # dry-run; exits 1 on drift with a unified-diff head
+# Writes app/backend/openapi.yaml
+docker compose -f docker-compose.test.yml run --rm backend \
+    python -m app.backend.generate_openapi
+
+# Dry-run; exits 1 on drift with a unified-diff head
+docker compose -f docker-compose.test.yml run --rm backend \
+    python -m app.backend.generate_openapi --check
 ```
+
+The module entrypoint (`python -m app.backend.generate_openapi [--check]`) is the frozen contract — wrapping it in `docker compose run` is the canonical invocation, but a future task substituting a different runner (e.g. a Cloud Run job) keeps the same module path.
 
 ### Serialisation guarantees
 
@@ -173,7 +182,8 @@ Research §3 decision: keeping drift detection inside the test suite gives the s
 ### Manual check
 
 ```bash
-uv run python -m app.backend.generate_openapi --check
+docker compose -f docker-compose.test.yml run --rm backend \
+    python -m app.backend.generate_openapi --check
 ```
 
 Exits 1 with a unified-diff head if drift exists, 0 otherwise. Useful in a tight edit loop; not required in CI.
@@ -187,11 +197,11 @@ Exits 1 with a unified-diff head if drift exists, 0 otherwise. Useful in a tight
 
 ## Invocation preconditions (all four surfaces)
 
-1. Python 3.12 and `uv` installed (T01 baseline).
-2. `uv sync --dev` has run at least once (creates `.venv/`).
-3. Current working directory is the repo root (so `app.backend.main` is importable via the installed project).
+1. Docker Engine 24.x or Docker Desktop installed and running (sole contributor prerequisite for the canonical loop).
+2. `docker compose build backend` has run at least once (subsequent runs reuse cached layers).
+3. Current working directory is the repo root so the bind-mounts in `docker-compose.yml` resolve to actual source.
 
-Steps 1–3 are documented in the README "Developer setup" section — T02 extends that section with three backend subsections (run the app, run the tests, regenerate `openapi.yaml`).
+Steps 1–3 are documented in the README "Backend dev loop (Docker-first)" subsection. Native `uv run` is intentionally not part of the contract — the dev container ships `uv`, pytest, ruff, and mypy, so any "I want to call X locally" use case has an exact in-container counterpart.
 
 ---
 
@@ -200,7 +210,7 @@ Steps 1–3 are documented in the README "Developer setup" section — T02 exten
 | Surface                                     | Frozen symbol / path                                                      |
 | ------------------------------------------- | ------------------------------------------------------------------------- |
 | OpenAPI file location                       | `app/backend/openapi.yaml`                                                |
-| OpenAPI generator command                   | `uv run python -m app.backend.generate_openapi [--check]`                 |
+| OpenAPI generator command                   | `docker compose -f docker-compose.test.yml run --rm backend python -m app.backend.generate_openapi [--check]` |
 | OpenAPI YAML serialisation options          | `sort_keys=True, allow_unicode=True, default_flow_style=False`            |
 | Health endpoint path                        | `GET /health`                                                             |
 | Health response field names                 | `status`, `service`, `version`                                            |

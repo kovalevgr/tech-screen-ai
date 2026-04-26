@@ -130,6 +130,24 @@ description: "Task list for T02 — FastAPI Skeleton"
 
 ---
 
+## Phase 8: Docker-first dev loop hardening (post-implementation)
+
+**Purpose**: Close the §7 parity gap that Phases 1–7 left open by quietly using a host-side `uv run` path. After review feedback (see PR #5 conversation) the canonical loop becomes Docker-only; native `uv run` is intentionally undocumented going forward. Driven by [research.md](./research.md) §8.
+
+**Why post-implementation rather than reordered into Phase 1**: T02 acceptance criteria from `implementation-plan.md` were tool-agnostic (`uvicorn app.backend.main:app starts locally`, `One smoke test in app/backend/tests/test_health.py`). Phases 1–7 satisfied those criteria via the fastest available path (host `uv run`). When the §7 parity gap was raised, this phase encoded the canonical Docker workflow without re-running the implementation work.
+
+- [X] T023 Add a `dev` stage to `Dockerfile` between `builder` and `runtime`. Stage extends `builder`, runs `uv sync --frozen` (full deps including pytest/httpx/types-PyYAML/ruff/mypy), exposes 8000, default CMD `uvicorn app.backend.main:app --host 0.0.0.0 --port 8000 --reload`. The `runtime` stage stays unchanged — Cloud Run still gets the lean `--no-dev` image. Reference: [research.md](./research.md) §8.
+- [X] T024 Fix two pre-existing Dockerfile bugs surfaced by the first `docker compose build`: (a) `COPY alembic.ini ./` referred to a missing file — removed with a `TODO(T05)` marker for re-introduction when Alembic lands; (b) the `curl … | sh` uv installer placed the binary at `/root/.cargo/bin/uv`, not `/root/.local/bin/uv`, so the subsequent `mv` failed — replaced with `COPY --from=ghcr.io/astral-sh/uv:0.4.25 /uv /usr/local/bin/uv` (faster, fully pinned, no PATH ambiguity). Reference: [research.md](./research.md) §8.
+- [X] T025 Update `docker-compose.yml`: `backend` switches `target: runtime` → `target: dev`; `postgres`, `vertex-mock`, and `frontend` move under profiles (`db`, `llm`, `web`, plus a `full` umbrella) so `docker compose up backend` works alone today; `env_file: .env` removed (no `.env` in repo; FR-003 means backend boots without env vars). Reference: [research.md](./research.md) §8.
+- [X] T026 Update `docker-compose.test.yml`: `backend` switches `target: runtime` → `target: dev`; `postgres`/`vertex-mock`/`frontend` get profiles; default command's `alembic upgrade head` line is commented with `TODO(T05)` because no migrations exist yet; `pytest …` runs alone today. Reference: [research.md](./research.md) §8.
+- [X] T027 Validate the canonical loop end-to-end: `docker compose build backend`; `docker compose up -d backend && curl /health` returns 200; `docker compose -f docker-compose.test.yml run --rm backend pytest app/backend/tests/` reports 6 passed; `docker compose -f docker-compose.test.yml run --rm backend python -m app.backend.generate_openapi --check` exits 0; `docker compose -f docker-compose.test.yml run --rm backend sh -c "ruff check app/backend && mypy app/backend"` exits 0.
+- [X] T028 Rewrite the README "Backend dev loop" section as "Backend dev loop (Docker-first)" — removes every `uv run` invocation from the canonical contract; documents `docker compose up backend`, the in-container pytest invocation, and the in-container `generate_openapi` command. Adds a callout that native `uv run` is intentionally undocumented. References profiles (`db`/`llm`/`web`/`full`) for later tasks.
+- [X] T029 Update spec-kit artefacts to match the new canonical state: `plan.md` (Technical Context, Performance Goals, Constitution Check §7 row, Project Structure file list), `research.md` (new §8 + summary row), `contracts/backend-contract.md` (Producer, Manual check, Invocation preconditions, frozen-surfaces table), `data-model.md` (Producer row + Validation rules + Relationships), `quickstart.md` (full rewrite of Steps 2–6 to Docker invocations).
+
+**Checkpoint**: §7 parity is no longer aspirational — every documented command executes inside the canonical container; the `dev` Dockerfile stage and updated compose files are committed; the README and every spec doc agree on the Docker-only contract.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase dependencies
@@ -141,6 +159,7 @@ description: "Task list for T02 — FastAPI Skeleton"
 - **Phase 5 US3** (T013–T015): depends on Foundational (T006 created the base `configure_logging`). **Does not depend on US1** — the test uses the `captured_logs` fixture and never imports `main.py`. T014 depends on T013 (uses the redactor); T015 depends on T014.
 - **Phase 6 US4** (T016–T017): depends on US1 (the `client` fixture imports `main.py`). T017 depends on T016.
 - **Phase 7 Polish** (T018–T022): depends on every prior phase. T019–T021 are `[P]`; T022 is the final gate.
+- **Phase 8 Docker hardening** (T023–T029): added post-implementation after review feedback. Depends on Phase 7 only structurally — Phases 1–7 used the host-side `uv run` workflow; Phase 8 retrofits the Docker-only canonical loop without altering the source code or tests committed by earlier phases.
 
 ### User story dependencies
 

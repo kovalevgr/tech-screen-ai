@@ -50,7 +50,7 @@ T02 introduces no persistent data (no tables, no files storing candidate/session
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Definition              | The committed YAML file describing every backend endpoint, generated deterministically from the `FastAPI` instance.                                                           |
 | File                    | `app/backend/openapi.yaml` — this **is** the contract; no duplicate lives under `specs/005-t02-fastapi-skeleton/contracts/`.                                                  |
-| Producer                | `app/backend/generate_openapi.py` — `uv run python -m app.backend.generate_openapi` writes; `--check` exits non-zero on drift.                                                |
+| Producer                | `app/backend/generate_openapi.py` — canonical invocation `docker compose -f docker-compose.test.yml run --rm backend python -m app.backend.generate_openapi` writes; `--check` exits non-zero on drift. (See research §8 for the Docker-first decision.) |
 | Serialisation contract  | `yaml.safe_dump(..., sort_keys=True, allow_unicode=True, default_flow_style=False)`. Byte-deterministic across runs and machines.                                             |
 | Contents at T02 close   | One path (`/health`), one operation (`GET`), one response schema (`HealthResponse`). Info block populated from the `FastAPI(title=..., version=...)` constructor.              |
 | Validation              | `test_openapi_regeneration.py` regenerates in memory and asserts byte-equality with the committed file. Emits a unified-diff head on failure.                                  |
@@ -80,22 +80,24 @@ OpenAPIDocument ──validated-by──► test_openapi_regeneration (byte-equa
 HealthResponse ──exercised-by──► test_health (request → 200 + shape)
 PIIRedactionProcessor ──exercised-by──► test_logging_pii (redaction both shapes)
 
-pyproject.toml [project].dependencies ──consumed-by──► Dockerfile `uv sync --frozen --no-dev`
-                                      └─consumed-by──► local dev `uv sync --dev` (adds dev group)
+pyproject.toml [project].dependencies ──consumed-by──► Dockerfile `runtime` stage (`uv sync --frozen --no-dev`)
+                                      └─consumed-by──► Dockerfile `dev` stage (`uv sync --frozen` — adds dev group)
 ```
 
 ---
 
 ## Validation rules (collected)
 
-1. `uvicorn app.backend.main:app` starts within 5 s on a clean machine with no environment configuration beyond T01's developer-setup prerequisites (FR-001, SC-001).
-2. `GET /health` responds with HTTP 200 and body matching the `HealthResponse` schema (FR-002, FR-009).
-3. The committed `app/backend/openapi.yaml` is byte-identical to the output of `uv run python -m app.backend.generate_openapi` on the same tree (FR-005, SC-003).
-4. A log call `logger.info("foo bar x@y.com", candidate_email="x@y.com")` produces a serialised record in which neither `x@y.com` nor `candidate_email="x@y.com"` appears; `"<REDACTED>"` appears in place of the field value; `"<REDACTED_EMAIL>"` appears in place of the free-text substring (FR-006, FR-007, FR-010, SC-004).
-5. `uv run pytest app/backend/tests/` exits 0 in under 30 s on a clean tree (FR-008, FR-009, FR-010, SC-002).
-6. `uv run ruff check app/backend && uv run mypy app/backend` exits 0 on every T02-introduced file (FR-012, SC-006).
-7. `pre-commit run --all-files` exits 0 (inherits T01's guardrail coverage; FR-014).
+All validation runs inside the Dockerfile `dev` stage (constitution §7; research §8).
+
+1. `docker compose up backend` reaches `Application startup complete` within 5 s and `GET /health` returns 200 (FR-001, FR-002, FR-003, SC-001).
+2. `GET /health` body matches the `HealthResponse` schema (FR-002, FR-009).
+3. `docker compose -f docker-compose.test.yml run --rm backend python -m app.backend.generate_openapi --check` exits 0 on the committed tree (FR-005, SC-003).
+4. A log call `logger.info("foo bar x@y.com", candidate_email="x@y.com")` produces a serialised record in which neither `x@y.com` nor `candidate_email="x@y.com"` appears; `"<REDACTED>"` appears in place of the field value; `"<REDACTED_EMAIL>"` appears in place of the free-text substring (FR-006, FR-007, FR-010, SC-004). The same redaction holds for Cyrillic IDN emails (`студент@приклад.укр`) — see `test_cyrillic_idn_email_redacted_in_freetext`.
+5. `docker compose -f docker-compose.test.yml run --rm backend pytest app/backend/tests/` exits 0 in under 30 s on a clean tree (FR-008, FR-009, FR-010, SC-002).
+6. `docker compose -f docker-compose.test.yml run --rm backend sh -c "ruff check app/backend && mypy app/backend"` exits 0 on every T02-introduced file (FR-012, SC-006).
+7. `pre-commit run --all-files` exits 0 on host — pre-commit operates around `git commit`, not inside the container (FR-014).
 8. No T02 file contains a secret value, a credential, or a real PII sample (FR-014; enforced by `gitleaks` + `detect-secrets`).
-9. T02 introduces no new endpoint besides `/health`, no migration, no Vertex call, no auth middleware, no CORS (FR-011; reviewer diff check).
+9. T02 introduces no new endpoint besides `/health`, no migration, no Vertex call, no auth middleware, no CORS (FR-011; reviewer diff check). Dockerfile and compose edits are in scope per research §8.
 
 No other data-model concerns — T02 has no persistence, no migrations, no LLM inputs/outputs, no rubric references. Those arrive in T04, T05, T08, T15, and later.

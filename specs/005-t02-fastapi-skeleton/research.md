@@ -180,6 +180,40 @@ No `DATABASE_URL`, no `VERTEX_PROJECT`, no `SECRET_KEY` lookups in T02's code pa
 
 ---
 
+## 8. Strict Docker-first dev loop
+
+**Decision**: Every documented backend workflow — running the app, running the tests, regenerating `openapi.yaml`, lint + type-check — is invoked through `docker compose` against the `dev` Dockerfile stage. Native `uv run` is intentionally undocumented as a contributor path. The Dockerfile gains a `dev` stage between `builder` and `runtime`; `docker-compose.yml` and `docker-compose.test.yml` both target `dev`. Production deploys keep using `runtime`.
+
+Concrete shape:
+
+- **`Dockerfile`** — three stages: `builder` (system deps + uv + project venv), `dev` (extends `builder`, runs `uv sync --frozen` to add pytest/httpx/types-PyYAML, ships `uvicorn --reload` as default CMD), `runtime` (lean image with `--no-dev` venv + tini + non-root user; deployed to Cloud Run).
+- **`docker-compose.yml`** — `backend` builds `target: dev`, bind-mounts `app/backend/`, `alembic/`, `alembic.ini`, `configs/`, `prompts/`. Postgres / vertex-mock / frontend are profile-gated (`db` / `llm` / `web` / `full`) so `docker compose up backend` runs the backend alone today; `--profile full` becomes the Tier-1 gate (T11).
+- **`docker-compose.test.yml`** — `backend` builds `target: dev`, runs `pytest …` directly (the `alembic upgrade head` step is gated on T05). Default invocation: `docker compose -f docker-compose.test.yml run --rm --build backend pytest app/backend/tests/`.
+- **`.env`** — no longer required for T02. The dev compose previously declared `env_file: .env`; that line is removed until a task introduces a required env var (T04 Vertex creds, T05/T06 Postgres + signing keys).
+
+**Rationale**:
+
+- Constitution §7 states "Local development, CI, and production all run the same containers." A native dev path was a quiet parity drift: the same code runs against a host Python + host venv vs. a containerised Python + containerised venv. Even with `uv` pinning the deps identically, libc differences, file-system case sensitivity, and host TLS roots vary. Catching that drift in CI rather than dev is the wrong direction.
+- The `dev` stage extends `builder`, so production layers (system deps, uv version, base venv) are shared bytes — image bloat is just the dev-deps delta (~30 MB).
+- Profiles satisfy "T02 should not require Postgres or Vertex mock" (FR-003) without forking the compose file. Later tasks light up profiles additively; the compose contract stays one file.
+- Removing `env_file: .env` in dev compose closes a real onboarding paper-cut: today there is no `.env` in the repo (only `.env.example`), so any contributor running `docker compose up backend` would have hit "env file not found". Reactivating `env_file` is a per-task decision when the task actually consumes a secret.
+
+**Two pre-existing Dockerfile bugs surfaced and fixed in the same change** (would have blocked the canonical loop):
+
+1. `COPY alembic.ini ./` — file does not exist yet. Removed with a `TODO(T05)` marker; Alembic onboarding task reactivates the COPY.
+2. `RUN curl -LsSf …/install.sh | sh && mv /root/.local/bin/uv /usr/local/bin/uv` — the install script in uv 0.4.25 places the binary under `/root/.cargo/bin`, not `/root/.local/bin`. Replaced with `COPY --from=ghcr.io/astral-sh/uv:0.4.25 /uv /usr/local/bin/uv`, which is faster, fully pinned, and immune to install-script PATH quirks.
+
+Both fixes belong technically to T09 (Docker stacks) but cannot be deferred — without them, the §7 invariant has no implementable canonical path today.
+
+**Alternatives considered**:
+
+- *Keep native `uv run` documented alongside Docker*: produces a "two paths, parity invariant" landmine — every contributor must remember which path matches CI. Rejected; one canonical path keeps reasoning simple.
+- *Run only `pytest` in Docker, keep app launch native*: arbitrary partition; tests already passed natively, the value of running them in Docker is precisely to validate the production image path. Rejected.
+- *Defer all Docker work to T09*: would leave §7 violated for the entire Tier-1 window (W1–W2). Adding two short stage definitions and four compose tweaks now is cheaper than re-validating after T09 reshapes everything.
+- *Build a separate `Dockerfile.dev`*: doubles the maintenance surface. The single multi-stage Dockerfile pattern is the industry default and what T09 was already aiming for.
+
+---
+
 ## Summary of resolved decisions
 
 | #   | Topic                      | Decision                                                                                                                                                      |
@@ -191,5 +225,6 @@ No `DATABASE_URL`, no `VERTEX_PROJECT`, no `SECRET_KEY` lookups in T02's code pa
 | 5   | Test framework             | pytest 8.x + `TestClient`. Package layout under `app/backend/tests/`. Three committed tests.                                                                  |
 | 6   | `/health` body shape       | `{"status": "ok", "service": "techscreen-backend", "version": "<pyproject version>"}`, unauth, unrate-limited.                                                |
 | 7   | Boot without secrets       | No required env vars; optional `LOG_FORMAT` / `LOG_LEVEL` with documented defaults and warn-and-fallback on invalid. No pydantic-settings yet.                |
+| 8   | Docker-first dev loop      | `dev` stage in Dockerfile; `docker-compose.yml` + `docker-compose.test.yml` both target `dev` with profiles for postgres/vertex-mock/frontend. Native `uv run` is intentionally undocumented. Two pre-existing Dockerfile bugs (`alembic.ini` COPY, uv install path) fixed inline. |
 
 No open `NEEDS CLARIFICATION` markers remain. Proceed to `data-model.md`, `contracts/backend-contract.md`, and `quickstart.md`.

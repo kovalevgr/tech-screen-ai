@@ -47,24 +47,41 @@ pnpm --dir app/frontend lint
 
 Run these from the repo root. Internet access to PyPI and the pnpm/npm registry is required for the one-time bootstrap; afterwards the check commands are fully local.
 
-### Backend dev loop
+### Backend dev loop (Docker-first)
 
-The backend skeleton (T02) ships a FastAPI app with a `GET /health` endpoint, a structlog-based logger that redacts candidate PII before logs leave the process, and a committed OpenAPI contract. See [`specs/005-t02-fastapi-skeleton/contracts/backend-contract.md`](./specs/005-t02-fastapi-skeleton/contracts/backend-contract.md) for the stable interface.
+Constitution §7 (Docker parity dev → CI → prod) is non-negotiable. **All backend run/test/regen workflows happen inside the same multi-stage image that CI and production use.** No native `uv run` for the canonical loop — Docker Desktop (or any Docker Engine) is the only contributor prerequisite for this layer.
+
+The Dockerfile has three stages: `builder` (deps + project), `dev` (builder + dev deps; default for local + CI), `runtime` (lean image deployed to Cloud Run). `docker-compose.yml` builds `dev`; `docker-compose.test.yml` builds `dev` and runs pytest; only Cloud Run gets `runtime`.
+
+The backend skeleton (T02) ships a FastAPI app with `GET /health`, a structlog-based PII-safe logger, and a committed OpenAPI contract. See [`specs/005-t02-fastapi-skeleton/contracts/backend-contract.md`](./specs/005-t02-fastapi-skeleton/contracts/backend-contract.md) for the stable interface.
 
 ```bash
-# Run the backend locally (port 8000, auto-reload)
-uv run uvicorn app.backend.main:app --reload
+# Run the backend (port 8000, hot reload via bind-mount).
+docker compose up backend
+#   …or rebuild then run if pyproject.toml or uv.lock changed:
+docker compose up --build backend
 
-# Run the backend test suite (health smoke, PII redaction, OpenAPI drift)
-uv run pytest app/backend/tests/
+# Run the backend test suite (health smoke, PII redaction × 4, OpenAPI drift).
+docker compose -f docker-compose.test.yml run --rm --build backend \
+    pytest app/backend/tests/
 
-# Regenerate the committed OpenAPI contract after changing routes or schemas
-uv run python -m app.backend.generate_openapi
-#   …or detect drift without overwriting the file (exits 1 on mismatch):
-uv run python -m app.backend.generate_openapi --check
+# Regenerate the committed OpenAPI contract after changing routes or schemas.
+docker compose -f docker-compose.test.yml run --rm backend \
+    python -m app.backend.generate_openapi
+#   …or detect drift without overwriting (exits 1 on mismatch).
+docker compose -f docker-compose.test.yml run --rm backend \
+    python -m app.backend.generate_openapi --check
+
+# Lint + type-check inside the container (ruff + mypy --strict).
+docker compose -f docker-compose.test.yml run --rm backend \
+    sh -c "ruff check app/backend && mypy app/backend"
 ```
 
+Profiles let later tasks add Postgres / Vertex mock / Next.js without forcing them on T02 today: `docker compose --profile db up` (T05+), `--profile llm` (T04+), `--profile web` (T03+), `--profile full` (everything; the Tier-1 gate / T11 smoke).
+
 The OpenAPI drift check also runs as part of the pytest suite — you will see a test failure if the committed `app/backend/openapi.yaml` disagrees with the live FastAPI app, with a unified-diff head in the failure message.
+
+> **Native `uv run` is intentionally undocumented.** Editor / IDE integrations (mypy daemon, ruff in your editor) may still use the host-side `uv sync --dev` venv — that's a tooling convenience, not a documented dev path. The canonical commands above are what CI runs and what every PR description references.
 
 ## What this repository is for
 

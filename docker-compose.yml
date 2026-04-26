@@ -1,19 +1,25 @@
 # TechScreen — local dev stack.
 #
-# Goal: one `docker compose up` brings up everything needed to exercise the
-# app end-to-end without touching GCP. Same image shapes as CI and prod
-# (ADR-010); behaviour differences are env-var driven.
+# Goal: one `docker compose up backend` brings up just the backend with
+# hot reload — no postgres, no Vertex mock, no `.env` required. Use
+# profiles to opt in to the heavier services as later tasks add them.
 #
-# Services:
-#   postgres     — Postgres 17 with pgvector baked in (matches Cloud SQL prod — ADR-001, ADR-007).
-#   vertex-mock  — FastAPI mock standing in for Vertex Gemini.
-#   backend      — FastAPI app, bind-mounted for hot reload during dev.
-#   frontend     — Next.js dev server, bind-mounted for hot reload.
+# Profiles:
+#   (default)        — `backend` only (T02 baseline). `docker compose up`.
+#   --profile db     — adds Postgres 17 + pgvector (lights up at T05).
+#   --profile llm    — adds the Vertex mock (lights up at T04).
+#   --profile web    — adds the Next.js frontend (lights up at T03).
+#   --profile full   — everything above (Tier-1 gate / T11 smoke).
+#
+# Constitution §7 Docker parity: backend uses the multi-stage `dev`
+# target — same image shape that runs in CI (docker-compose.test.yml).
+# Production deploys the `runtime` target (no dev deps); see Dockerfile.
 
 name: techscreen-dev
 
 services:
   postgres:
+    profiles: ["db", "full"]
     image: pgvector/pgvector:pg17
     restart: unless-stopped
     environment:
@@ -31,6 +37,7 @@ services:
       retries: 10
 
   vertex-mock:
+    profiles: ["llm", "full"]
     build:
       context: .
       dockerfile: Dockerfile.vertex-mock
@@ -51,44 +58,42 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: runtime
+      target: dev
     restart: unless-stopped
-    env_file:
-      - .env
+    # `.env` is intentionally NOT loaded by default at T02 — the
+    # backend boots with no required env vars (FR-003). Tasks that
+    # introduce real secrets (T04 Vertex, T05/T06 Postgres + Secret
+    # Manager) reactivate `env_file: .env` then.
     environment:
       APP_ENV: dev
-      LLM_BACKEND: mock
       LOG_FORMAT: json
       LOG_LEVEL: debug
+      # Optional dev knobs (used only when their profile is active):
       DATABASE_URL: postgresql+asyncpg://techscreen:techscreen@postgres:5432/techscreen
       VERTEX_MOCK_URL: http://vertex-mock:8080
     ports:
       - "127.0.0.1:8000:8000"
+    # depends_on resolves at the profile level: when the dependent
+    # service is hidden behind a profile that's not active, the
+    # depends_on entry is silently ignored by Compose.
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
       vertex-mock:
         condition: service_healthy
-    # Bind-mount source for hot reload. Uvicorn reload is enabled via the
-    # override command below.
+        required: false
+    # Bind-mount source for hot reload. Uvicorn reload is enabled via
+    # the dev image's default CMD.
     volumes:
       - ./app/backend:/app/app/backend
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
       - ./configs:/app/configs
       - ./prompts:/app/prompts
-    command:
-      - uvicorn
-      - app.backend.main:app
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8000"
-      - --reload
-      - --reload-dir
-      - /app/app/backend
 
   frontend:
+    profiles: ["web", "full"]
     build:
       context: .
       dockerfile: Dockerfile.frontend
