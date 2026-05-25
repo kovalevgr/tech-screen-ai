@@ -39,10 +39,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Copy the app and install the project itself.
 COPY app/backend ./app/backend
 COPY alembic ./alembic
-# TODO(T05): re-introduce `COPY alembic.ini ./` once Alembic is wired.
-# Today the file does not exist; copying a missing file fails the build.
+COPY alembic.ini ./
 COPY configs ./configs
 COPY prompts ./prompts
+# scripts/ carries the no-provider-sdk-imports guardrail that
+# app/backend/tests/llm/test_no_provider_sdk_imports.py executes in-container.
+COPY scripts ./scripts
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
@@ -59,6 +61,13 @@ FROM builder AS dev
 ENV PATH="/app/.venv/bin:${PATH}" \
     APP_ENV=dev \
     LOG_FORMAT=json
+
+# ripgrep backs scripts/check-no-provider-sdk-imports.sh (the no-provider-SDK
+# guardrail). It is a dev/CI-only tool, so it is installed here and NOT in the
+# runtime stage, keeping the production image minimal (constitution §7).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ripgrep \
+ && rm -rf /var/lib/apt/lists/*
 
 # Add dev deps on top of the prod venv. Cached layer; only re-runs when
 # `pyproject.toml` or `uv.lock` change.
