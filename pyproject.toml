@@ -12,6 +12,9 @@ dependencies = [
   "google-api-core>=2.20,<3",
   "tenacity>=9.0,<10",
   "pydantic-settings>=2.6,<3",
+  "sqlalchemy[asyncio]>=2.0,<2.1",
+  "alembic>=1.13,<2",
+  "asyncpg>=0.30,<0.31",
 ]
 
 [dependency-groups]
