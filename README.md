@@ -111,6 +111,29 @@ result = await call_model(
 - **Production refuses to start in mock mode.** `Settings.assert_safe_for_environment()` runs at module init in `app/backend/main.py`; an `APP_ENV=prod` worker with `LLM_BACKEND=mock` exits non-zero before the first request (FR-007). `APP_ENV` is the canonical runtime selector already set by `Dockerfile` and every `docker-compose*.yml`. The same check refuses `LLM_BUDGET_PER_SESSION_USD > $5.00` in production (constitution §12).
 - **Fixtures live under [`app/backend/tests/fixtures/llm_responses/<agent>/<sha>.json`](./app/backend/tests/fixtures/llm_responses/).** Filename is the SHA-256 of the canonical prompt envelope (see [`app/backend/llm/_mock_backend.py`](./app/backend/llm/_mock_backend.py) for the recipe). When a test prompt has no fixture, the mock writes the unseen envelope to `_unrecorded/<sha>.json` and raises `RuntimeError` so the developer can edit the captured file and `mv` it into the agent directory to "promote" it. The full flow is documented in [`app/backend/tests/fixtures/llm_responses/README.md`](./app/backend/tests/fixtures/llm_responses/README.md).
 
+#### Database dev loop
+
+The schema is owned by Alembic (one baseline migration, `alembic/versions/0001_baseline.py`) and runs inside the same Docker image as everything else. The `db` profile brings up Postgres 17 + pgvector (`pgvector/pgvector:pg17`, identical dev → CI → prod per §7). See [`specs/008-t05-db-schema-v0/`](./specs/008-t05-db-schema-v0/) for the full schema spec, contract, and quickstart.
+
+```bash
+# Start the dev DB, then apply the schema (creates all 16 tables, the vector +
+# pgcrypto extensions, and the two roles).
+docker compose --profile db up -d postgres
+docker compose --profile db run --rm backend alembic upgrade head
+
+# Reset a local DB to empty (forward-only in prod; this is a local/CI convenience).
+docker compose --profile db run --rm backend alembic downgrade base
+
+# Run the DB integration suite against a freshly migrated test database.
+docker compose -f docker-compose.test.yml --profile db up -d postgres
+docker compose -f docker-compose.test.yml --profile db run --rm backend \
+    sh -c "alembic upgrade head && pytest app/backend/tests/db -v"
+```
+
+The DB tests skip themselves when no database is reachable, so the no-DB unit run (`docker compose -f docker-compose.test.yml run --rm backend pytest app/backend/tests`) stays green.
+
+**Two roles, one append-only guarantee.** The baseline migration creates `techscreen_app` (the runtime role) and `techscreen_migrator` (migrations). The six audit tables — `turn_trace`, `assessment`, `assessment_correction`, `turn_annotation`, `audit_log`, `session_decision` — are **append-only** (constitution §3, ADR-019), enforced in two layers: `UPDATE`/`DELETE` are revoked from `techscreen_app`, and a `BEFORE UPDATE OR DELETE` trigger raises `append-only: …` for every non-migrator caller (including a superuser). Corrections are new rows, never mutations. Only `techscreen_migrator` may evolve audit data, and only via a human-approved forward-only migration.
+
 ### Frontend dev loop (Docker-first)
 
 Constitution §7 (Docker parity dev → CI → prod) is non-negotiable. **All frontend run/test/regen workflows happen inside the same multi-stage image that CI and production use.** No native `pnpm --dir app/frontend …` for the canonical loop — Docker Desktop (or any Docker Engine) is the only contributor prerequisite for this layer.
