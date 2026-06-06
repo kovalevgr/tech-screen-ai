@@ -167,7 +167,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
   Alembic baseline migration `0001_baseline.py`. Forward-only invariant enforced (§10). SQLAlchemy models under `app/backend/db/models/`.
 
   **Extensions enabled (at baseline, even though MVP doesn't use them):**
-  - `CREATE EXTENSION IF NOT EXISTS vector;` — pgvector for H2 RAG (ADR-008). Enabling at baseline avoids a destructive migration later.
+  - `CREATE EXTENSION IF NOT EXISTS vector;` — pgvector for H2 RAG (ADR-007). Enabling at baseline avoids a destructive migration later.
   - `CREATE EXTENSION IF NOT EXISTS pgcrypto;` — for `gen_random_uuid()` used by several PKs.
 
   **Tables created:**

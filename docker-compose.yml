@@ -6,7 +6,11 @@
 #
 # Profiles:
 #   (default)        — `backend` only (T02 baseline). `docker compose up`.
-#   --profile db     — adds Postgres 17 + pgvector (lights up at T05).
+#   --profile db     — adds Postgres 17 + pgvector (lights up at T05). Apply
+#                      the schema with:
+#                        docker compose --profile db up -d postgres
+#                        docker compose --profile db run --rm backend alembic upgrade head
+#                      and reset a local DB with `alembic downgrade base`.
 #   --profile llm    — adds the Vertex mock (lights up at T04).
 #   --profile web    — adds the Next.js frontend (lights up at T03).
 #   --profile full   — everything above (Tier-1 gate / T11 smoke).

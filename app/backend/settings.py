@@ -10,6 +10,9 @@ non-secret keys (per ADR-022):
   guard fires under the existing infra wiring.
 - ``LLM_BUDGET_PER_SESSION_USD`` — Decimal; production caps at $5.00 (constitution §12).
 - ``LLM_FIXTURES_DIR``      — Path; mock-mode fixture root.
+- ``DATABASE_URL``          — optional async DSN (``postgresql+asyncpg://…``)
+  consumed by :mod:`app.backend.db.session` (T05). Unset by default so the
+  no-DB unit run and module-import smoke tests need no database.
 
 The :meth:`Settings.assert_safe_for_environment` method is invoked once at
 ``app/backend/main.py`` module init. Production startup fails fast with a
@@ -37,6 +40,7 @@ class Settings(BaseSettings):
     app_env: Literal["dev", "test", "prod"] = "dev"
     llm_budget_per_session_usd: Decimal = Decimal("5.00")
     llm_fixtures_dir: Path = Path("app/backend/tests/fixtures/llm_responses")
+    database_url: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

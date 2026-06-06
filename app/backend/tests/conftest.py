@@ -7,17 +7,21 @@ task builds on.
 
 from __future__ import annotations
 
-from collections.abc import Generator
+import subprocess
+from collections.abc import AsyncGenerator, AsyncIterator, Generator
+from contextlib import asynccontextmanager
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
 import structlog
+from sqlalchemy import text
 from structlog.typing import EventDict, WrappedLogger
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
+    from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
     from app.backend.llm._mock_backend import MockVertexBackend
     from app.backend.llm.cost_ledger import InMemoryCostLedger
@@ -28,6 +32,7 @@ if TYPE_CHECKING:
 
 
 _FIXTURES_DIR: Path = Path(__file__).resolve().parent / "fixtures" / "llm_responses"
+_REPO_ROOT: Path = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture(scope="session")
@@ -149,3 +154,128 @@ def mock_backend() -> MockVertexBackend:
     from app.backend.llm._mock_backend import MockVertexBackend
 
     return MockVertexBackend(agent="assessor", fixtures_dir=_FIXTURES_DIR)
+
+
+# ---------------------------------------------------------------------------
+# T05 — Database integration test fixtures
+# ---------------------------------------------------------------------------
+#
+# These fixtures gate the `tests/db/` suite: when no database is reachable they
+# `pytest.skip` so the existing no-DB unit run stays green (research §9). When a
+# DB is present, the schema is materialised by the REAL `alembic upgrade head`
+# (never `Base.metadata.create_all`) because the §3 guarantee — triggers, roles,
+# grants — lives only in the migration, not in the model metadata.
+
+
+def _resolve_database_url() -> str | None:
+    """Return the configured async DSN, or ``None`` when unset/blank.
+
+    An empty or whitespace-only ``DATABASE_URL`` (e.g. ``DATABASE_URL=`` in the
+    environment) is treated as unset so the DB suite skips rather than trying to
+    parse an invalid URL.
+    """
+    from app.backend.settings import Settings
+
+    url = Settings().database_url
+    if url is None or not url.strip():
+        return None
+    return url
+
+
+async def _can_connect(database_url: str) -> bool:
+    """Best-effort connectivity probe; ``False`` on any failure.
+
+    Catches both URL-parse errors (engine creation) and connection failures, so
+    a malformed or unreachable DSN cleanly skips the suite instead of erroring.
+    """
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    try:
+        engine = create_async_engine(database_url)
+    except Exception:  # noqa: BLE001 — bad URL → "not reachable" → skip
+        return False
+    try:
+        async with engine.connect():
+            return True
+    except Exception:  # noqa: BLE001 — any failure means "DB not reachable" → skip
+        return False
+    finally:
+        await engine.dispose()
+
+
+@pytest.fixture(scope="session")
+async def db_available() -> str:
+    """Skip the DB suite unless a reachable ``DATABASE_URL`` is configured.
+
+    Returns the DSN string when present and connectable; otherwise calls
+    :func:`pytest.skip` so the no-DB unit run is unaffected.
+    """
+    database_url = _resolve_database_url()
+    if database_url is None:
+        pytest.skip("DATABASE_URL is not set; skipping DB integration tests")
+    if not await _can_connect(database_url):
+        pytest.skip(f"database at {database_url!r} is not reachable; skipping DB tests")
+    return database_url
+
+
+@pytest.fixture(scope="session")
+def migrated_schema(db_available: str) -> str:
+    """Run the real ``alembic upgrade head`` once for the DB test session.
+
+    Uses the committed ``alembic.ini`` + async ``env.py`` so the materialised
+    schema includes the triggers, roles, and grants that ``create_all`` would
+    never produce. Idempotent — re-running against an already-migrated DB is a
+    no-op (the migration guards roles/extensions).
+    """
+    result = subprocess.run(  # noqa: S603 — fixed argv, no shell, trusted input
+        ["alembic", "upgrade", "head"],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        pytest.fail(
+            "alembic upgrade head failed in the migrated_schema fixture:\n"
+            f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+        )
+    return db_available
+
+
+@pytest.fixture
+async def db_engine(migrated_schema: str) -> AsyncGenerator[AsyncEngine, None]:
+    """A per-test async engine bound to the migrated test database."""
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    engine = create_async_engine(migrated_schema)
+    try:
+        yield engine
+    finally:
+        await engine.dispose()
+
+
+@pytest.fixture
+async def db_conn(db_engine: AsyncEngine) -> AsyncGenerator[AsyncConnection, None]:
+    """A per-test async connection on the migrated schema.
+
+    Each test gets a fresh connection so ``SET ROLE`` / ``RESET ROLE`` state
+    never leaks between tests.
+    """
+    async with db_engine.connect() as conn:
+        yield conn
+
+
+@asynccontextmanager
+async def set_role(conn: AsyncConnection, role: str) -> AsyncIterator[None]:
+    """Run a block as ``role`` via ``SET ROLE`` / ``RESET ROLE``.
+
+    ``SET ROLE`` from the superuser to a ``NOLOGIN`` role makes privilege checks
+    apply *as that role* (``is_superuser`` becomes false), so the §3 ``REVOKE``
+    is genuinely enforced under test without provisioning a LOGIN password
+    (research §3). ``RESET ROLE`` always runs on exit, even on error.
+    """
+    await conn.execute(text(f'SET ROLE "{role}"'))
+    try:
+        yield
+    finally:
+        await conn.execute(text("RESET ROLE"))

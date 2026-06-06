@@ -19,7 +19,10 @@ name: techscreen-test
 services:
   postgres:
     profiles: ["db", "full"]
-    image: postgres:16-bookworm
+    # pgvector/pgvector:pg17 (== docker-compose.yml dev image): constitution §7
+    # Docker parity, and required so `CREATE EXTENSION vector` in the baseline
+    # migration succeeds in CI (stock postgres images lack the extension files).
+    image: pgvector/pgvector:pg17
     environment:
       POSTGRES_USER: techscreen
       POSTGRES_PASSWORD: techscreen
@@ -70,17 +73,18 @@ services:
       vertex-mock:
         condition: service_healthy
         required: false
-    # T02: tests do not need a DB; alembic step lands with T05 (it would
-    # fail today because `alembic/` only carries a placeholder). Override
-    # the command from CLI when needed: `docker compose -f
-    # docker-compose.test.yml run --rm backend pytest -k smoke`.
+    # The default command applies the migration (db profile) then runs the
+    # full suite. Without the `db` profile the postgres service is absent, so
+    # `alembic upgrade head` would have no DB — run the no-DB unit suite via
+    # the explicit CLI override instead: `docker compose -f
+    # docker-compose.test.yml run --rm backend pytest app/backend/tests`
+    # (the DB tests skip themselves when DATABASE_URL is unreachable).
     command:
       - sh
       - -c
       - |
         set -eu
-        # TODO(T05): re-enable once Alembic migrations land.
-        # alembic upgrade head
+        alembic upgrade head
         pytest --maxfail=1 --strict-markers -ra app/backend/tests
 
   frontend:
