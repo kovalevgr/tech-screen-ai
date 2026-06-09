@@ -17,6 +17,7 @@ from app.backend.db.models.audit import (
     TurnAnnotation,
     TurnTrace,
 )
+from app.backend.db.models.feature_flag import FeatureFlag
 from app.backend.db.models.identity import User
 from app.backend.db.models.interview import (
     InterviewPlan,
@@ -53,4 +54,6 @@ __all__ = [
     "TurnAnnotation",
     "AuditLog",
     "SessionDecision",
+    # feature flags (T05a; explicit §3 carve-out — see feature_flag.py docstring)
+    "FeatureFlag",
 ]

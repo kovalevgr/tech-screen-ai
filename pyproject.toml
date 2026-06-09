@@ -15,6 +15,7 @@ dependencies = [
   "sqlalchemy[asyncio]>=2.0,<2.1",
   "alembic>=1.13,<2",
   "asyncpg>=0.30,<0.31",
+  "jsonschema>=4.23,<5",
 ]
 
 [dependency-groups]
@@ -56,4 +57,11 @@ mypy_path = "."
 # is the only consumer and is itself fully typed at the public surface.
 [[tool.mypy.overrides]]
 module = ["google.genai", "google.genai.*"]
+ignore_missing_imports = true
+
+# jsonschema (4.x) and asyncpg both lack a `py.typed` marker. Treat them as
+# untyped at the module boundary — the FeatureFlagService (T05a) is itself
+# fully typed at its public surface.
+[[tool.mypy.overrides]]
+module = ["jsonschema", "jsonschema.*", "asyncpg", "asyncpg.*"]
 ignore_missing_imports = true

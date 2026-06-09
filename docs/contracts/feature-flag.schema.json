@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kovalevgr/tech-screen-ai/blob/main/docs/contracts/feature-flag.schema.json",
+  "title": "TechScreen feature-flag YAML contract (T05a, FR-006)",
+  "description": "Schema for entries in configs/feature-flags.yaml. Every flag the project has ever had appears here (active or sunset). Sunset entries remain forever (constitution §1, FR-011).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["flags"],
+  "properties": {
+    "flags": {
+      "type": "array",
+      "description": "Every declared flag — active and sunset alike.",
+      "items": {"$ref": "#/$defs/flag_entry"}
+    }
+  },
+  "$defs": {
+    "flag_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "owner", "default", "description", "state"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Snake-case identifier referenced verbatim by is_enabled() call sites and by the feature_flag.name DB primary key.",
+          "pattern": "^[a-z][a-z0-9_]{2,63}$"
+        },
+        "owner": {
+          "type": "string",
+          "description": "Accountability handle, conventionally a GitHub @handle.",
+          "minLength": 1
+        },
+        "default": {
+          "type": "boolean",
+          "description": "Initial enabled state when the row is first synced into the DB. After the first sync the DB value may diverge from this whenever an operator flips the runtime state."
+        },
+        "default_value": {
+          "description": "Reserved for future non-boolean payloads (mirrors the feature_flag.default_value JSONB column). Unused at MVP."
+        },
+        "description": {
+          "type": "string",
+          "description": "One short paragraph in English explaining what flipping this flag does."
+        },
+        "state": {
+          "type": "string",
+          "enum": ["active", "sunset"],
+          "description": "Lifecycle. 'active' = live flag with at least one in-code call site. 'sunset' = retired flag; entry stays in the file forever (FR-011) and must have sunset_pr + sunset_date."
+        },
+        "sunset_pr": {
+          "type": "string",
+          "description": "GitHub PR back-reference for the PR that sunsetted the flag (required when state=sunset).",
+          "pattern": "^#[0-9]+$"
+        },
+        "sunset_date": {
+          "type": "string",
+          "description": "ISO date the flag was sunsetted (required when state=sunset).",
+          "format": "date"
+        }
+      },
+      "if": {"properties": {"state": {"const": "sunset"}}, "required": ["state"]},
+      "then": {"required": ["sunset_pr", "sunset_date"]}
+    }
+  }
+}

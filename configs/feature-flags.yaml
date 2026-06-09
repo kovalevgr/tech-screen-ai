@@ -1,0 +1,31 @@
+# TechScreen feature flags — source of truth (constitution §16, FR-005).
+#
+# Every flag the project has ever had appears in this file: active flags drive
+# runtime behaviour, sunset flags stay forever to preserve audit history
+# (FR-011, §1). The schema is committed at docs/contracts/feature-flag.schema.json
+# and enforced on every commit by scripts/check-feature-flag-registration.py.
+#
+# To add a flag:        add an entry with state=active + at least one
+#                       is_enabled("name") call site in app/backend/.
+# To flip a flag:        PR that changes default=false → default=true (mostly
+#                       documentation — operators flip the DB row directly via
+#                       the sync workflow or emergency SQL).
+# To sunset a flag:      flip state to "sunset", set sunset_pr + sunset_date,
+#                       add a row to docs/engineering/feature-flags.md
+#                       Sunset table. The entry never leaves this file.
+#
+# See docs/engineering/feature-flags.md for the human-readable index.
+
+flags:
+  # Demonstration sunset entry — shipped intentionally so the format is
+  # concrete from day one and the bidirectional registration hook
+  # (scripts/check-feature-flag-registration.py) has a baseline to validate
+  # against. This name is reserved and must never be reused.
+  - name: example_demonstration
+    owner: "@andrii"
+    default: false
+    default_value: null
+    description: "Demonstration entry showing the sunset-row shape; never wired to a call site, never re-introduced."
+    state: sunset
+    sunset_pr: "#9"
+    sunset_date: "2026-04-28"
