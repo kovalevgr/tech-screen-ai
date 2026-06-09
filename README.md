@@ -134,6 +134,10 @@ The DB tests skip themselves when no database is reachable, so the no-DB unit ru
 
 **Two roles, one append-only guarantee.** The baseline migration creates `techscreen_app` (the runtime role) and `techscreen_migrator` (migrations). The six audit tables — `turn_trace`, `assessment`, `assessment_correction`, `turn_annotation`, `audit_log`, `session_decision` — are **append-only** (constitution §3, ADR-019), enforced in two layers: `UPDATE`/`DELETE` are revoked from `techscreen_app`, and a `BEFORE UPDATE OR DELETE` trigger raises `append-only: …` for every non-migrator caller (including a superuser). Corrections are new rows, never mutations. Only `techscreen_migrator` may evolve audit data, and only via a human-approved forward-only migration.
 
+#### Feature flags
+
+Risky features ship behind a flag that starts `false` (constitution §9). The mechanism lives in [`app/backend/services/feature_flags.py`](./app/backend/services/feature_flags.py); the source of truth is [`configs/feature-flags.yaml`](./configs/feature-flags.yaml), the schema contract is [`docs/contracts/feature-flag.schema.json`](./docs/contracts/feature-flag.schema.json), and the human-readable index — declare / flip / sunset / emergency-disable runbooks — is [`docs/engineering/feature-flags.md`](./docs/engineering/feature-flags.md). A bidirectional pre-commit + CI hook blocks orphan call sites and silently-deleted history; DB→backend propagation is sub-second via `LISTEN/NOTIFY` (see [`specs/009-t05a-feature-flag-infrastructure/`](./specs/009-t05a-feature-flag-infrastructure/)).
+
 ### Frontend dev loop (Docker-first)
 
 Constitution §7 (Docker parity dev → CI → prod) is non-negotiable. **All frontend run/test/regen workflows happen inside the same multi-stage image that CI and production use.** No native `pnpm --dir app/frontend …` for the canonical loop — Docker Desktop (or any Docker Engine) is the only contributor prerequisite for this layer.

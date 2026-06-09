@@ -45,6 +45,13 @@ COPY prompts ./prompts
 # scripts/ carries the no-provider-sdk-imports guardrail that
 # app/backend/tests/llm/test_no_provider_sdk_imports.py executes in-container.
 COPY scripts ./scripts
+# docs/contracts/ carries committed JSON Schema contracts read at runtime
+# (T05a: feature-flag.schema.json is validated by the FeatureFlagService
+# at startup and by scripts/check-feature-flag-registration.py).
+# docs/engineering/feature-flags.md is read by the registration hook to
+# enforce the sunset-row invariant (FR-011).
+COPY docs/contracts ./docs/contracts
+COPY docs/engineering ./docs/engineering
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev

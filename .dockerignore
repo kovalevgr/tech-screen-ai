@@ -65,6 +65,10 @@ adr/
 specs/
 *.md
 !README.md
+# Allow contract artefacts + the feature-flag index — read at runtime by the
+# FeatureFlagService and by scripts/check-feature-flag-registration.py (T05a).
+!docs/contracts/
+!docs/engineering/
 
 # Tests — included in test image, excluded via bind mount in prod build stages
 # (Dockerfiles handle this explicitly).
