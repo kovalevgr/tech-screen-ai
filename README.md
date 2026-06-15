@@ -138,6 +138,10 @@ The DB tests skip themselves when no database is reachable, so the no-DB unit ru
 
 Risky features ship behind a flag that starts `false` (constitution §9). The mechanism lives in [`app/backend/services/feature_flags.py`](./app/backend/services/feature_flags.py); the source of truth is [`configs/feature-flags.yaml`](./configs/feature-flags.yaml), the schema contract is [`docs/contracts/feature-flag.schema.json`](./docs/contracts/feature-flag.schema.json), and the human-readable index — declare / flip / sunset / emergency-disable runbooks — is [`docs/engineering/feature-flags.md`](./docs/engineering/feature-flags.md). A bidirectional pre-commit + CI hook blocks orphan call sites and silently-deleted history; DB→backend propagation is sub-second via `LISTEN/NOTIFY` (see [`specs/009-t05a-feature-flag-infrastructure/`](./specs/009-t05a-feature-flag-infrastructure/)).
 
+#### Rubric content
+
+The rubric tree is loaded from Git-tracked YAML (constitution §16). Maintainers convert an authoritative Excel "matrix" with `python -m app.backend.cli.import_matrix convert <xlsx> --out configs/rubric/`, then seed the database with `python -m app.backend.cli.import_matrix seed` — each content change creates a new immutable `rubric_tree_version` (§4 / ADR-018). Contracts: [`docs/contracts/rubric.schema.json`](./docs/contracts/rubric.schema.json) + [`docs/contracts/matrix-format.md`](./docs/contracts/matrix-format.md); source-of-truth YAMLs in [`configs/rubric/`](./configs/rubric/); details in [`specs/010-t08-matrix-importer/`](./specs/010-t08-matrix-importer/).
+
 ### Frontend dev loop (Docker-first)
 
 Constitution §7 (Docker parity dev → CI → prod) is non-negotiable. **All frontend run/test/regen workflows happen inside the same multi-stage image that CI and production use.** No native `pnpm --dir app/frontend …` for the canonical loop — Docker Desktop (or any Docker Engine) is the only contributor prerequisite for this layer.

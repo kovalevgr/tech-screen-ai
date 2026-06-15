@@ -19,7 +19,7 @@ description: "Task list for T08 — Matrix importer (xlsx → YAML → DB)"
 
 **Purpose**: Add the one new dependency `openpyxl` so the importer service can read xlsx workbooks.
 
-- [ ] T001 Add `openpyxl>=3.1,<4` to `[project].dependencies` in `pyproject.toml`; regenerate `uv.lock` via `docker run --rm -v "$PWD":/w -w /w ghcr.io/astral-sh/uv:python3.12-bookworm uv lock` (research §1; uses the same uv 0.9.x image that T05a established for PEP 735 support).
+- [x] T001 Add `openpyxl>=3.1,<4` to `[project].dependencies` in `pyproject.toml`; regenerate `uv.lock` via `docker run --rm -v "$PWD":/w -w /w ghcr.io/astral-sh/uv:python3.12-bookworm uv lock` (research §1; uses the same uv 0.9.x image that T05a established for PEP 735 support).
 
 ---
 
@@ -29,12 +29,12 @@ description: "Task list for T08 — Matrix importer (xlsx → YAML → DB)"
 
 **⚠️ CRITICAL**: No user story can be validated until this phase is complete.
 
-- [ ] T002 Create `docs/contracts/rubric.schema.json` — JSON Schema draft 2020-12 per data-model.md §2. Required fields on a YAML file: `version` (int), `retired` (bool, default false), `nodes` (array). Each node: stable `id` (regex `^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$`), `label_en` (required always), `label_uk` (required when `retired=false`), optional `parent`, optional `retired`, optional `levels[]` with `{level: int 1..5, label_uk, descriptor_en, evidence_examples_en: [str]}`. Validates §11 hybrid-language and FR-012.
-- [ ] T003 [P] Create `docs/contracts/matrix-format.md` — human-readable Excel workbook contract (FR-003). One sheet per stack; header columns `block`, `competency_id`, `competency_label_uk`, `competency_label_en`, `topic`, `level`, `descriptor_en`, `evidence_examples` (semicolon-separated); workbook-quirk rules from research §8 (merged cells across key cols rejected; NFC normalisation; HTML passthrough; semicolon delimiter).
-- [ ] T004 Edit `app/backend/db/models/rubric.py` — add `payload_hash: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("''"))` to `RubricTreeVersion`. Docstring explains the §4 versioning role.
-- [ ] T005 Create `alembic/versions/0003_rubric_payload_hash.py` (revision `"0003_rubric_payload_hash"`, `down_revision="0002_feature_flags"`). `upgrade()` runs `ALTER TABLE rubric_tree_version ADD COLUMN payload_hash TEXT NOT NULL DEFAULT ''` then `ADD CONSTRAINT uq_rubric_tree_version_payload_hash UNIQUE (payload_hash)`. Reversible `downgrade()` drops constraint + column. Docstring documents the transitional-row safety (research §10).
-- [ ] T006 [P] Create `configs/rubric/.gitkeep` + `configs/rubric/example.yaml` — minimal valid draft (`version: 1`, `retired: false`, `nodes:` with one retired demonstration node `example.demonstration`). Must validate against T002's schema; sunset-style entry locks in the format from day one (mirrors T05a's `example_demonstration` pattern).
-- [ ] T007 [P] Create `app/backend/tests/cli/__init__.py` and `app/backend/tests/contracts/test_rubric_schema.py` placeholder + `app/backend/tests/contracts/test_rubric_schema_hook.py` placeholder (test bodies filled later in their stories' phases). Package markers exist so other stories' tests can run in isolation.
+- [x] T002 Create `docs/contracts/rubric.schema.json` — JSON Schema draft 2020-12 per data-model.md §2. Required fields on a YAML file: `version` (int), `retired` (bool, default false), `nodes` (array). Each node: stable `id` (regex `^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$`), `label_en` (required always), `label_uk` (required when `retired=false`), optional `parent`, optional `retired`, optional `levels[]` with `{level: int 1..5, label_uk, descriptor_en, evidence_examples_en: [str]}`. Validates §11 hybrid-language and FR-012.
+- [x] T003 [P] Create `docs/contracts/matrix-format.md` — human-readable Excel workbook contract (FR-003). One sheet per stack; header columns `block`, `competency_id`, `competency_label_uk`, `competency_label_en`, `topic`, `level`, `descriptor_en`, `evidence_examples` (semicolon-separated); workbook-quirk rules from research §8 (merged cells across key cols rejected; NFC normalisation; HTML passthrough; semicolon delimiter).
+- [x] T004 Edit `app/backend/db/models/rubric.py` — add `payload_hash: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("''"))` to `RubricTreeVersion`. Docstring explains the §4 versioning role.
+- [x] T005 Create `alembic/versions/0003_rubric_payload_hash.py` (revision `"0003_rubric_payload_hash"`, `down_revision="0002_feature_flags"`). `upgrade()` runs `ALTER TABLE rubric_tree_version ADD COLUMN payload_hash TEXT NOT NULL DEFAULT ''` then `ADD CONSTRAINT uq_rubric_tree_version_payload_hash UNIQUE (payload_hash)`. Reversible `downgrade()` drops constraint + column. Docstring documents the transitional-row safety (research §10).
+- [x] T006 [P] Create `configs/rubric/.gitkeep` + `configs/rubric/example.yaml` — minimal valid draft (`version: 1`, `retired: false`, `nodes:` with one retired demonstration node `example.demonstration`). Must validate against T002's schema; sunset-style entry locks in the format from day one (mirrors T05a's `example_demonstration` pattern).
+- [x] T007 [P] Create `app/backend/tests/cli/__init__.py` and `app/backend/tests/contracts/test_rubric_schema.py` placeholder + `app/backend/tests/contracts/test_rubric_schema_hook.py` placeholder (test bodies filled later in their stories' phases). Package markers exist so other stories' tests can run in isolation.
 
 **Checkpoint**: contracts + model + migration + example YAML + package markers exist. User-story implementation can begin.
 
@@ -48,12 +48,12 @@ description: "Task list for T08 — Matrix importer (xlsx → YAML → DB)"
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Create `app/backend/services/rubric_importer.py` (first slice — convert path + shared canonical YAML emitter + payload hash helper). Public surface: `class RubricImporter`, `RubricImporter.convert(xlsx_path: Path, out_dir: Path) -> list[Path]`, module-level `_emit_canonical_yaml(area: dict) -> str` and `_compute_payload_hash(yaml_dir: Path) -> str` (research §2/§3/§7). Workbook-quirk rules per research §8: NFC normalisation; semicolon-split `evidence_examples`; merged-cell across key columns → `MergedKeyColumnError`. Duplicate `competency_id` across blocks → `DuplicateCompetencyIdError`. No DB access in this slice.
-- [ ] T009 [US1] Create `app/backend/cli/__init__.py` + `app/backend/cli/import_matrix.py` (convert subcommand only at this slice; seed lands in US2). `python -m app.backend.cli.import_matrix convert <xlsx> --out <dir>` invokes `RubricImporter.convert(...)`. Errors print to stderr with no traceback; exit codes: 0 success, 1 validation failure, 2 configuration error.
+- [x] T008 [US1] Create `app/backend/services/rubric_importer.py` (first slice — convert path + shared canonical YAML emitter + payload hash helper). Public surface: `class RubricImporter`, `RubricImporter.convert(xlsx_path: Path, out_dir: Path) -> list[Path]`, module-level `_emit_canonical_yaml(area: dict) -> str` and `_compute_payload_hash(yaml_dir: Path) -> str` (research §2/§3/§7). Workbook-quirk rules per research §8: NFC normalisation; semicolon-split `evidence_examples`; merged-cell across key columns → `MergedKeyColumnError`. Duplicate `competency_id` across blocks → `DuplicateCompetencyIdError`. No DB access in this slice.
+- [x] T009 [US1] Create `app/backend/cli/__init__.py` + `app/backend/cli/import_matrix.py` (convert subcommand only at this slice; seed lands in US2). `python -m app.backend.cli.import_matrix convert <xlsx> --out <dir>` invokes `RubricImporter.convert(...)`. Errors print to stderr with no traceback; exit codes: 0 success, 1 validation failure, 2 configuration error.
 
 ### Tests for User Story 1
 
-- [ ] T010 [P] [US1] Create `app/backend/tests/cli/test_import_matrix_convert.py` — fixture workbook constructed in `tmp_path` with `openpyxl.Workbook()` (research §9); subprocess invocation of `python -m app.backend.cli.import_matrix convert ...`. Asserts: exit 0; N YAMLs written; every YAML validates against the schema; second invocation produces a byte-identical diff (SC-002, `filecmp.cmp(strict=True)`); duplicate-id fixture exits non-zero with the offending id in stderr; merged-cell-across-key-column fixture exits non-zero. Plus a unit test of `_emit_canonical_yaml`: same input → byte-identical output across runs.
+- [x] T010 [P] [US1] Create `app/backend/tests/cli/test_import_matrix_convert.py` — fixture workbook constructed in `tmp_path` with `openpyxl.Workbook()` (research §9); subprocess invocation of `python -m app.backend.cli.import_matrix convert ...`. Asserts: exit 0; N YAMLs written; every YAML validates against the schema; second invocation produces a byte-identical diff (SC-002, `filecmp.cmp(strict=True)`); duplicate-id fixture exits non-zero with the offending id in stderr; merged-cell-across-key-column fixture exits non-zero. Plus a unit test of `_emit_canonical_yaml`: same input → byte-identical output across runs.
 
 **Checkpoint**: Excel → Git-tracked YAML pipeline is provable end-to-end on a fixture workbook — the MVP of T08.
 
@@ -67,12 +67,12 @@ description: "Task list for T08 — Matrix importer (xlsx → YAML → DB)"
 
 ### Implementation for User Story 2
 
-- [ ] T011 [US2] Extend `app/backend/services/rubric_importer.py` — add `RubricImporter.seed(yaml_dir: Path, *, dsn: str, dry_run: bool = False) -> SeedResult`. Flow per research §3–6: load + validate every `configs/rubric/*.yaml` against the schema (defence in depth); compute SHA-256 payload hash via `_compute_payload_hash`; open asyncpg connection; take `pg_advisory_xact_lock(987654321)`; look up the latest `rubric_tree_version.payload_hash`; if equal → return `SeedResult(noop=True)`; if different → INSERT new `rubric_tree_version` row (label `tree:<sha-prefix>`, `payload_hash=<full hash>`, `is_active=true`), then materialise the tree (`stack` → `competency_block` → `competency` → `topic` → `level`), then INSERT one `audit_log` row (`action='rubric.versioned'`, `actor_id=NULL`, `subject_hash=<hash>`). Commit. `--dry-run`: return the computed `SeedResult` without writing.
-- [ ] T012 [US2] Extend `app/backend/cli/import_matrix.py` — add `seed` subcommand and the `--dry-run` flag. Connects to `DATABASE_URL` (Settings). Reports the SeedResult on stdout in a stable one-line format. Exit codes: 0 success/no-op, 1 validation failure, 2 DB connectivity error.
+- [x] T011 [US2] Extend `app/backend/services/rubric_importer.py` — add `RubricImporter.seed(yaml_dir: Path, *, dsn: str, dry_run: bool = False) -> SeedResult`. Flow per research §3–6: load + validate every `configs/rubric/*.yaml` against the schema (defence in depth); compute SHA-256 payload hash via `_compute_payload_hash`; open asyncpg connection; take `pg_advisory_xact_lock(987654321)`; look up the latest `rubric_tree_version.payload_hash`; if equal → return `SeedResult(noop=True)`; if different → INSERT new `rubric_tree_version` row (label `tree:<sha-prefix>`, `payload_hash=<full hash>`, `is_active=true`), then materialise the tree (`stack` → `competency_block` → `competency` → `topic` → `level`), then INSERT one `audit_log` row (`action='rubric.versioned'`, `actor_id=NULL`, `subject_hash=<hash>`). Commit. `--dry-run`: return the computed `SeedResult` without writing.
+- [x] T012 [US2] Extend `app/backend/cli/import_matrix.py` — add `seed` subcommand and the `--dry-run` flag. Connects to `DATABASE_URL` (Settings). Reports the SeedResult on stdout in a stable one-line format. Exit codes: 0 success/no-op, 1 validation failure, 2 DB connectivity error.
 
 ### Tests for User Story 2
 
-- [ ] T013 [P] [US2] Create `app/backend/tests/cli/test_import_matrix_seed.py` — gated by the existing `db_available` fixture. Sub-tests:
+- [x] T013 [P] [US2] Create `app/backend/tests/cli/test_import_matrix_seed.py` — gated by the existing `db_available` fixture. Sub-tests:
   - `test_first_seed_creates_one_version_and_full_tree` — asserts row counts in `rubric_tree_version`/`stack`/`competency_block`/`competency`/`topic`/`level` after one seed against a fixture YAML directory.
   - `test_repeat_seed_is_no_op` — second seed inserts zero rows (compare row counts pre/post; SC-003).
   - `test_content_change_creates_new_version` — bumps `version` + edits one descriptor → seed runs; assert 1 new `rubric_tree_version`, fresh child row set linked to new version, prior-version rows byte-identical via SHA-256 of `row_to_json` per row (SC-004).
@@ -91,13 +91,13 @@ description: "Task list for T08 — Matrix importer (xlsx → YAML → DB)"
 
 ### Implementation for User Story 3
 
-- [ ] T014 [US3] Create `scripts/check-rubric-schema.py` — Python 3.12 script. Resolves `--root <path>` (default = repo root from script location). Loads `docs/contracts/rubric.schema.json` and validates every `configs/rubric/*.yaml`. Exits non-zero with a precise stderr message (file + JSON path + error description) on any violation. Mirrors the shape of `scripts/check-feature-flag-registration.py` from T05a.
-- [ ] T015 [US3] Edit `.pre-commit-config.yaml` — add one new local hook `id: rubric-schema`, `name: rubric schema validation`, `language: system`, `entry: python3 scripts/check-rubric-schema.py`, `files: ^(configs/rubric/.+\\.yaml|docs/contracts/rubric\\.schema\\.json)$`, `pass_filenames: false`. Mirror T05a's `feature-flag-registered` hook shape.
+- [x] T014 [US3] Create `scripts/check-rubric-schema.py` — Python 3.12 script. Resolves `--root <path>` (default = repo root from script location). Loads `docs/contracts/rubric.schema.json` and validates every `configs/rubric/*.yaml`. Exits non-zero with a precise stderr message (file + JSON path + error description) on any violation. Mirrors the shape of `scripts/check-feature-flag-registration.py` from T05a.
+- [x] T015 [US3] Edit `.pre-commit-config.yaml` — add one new local hook `id: rubric-schema`, `name: rubric schema validation`, `language: system`, `entry: python3 scripts/check-rubric-schema.py`, `files: ^(configs/rubric/.+\\.yaml|docs/contracts/rubric\\.schema\\.json)$`, `pass_filenames: false`. Mirror T05a's `feature-flag-registered` hook shape.
 
 ### Tests for User Story 3
 
-- [ ] T016 [P] [US3] Create `app/backend/tests/contracts/test_rubric_schema.py` — for each of five fixture YAMLs written to `tmp_path` (missing `label_uk` on active node; invalid level integer > 5; bad `id` regex; retired-without-retire-metadata-on-area; missing `descriptor_en` on active competency level), assert `jsonschema.Draft202012Validator(schema).iter_errors(doc)` returns the expected error message substring. Plus a positive baseline: the post-T08 example YAML validates clean (SC-006).
-- [ ] T017 [P] [US3] Create `app/backend/tests/contracts/test_rubric_schema_hook.py` — subprocess invocations of `scripts/check-rubric-schema.py --root <tmp_path>` against fixture trees. Five negative trees (one per failure mode above) assert non-zero exit + precise message. One positive test against the real post-T08 tree (no `--root`) asserts exit 0 (SC-006).
+- [x] T016 [P] [US3] Create `app/backend/tests/contracts/test_rubric_schema.py` — for each of five fixture YAMLs written to `tmp_path` (missing `label_uk` on active node; invalid level integer > 5; bad `id` regex; retired-without-retire-metadata-on-area; missing `descriptor_en` on active competency level), assert `jsonschema.Draft202012Validator(schema).iter_errors(doc)` returns the expected error message substring. Plus a positive baseline: the post-T08 example YAML validates clean (SC-006).
+- [x] T017 [P] [US3] Create `app/backend/tests/contracts/test_rubric_schema_hook.py` — subprocess invocations of `scripts/check-rubric-schema.py --root <tmp_path>` against fixture trees. Five negative trees (one per failure mode above) assert non-zero exit + precise message. One positive test against the real post-T08 tree (no `--root`) asserts exit 0 (SC-006).
 
 **Checkpoint**: SC-006 + SC-007 enforced on every commit and in CI.
 
@@ -111,11 +111,11 @@ description: "Task list for T08 — Matrix importer (xlsx → YAML → DB)"
 
 ### Implementation for User Story 4
 
-- [ ] T018 [US4] Extend `app/backend/services/rubric_importer.py` — within `seed()`, after the new-version detection but before writing, run the rename check from research §5: load prior-version active node-id set; compute `disappeared = prior_active - new_active - new_retired`; if non-empty, raise `RenameForbiddenError(disappeared)` with a message naming the disappeared ids and instructing "retire + introduce instead". Transaction is rolled back, advisory lock released.
+- [x] T018 [US4] Extend `app/backend/services/rubric_importer.py` — within `seed()`, after the new-version detection but before writing, run the rename check from research §5: load prior-version active node-id set; compute `disappeared = prior_active - new_active - new_retired`; if non-empty, raise `RenameForbiddenError(disappeared)` with a message naming the disappeared ids and instructing "retire + introduce instead". Transaction is rolled back, advisory lock released.
 
 ### Tests for User Story 4
 
-- [ ] T019 [P] [US4] Extend `app/backend/tests/cli/test_import_matrix_seed.py` (existing file from T013) — add `test_rename_attempt_rejected`: seed initial version; then edit a YAML to rename one stable id from the prior payload without retiring; assert seed exits non-zero with the offending id in stderr and writes zero rows (SC-005). Also a positive: explicit retire-old + introduce-new is accepted.
+- [x] T019 [P] [US4] Extend `app/backend/tests/cli/test_import_matrix_seed.py` (existing file from T013) — add `test_rename_attempt_rejected`: seed initial version; then edit a YAML to rename one stable id from the prior payload without retiring; assert seed exits non-zero with the offending id in stderr and writes zero rows (SC-005). Also a positive: explicit retire-old + introduce-new is accepted.
 
 **Checkpoint**: SC-005 locked in; the §4/ADR-018 stable-id contract is enforced structurally.
 
@@ -123,8 +123,8 @@ description: "Task list for T08 — Matrix importer (xlsx → YAML → DB)"
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T020 [P] Edit `README.md` — add a short "Rubric content" subsection (two sentences max) with links to `docs/contracts/rubric.schema.json`, `docs/contracts/matrix-format.md`, and `configs/rubric/`. Mirrors the T05a "Feature flags" subsection.
-- [ ] T021 Run guardrails inside Docker: `ruff check app/backend` + `ruff format --check app/backend alembic scripts` + `mypy --strict app/backend` + `python -m app.backend.generate_openapi --check` (byte-identical — no route added). `pre-commit run --all-files` passes (the new hook runs against the clean tree → exit 0). Full test suite under the `db` profile: `docker compose -f docker-compose.test.yml --profile db run --rm backend sh -c "alembic upgrade head && pytest app/backend/tests -v"`. Confirm SC-009 (< 90 s wall time).
+- [x] T020 [P] Edit `README.md` — add a short "Rubric content" subsection (two sentences max) with links to `docs/contracts/rubric.schema.json`, `docs/contracts/matrix-format.md`, and `configs/rubric/`. Mirrors the T05a "Feature flags" subsection.
+- [x] T021 Run guardrails inside Docker: `ruff check app/backend` + `ruff format --check app/backend alembic scripts` + `mypy --strict app/backend` + `python -m app.backend.generate_openapi --check` (byte-identical — no route added). `pre-commit run --all-files` passes (the new hook runs against the clean tree → exit 0). Full test suite under the `db` profile: `docker compose -f docker-compose.test.yml --profile db run --rm backend sh -c "alembic upgrade head && pytest app/backend/tests -v"`. Confirm SC-009 (< 90 s wall time).
 
 ---
 
