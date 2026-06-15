@@ -16,6 +16,7 @@ dependencies = [
   "alembic>=1.13,<2",
   "asyncpg>=0.30,<0.31",
   "jsonschema>=4.23,<5",
+  "openpyxl>=3.1,<4",
 ]
 
 [dependency-groups]
@@ -64,4 +65,10 @@ ignore_missing_imports = true
 # fully typed at its public surface.
 [[tool.mypy.overrides]]
 module = ["jsonschema", "jsonschema.*", "asyncpg", "asyncpg.*"]
+ignore_missing_imports = true
+
+# openpyxl (3.x) ships without a `py.typed` marker; the RubricImporter (T08)
+# is the only consumer and is itself fully typed at its public surface.
+[[tool.mypy.overrides]]
+module = ["openpyxl", "openpyxl.*"]
 ignore_missing_imports = true
