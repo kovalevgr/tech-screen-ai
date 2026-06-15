@@ -1,0 +1,91 @@
+# T05a — feature-flag sync workflow.
+#
+# Authenticates to Cloud SQL via Workload Identity Federation (NO JSON
+# service-account key; constitution §6) and upserts every entry from
+# configs/feature-flags.yaml into the feature_flag table with
+# updated_by='configs-as-code'. Orphan rows (in DB but not in YAML) are
+# surfaced as workflow warning annotations — NEVER auto-deleted (FR-009).
+#
+# T05a-INERT BY DESIGN: this workflow ships with <TODO-T06: ...>
+# placeholders for the WIF/Cloud-SQL live binding (Cloud SQL instance is
+# provisioned in T06). The "Guard" step below sets `skip=true` until every
+# placeholder is filled, so the workflow file is structurally valid +
+# actionlint-clean while the live upsert path stays inert.
+
+name: Sync feature flags
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "configs/feature-flags.yaml"
+      - "docs/contracts/feature-flag.schema.json"
+      - ".github/workflows/sync-feature-flags.yml"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write   # required by google-github-actions/auth (WIF)
+  contents: read
+
+jobs:
+  sync:
+    name: Upsert flags into Cloud SQL
+    runs-on: ubuntu-latest
+    env:
+      # <TODO-T06: fill once Cloud SQL + WIF binding are provisioned>
+      WIF_PROVIDER: ""              # e.g. projects/<NUM>/locations/global/workloadIdentityPools/<POOL>/providers/<PROV>
+      WIF_SERVICE_ACCOUNT: ""       # e.g. feature-flag-sync@<PROJECT>.iam.gserviceaccount.com
+      GCP_PROJECT: ""               # e.g. techscreen-prod
+      CLOUD_SQL_INSTANCE: ""        # e.g. <PROJECT>:europe-west1:<INSTANCE>
+      DATABASE_NAME: "techscreen"
+      DATABASE_USER: "techscreen_migrator"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install validation deps
+        run: pip install "jsonschema>=4.23,<5" "pyyaml>=6.0,<7" "asyncpg>=0.30,<0.31"
+
+      - name: Validate YAML against committed schema (defence in depth; FR-006)
+        run: python scripts/check-feature-flag-registration.py
+
+      - name: Guard — skip live steps until T06 fills WIF / Cloud SQL placeholders
+        id: t06_guard
+        run: |
+          if [ -z "$WIF_PROVIDER" ] || [ -z "$WIF_SERVICE_ACCOUNT" ] || [ -z "$GCP_PROJECT" ] || [ -z "$CLOUD_SQL_INSTANCE" ]; then
+            echo "::warning::T05a-inert: WIF / Cloud SQL placeholders not filled (T06 owns this binding)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        if: steps.t06_guard.outputs.skip != 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Start Cloud SQL Auth Proxy (IAM auth, ephemeral)
+        if: steps.t06_guard.outputs.skip != 'true'
+        run: |
+          curl -fsSL -o cloud-sql-proxy \
+            https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.13.0/cloud-sql-proxy.linux.amd64
+          chmod +x cloud-sql-proxy
+          ./cloud-sql-proxy --auto-iam-authn --port=5432 "$CLOUD_SQL_INSTANCE" &
+          for _ in {1..15}; do
+            if (echo > /dev/tcp/127.0.0.1/5432) 2>/dev/null; then break; fi
+            sleep 1
+          done
+
+      - name: Upsert feature_flag rows + warn on orphans
+        if: steps.t06_guard.outputs.skip != 'true'
+        env:
+          DATABASE_URL: "postgresql://${{ env.DATABASE_USER }}@127.0.0.1:5432/${{ env.DATABASE_NAME }}"
+        run: python scripts/sync_feature_flags_to_db.py

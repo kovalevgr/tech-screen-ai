@@ -141,6 +141,16 @@ repos:
         # Spec FR-014 / constitution §12 / ADR-002. Allowlist:
         # app/backend/llm/_real_backend.py and _mock_backend.py only.
 
+      - id: feature-flag-registered
+        name: feature-flag registration (T05a, FR-010 / FR-011)
+        language: system
+        pass_filenames: false
+        files: ^(app/backend/.+\.py|configs/feature-flags\.yaml|docs/engineering/feature-flags\.md|docs/contracts/feature-flag\.schema\.json)$
+        entry: python3 scripts/check-feature-flag-registration.py
+        # Bidirectional guard: undeclared is_enabled("...") calls are blocked;
+        # removing the last call requires flipping the YAML entry to sunset
+        # AND adding a sunset row in docs/engineering/feature-flags.md.
+
       - id: no-print-statements
         name: forbid print() in backend code
         language: pygrep

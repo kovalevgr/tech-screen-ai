@@ -21,6 +21,7 @@ _REPO_ROOT: Path = Path(__file__).resolve().parents[4]
 
 EXPECTED_TABLES: frozenset[str] = frozenset(
     {
+        # 0001_baseline
         "rubric_tree_version",
         "stack",
         "competency_block",
@@ -37,6 +38,8 @@ EXPECTED_TABLES: frozenset[str] = frozenset(
         "turn_annotation",
         "audit_log",
         "session_decision",
+        # 0002_feature_flags (T05a — mutable; explicit §3 carve-out, FR-013)
+        "feature_flag",
     }
 )
 
@@ -62,9 +65,10 @@ async def _public_table_names(conn: AsyncConnection) -> set[str]:
     return {row[0] for row in result}
 
 
-async def test_upgrade_creates_all_sixteen_tables(
+async def test_upgrade_creates_all_expected_tables(
     db_conn: AsyncConnection, migrated_schema: str
 ) -> None:
+    """The full migration head creates every expected table (0001 + 0002)."""
     assert await _public_table_names(db_conn) == set(EXPECTED_TABLES)
 
 
