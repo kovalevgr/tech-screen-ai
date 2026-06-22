@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kovalevgr/tech-screen-ai/blob/main/docs/contracts/rubric.schema.json",
+  "title": "TechScreen rubric YAML contract (T08, FR-002)",
+  "description": "Schema for files in configs/rubric/<stack-id>.yaml. One YAML file per stack. Every node has a stable id; renames are forbidden (retire + introduce). Sunset / retired nodes remain forever (§4 / ADR-018).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "nodes"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bumped whenever this file's content changes. Documentation-only; the runtime importer compares SHA-256 payload hashes, not this integer."
+    },
+    "retired": {
+      "type": "boolean",
+      "default": false,
+      "description": "Retire the entire stack. When true, every node inside is treated as retired."
+    },
+    "nodes": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/node"}
+    }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label_en"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$",
+          "description": "Stable identifier. snake_case segments separated by dots. Never renamed. Never reused after retire."
+        },
+        "label_en": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Internal English label. Required on every node (§11)."
+        },
+        "label_uk": {
+          "type": "string",
+          "description": "Candidate-facing Ukrainian label. Required when retired=false (validated via if/then)."
+        },
+        "retired": {
+          "type": "boolean",
+          "default": false
+        },
+        "parent": {
+          "type": ["string", "null"],
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$",
+          "description": "Stable id of the parent node, or null for top-level (== competency_block)."
+        },
+        "levels": {
+          "type": "array",
+          "description": "Present only on competency-leaf nodes. Each level has a rank (1..5), labels, and an EN descriptor.",
+          "items": {"$ref": "#/$defs/level"}
+        }
+      },
+      "if": {"properties": {"retired": {"const": false}}, "required": ["retired"]},
+      "then": {"required": ["label_uk"]},
+      "else": {
+        "if": {"not": {"required": ["retired"]}},
+        "then": {"required": ["label_uk"]}
+      }
+    },
+    "level": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "descriptor_en", "label_uk"],
+      "properties": {
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "label_uk": {
+          "type": "string",
+          "minLength": 1
+        },
+        "descriptor_en": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Internal English descriptor consumed by the Assessor (§11 / ADR-008)."
+        },
+        "evidence_examples_en": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "default": []
+        }
+      }
+    }
+  }
+}

@@ -151,6 +151,15 @@ repos:
         # removing the last call requires flipping the YAML entry to sunset
         # AND adding a sunset row in docs/engineering/feature-flags.md.
 
+      - id: rubric-schema
+        name: rubric YAML schema (T08, FR-011)
+        language: system
+        pass_filenames: false
+        files: ^(configs/rubric/.+\.yaml|docs/contracts/rubric\.schema\.json)$
+        entry: python3 scripts/check-rubric-schema.py
+        # Validates every configs/rubric/*.yaml against the committed
+        # rubric.schema.json on every commit (defence-in-depth at PR time).
+
       - id: no-print-statements
         name: forbid print() in backend code
         language: pygrep

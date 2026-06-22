@@ -23,7 +23,13 @@ from app.backend.db.models._mixins import TimestampCreated, UUIDPk
 
 
 class RubricTreeVersion(UUIDPk, TimestampCreated, Base):
-    """A named, versioned snapshot root for an entire rubric tree."""
+    """A named, versioned snapshot root for an entire rubric tree.
+
+    T08 adds ``payload_hash`` — SHA-256 hex of the canonical YAML payload that
+    materialised this version. The importer compares it against the latest
+    row to decide between "no-op" (same hash) and "create new version" paths
+    (FR-007 / SC-003). The UNIQUE constraint enforces "one row per payload".
+    """
 
     __tablename__ = "rubric_tree_version"
 
@@ -31,6 +37,10 @@ class RubricTreeVersion(UUIDPk, TimestampCreated, Base):
     # At most one active version is enforced in app/importer logic (T08),
     # not as a DB constraint at T05.
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # SHA-256 hex (64 chars) of the concatenated canonical YAML bytes that
+    # produced this version. T08 / research §3. The DEFAULT '' covers
+    # transitional pre-T08 rows; the UNIQUE constraint protects FR-007.
+    payload_hash: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
 
 
 class Stack(UUIDPk, TimestampCreated, Base):

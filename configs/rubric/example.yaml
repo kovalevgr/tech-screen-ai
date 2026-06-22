@@ -1,0 +1,22 @@
+# TechScreen rubric — demonstration file (T08).
+#
+# This file ships intentionally so the rubric-schema pre-commit hook has a
+# baseline to validate against from day one (SC-006). The single node below
+# is RETIRED on arrival — it never had a call site, never was active, and
+# never will be. Real-world rubric content lands via follow-up PRs through
+# `python -m app.backend.cli.import_matrix convert ...` (see
+# docs/contracts/matrix-format.md).
+#
+# Schema: docs/contracts/rubric.schema.json
+# Index:  docs/engineering/feature-flags.md is for feature flags;
+#         rubric content has no separate human index — the schema + this
+#         example + matrix-format.md are the only documents.
+
+version: 1
+retired: false
+nodes:
+  - id: example.demonstration
+    label_en: Demonstration
+    label_uk: "Демонстраційний запис"
+    parent: null
+    retired: true
