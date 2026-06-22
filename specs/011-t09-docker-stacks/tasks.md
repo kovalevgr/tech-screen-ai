@@ -39,12 +39,12 @@ No foundational phase. T09 has no blocking-prerequisite phase; every story task 
 
 ### Implementation for User Story 3
 
-- [ ] T001 [US3] Delete `Dockerfile.vertex-mock` from the repository root. The file copies a non-existent `tools/vertex-mock/` directory and has no consumer (FR-002).
-- [ ] T002 [US3] Edit `docker-compose.yml`: remove the entire `vertex-mock:` service block; remove `vertex-mock` from the `llm`/`full` profile membership; remove the `llm` profile entirely; remove the `VERTEX_MOCK_URL: http://vertex-mock:8080` env line from the `backend:` service block; update the file-leading comment block to reflect the new profile set (`db`, `web`, `full` only — `db` adds Postgres; `web` adds frontend; `full` = `db` + `web`). (FR-001, FR-003)
-- [ ] T003 [US3] Edit `docker-compose.test.yml`: remove the entire `vertex-mock:` service block; remove `vertex-mock` from the `llm`/`full` profile membership; remove the `llm` profile entirely; remove `VERTEX_MOCK_URL: http://vertex-mock:8080` from the `backend:` service env; update the file-leading comment block to reflect the new profile set (`db`, `e2e`, `full`). (FR-001, FR-003)
-- [ ] T004 [P] [US3] Edit `.env.example`: remove the entire `VERTEX_MOCK_URL=http://vertex-mock:8080` block including any surrounding comments. (FR-003)
-- [ ] T005 [P] [US3] Update the docstring of `app/backend/llm/_mock_backend.py` (one paragraph at the top of the module): call out that this is the project's ONLY Vertex mock; the HTTP layer was removed by T09 because no consumer ever needed it; future HTTP isolation, if ever required, would land as a new task with a real consumer. (FR-009)
-- [ ] T006 [US3] Verify (interactive): `git grep -nE "vertex-mock|VERTEX_MOCK_URL|tools/vertex-mock|Dockerfile\.vertex-mock" -- ':!specs/011-t09-docker-stacks/'` returns no matches. If it does, finish the cleanup before moving on. (SC-002)
+- [x] T001 [US3] Delete `Dockerfile.vertex-mock` from the repository root. The file copies a non-existent `tools/vertex-mock/` directory and has no consumer (FR-002).
+- [x] T002 [US3] Edit `docker-compose.yml`: remove the entire `vertex-mock:` service block; remove `vertex-mock` from the `llm`/`full` profile membership; remove the `llm` profile entirely; remove the `VERTEX_MOCK_URL: http://vertex-mock:8080` env line from the `backend:` service block; update the file-leading comment block to reflect the new profile set (`db`, `web`, `full` only — `db` adds Postgres; `web` adds frontend; `full` = `db` + `web`). (FR-001, FR-003)
+- [x] T003 [US3] Edit `docker-compose.test.yml`: remove the entire `vertex-mock:` service block; remove `vertex-mock` from the `llm`/`full` profile membership; remove the `llm` profile entirely; remove `VERTEX_MOCK_URL: http://vertex-mock:8080` from the `backend:` service env; update the file-leading comment block to reflect the new profile set (`db`, `e2e`, `full`). (FR-001, FR-003)
+- [x] T004 [P] [US3] Edit `.env.example`: remove the entire `VERTEX_MOCK_URL=http://vertex-mock:8080` block including any surrounding comments. (FR-003)
+- [x] T005 [P] [US3] Update the docstring of `app/backend/llm/_mock_backend.py` (one paragraph at the top of the module): call out that this is the project's ONLY Vertex mock; the HTTP layer was removed by T09 because no consumer ever needed it; future HTTP isolation, if ever required, would land as a new task with a real consumer. (FR-009)
+- [x] T006 [US3] Verify (interactive): `git grep -nE "vertex-mock|VERTEX_MOCK_URL|tools/vertex-mock|Dockerfile\.vertex-mock" -- ':!specs/011-t09-docker-stacks/'` returns no matches. If it does, finish the cleanup before moving on. (SC-002)
 
 **Checkpoint**: dead infrastructure is gone; the compose files are buildable; the smoke script and the test-stack regression can now meaningfully run.
 
@@ -58,11 +58,11 @@ No foundational phase. T09 has no blocking-prerequisite phase; every story task 
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Create `scripts/smoke-docker-stack.sh` (executable, `chmod +x`). Pure bash + `curl` + `docker compose`; `set -euo pipefail`; `trap` for tear-down. Flow per research §2: bring up `--profile db --profile web` with `--build`; poll `localhost:8000/health` until 200 (max 30 × 2s curl + 1s sleep); poll `localhost:3000/` similarly; tear down on EXIT; clear stderr message + exit 1 on failure; exit 0 on success. (FR-006, SC-003)
+- [x] T007 [US1] Create `scripts/smoke-docker-stack.sh` (executable, `chmod +x`). Pure bash + `curl` + `docker compose`; `set -euo pipefail`; `trap` for tear-down. Flow per research §2: bring up `--profile db --profile web` with `--build`; poll `localhost:8000/health` until 200 (max 30 × 2s curl + 1s sleep); poll `localhost:3000/` similarly; tear down on EXIT; clear stderr message + exit 1 on failure; exit 0 on success. (FR-006, SC-003)
 
 ### Tests for User Story 1
 
-- [ ] T008 [US1] Run `bash scripts/smoke-docker-stack.sh` against the local Docker; verify exit 0; verify the dev stack was torn down at the end (no lingering `techscreen-dev-*` containers). (SC-003)
+- [x] T008 [US1] Run `bash scripts/smoke-docker-stack.sh` against the local Docker; verify exit 0; verify the dev stack was torn down at the end (no lingering `techscreen-dev-*` containers). (SC-003)
 
 **Checkpoint**: dev stack works end-to-end; the smoke script proves it programmatically.
 
@@ -76,8 +76,8 @@ No foundational phase. T09 has no blocking-prerequisite phase; every story task 
 
 ### Implementation for User Story 4
 
-- [ ] T009 [US4] Create `docs/engineering/docker.md` per plan §Phase 1 / data-model.md §3 / spec FR-004. Seven sections: (0) Why this doc exists; (1) Dev stack (profiles, commands, hot-reload); (2) Test stack (commands, no-DB skip path, e2e); (3) Dockerfile targets (builder/dev/runtime); (4) §7 parity guarantee + the canonical-diff table from data-model.md §5; (5) `LLM_BACKEND` switch (mock/vertex + the prod-refuse-mock startup check from T04); (6) Resetting local state (`down` vs `down -v`); (7) Troubleshooting (rebuild after pyproject change; postgres-data volume; port conflicts). Cross-link to `specs/011-t09-docker-stacks/` for the T09 history. (FR-004)
-- [ ] T010 [US4] Edit `README.md`: replace the Docker explanation paragraphs (anywhere they appear — likely in the `Stack` and `Quickstart (local, Docker-first)` sections) with a single short paragraph that lists the canonical bring-up command and links to `docs/engineering/docker.md` for the deep dive. Remove any remaining `vertex-mock` references. (FR-005)
+- [x] T009 [US4] Create `docs/engineering/docker.md` per plan §Phase 1 / data-model.md §3 / spec FR-004. Seven sections: (0) Why this doc exists; (1) Dev stack (profiles, commands, hot-reload); (2) Test stack (commands, no-DB skip path, e2e); (3) Dockerfile targets (builder/dev/runtime); (4) §7 parity guarantee + the canonical-diff table from data-model.md §5; (5) `LLM_BACKEND` switch (mock/vertex + the prod-refuse-mock startup check from T04); (6) Resetting local state (`down` vs `down -v`); (7) Troubleshooting (rebuild after pyproject change; postgres-data volume; port conflicts). Cross-link to `specs/011-t09-docker-stacks/` for the T09 history. (FR-004)
+- [x] T010 [US4] Edit `README.md`: replace the Docker explanation paragraphs (anywhere they appear — likely in the `Stack` and `Quickstart (local, Docker-first)` sections) with a single short paragraph that lists the canonical bring-up command and links to `docs/engineering/docker.md` for the deep dive. Remove any remaining `vertex-mock` references. (FR-005)
 
 **Checkpoint**: a new contributor has exactly one place to learn the Docker contract.
 
@@ -91,8 +91,8 @@ No foundational phase. T09 has no blocking-prerequisite phase; every story task 
 
 ### Tests for User Story 2
 
-- [ ] T011 [US2] Run the full backend test suite inside the test stack (with `db` profile): `docker compose -f docker-compose.test.yml --profile db run --rm backend sh -c "alembic upgrade head && pytest app/backend/tests -v"`. Assert: 138 passed (or higher if newer tests were added on `main` between branch creation and now). (SC-004 / FR-007)
-- [ ] T012 [US2] Run the no-DB skip path: `docker compose -f docker-compose.test.yml run --rm -e DATABASE_URL= backend pytest app/backend/tests/cli app/backend/tests/db app/backend/tests/services -q --no-header`. Assert: skips that should skip do skip; passes that don't need DB pass.
+- [x] T011 [US2] Run the full backend test suite inside the test stack (with `db` profile): `docker compose -f docker-compose.test.yml --profile db run --rm backend sh -c "alembic upgrade head && pytest app/backend/tests -v"`. Assert: 138 passed (or higher if newer tests were added on `main` between branch creation and now). (SC-004 / FR-007)
+- [x] T012 [US2] Run the no-DB skip path: `docker compose -f docker-compose.test.yml run --rm -e DATABASE_URL= backend pytest app/backend/tests/cli app/backend/tests/db app/backend/tests/services -q --no-header`. Assert: skips that should skip do skip; passes that don't need DB pass.
 
 **Checkpoint**: §7 parity is empirically proven on the post-T09 tree.
 
@@ -100,8 +100,8 @@ No foundational phase. T09 has no blocking-prerequisite phase; every story task 
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T013 [P] Run guardrails: `docker compose -f docker-compose.test.yml run --rm backend ruff check app/backend` + `ruff format --check app/backend alembic scripts` + `mypy --strict app/backend`. Run `docker compose -f docker-compose.test.yml run --rm backend python -m app.backend.generate_openapi --check` (byte-identical — no route added, SC-007). Run `pre-commit run --all-files` on the host (all existing hooks pass, SC-006).
-- [ ] T014 Walk through `quickstart.md` § 1–§ 10 end-to-end; tick each SC-001..SC-008 box in the checklist at the bottom of the quickstart. If any step diverges from expected, fix before proceeding to commit.
+- [x] T013 [P] Run guardrails: `docker compose -f docker-compose.test.yml run --rm backend ruff check app/backend` + `ruff format --check app/backend alembic scripts` + `mypy --strict app/backend`. Run `docker compose -f docker-compose.test.yml run --rm backend python -m app.backend.generate_openapi --check` (byte-identical — no route added, SC-007). Run `pre-commit run --all-files` on the host (all existing hooks pass, SC-006).
+- [x] T014 Walk through `quickstart.md` § 1–§ 10 end-to-end; tick each SC-001..SC-008 box in the checklist at the bottom of the quickstart. If any step diverges from expected, fix before proceeding to commit.
 
 ---
 

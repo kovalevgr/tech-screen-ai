@@ -285,13 +285,14 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 - **agent:** `infra-engineer`
 - **parallel:** true
 - **depends_on:** [T01, T05]
-- **contract:** none (local-only)
+- **contract:** `docs/engineering/docker.md` + `scripts/smoke-docker-stack.sh`
 - **description:**
-  `docker-compose.yml` (backend + frontend + Postgres + pgvector + Vertex mock) and `docker-compose.test.yml` (backend + Postgres + mock only, for CI). Pre-commit hooks run inside a container in CI. The Vertex mock is a tiny FastAPI echo server (`infra/vertex-mock/`) returning canned JSON per model+prompt hash.
+  Consolidation PR. Removes the dead HTTP `vertex-mock` infrastructure (the `Dockerfile.vertex-mock`, the `vertex-mock` service in both compose files, the `llm` profile, and the `VERTEX_MOCK_URL` env var) — superseded by T04's in-process `_mock_backend.py` with zero remaining consumers. Ships `docs/engineering/docker.md` as the single canonical Docker reference (7 sections covering dev / test stacks, Dockerfile targets, §7 parity, the `LLM_BACKEND` switch, local-state reset, troubleshooting). Adds `scripts/smoke-docker-stack.sh` — pure bash + curl + docker compose smoke that T10 wires into CI and T11 invokes in the Tier-1 gate. See `specs/011-t09-docker-stacks/`.
 - **acceptance:**
-  - `docker compose up` brings everything up on first invocation with `docker compose build`.
-  - `docker compose -f docker-compose.test.yml run --rm backend pytest` green.
-  - CI workflow (T10) uses the test stack.
+  - `docker compose --profile db --profile web up --build` brings backend + frontend + Postgres up; `/health` 200; `localhost:3000` 200.
+  - `docker compose -f docker-compose.test.yml --profile db run --rm backend sh -c "alembic upgrade head && pytest app/backend/tests"` passes the full suite (138+ at T08 baseline).
+  - `git grep -nE "vertex-mock|VERTEX_MOCK_URL|tools/vertex-mock|Dockerfile\.vertex-mock"` returns empty against active docs (historical specs/ADRs exempted).
+  - `scripts/smoke-docker-stack.sh` exits 0 against a healthy dev stack.
 
 ### T10 — CI pipeline (lint + test on PR) + migration approval gate
 

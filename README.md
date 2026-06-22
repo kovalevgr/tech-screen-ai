@@ -201,38 +201,21 @@ Everything in this repository runs in Docker. Local dev, CI, and production use 
 
 ## Quickstart (local, Docker-first)
 
-> **Status: partial today.** `app/backend/` and `app/frontend/` are scaffolded in Tier 1 (tasks T02 / T03 of the implementation plan). Until those land, only `postgres` and `vertex-mock` come up cleanly; `docker compose up` of `backend` / `frontend` will fail on missing Dockerfile targets. Treat the steps below as the target dev loop.
-
-Prerequisites: Docker Engine with Compose v2 (Docker Desktop works too) and a populated `.env` file (copy from `.env.example`). No `gcloud` needed on day one — the dev stack uses the in-repo `vertex-mock` service.
+Everything runs in Docker. Bring up the full dev stack (backend + frontend + Postgres) with one command:
 
 ```bash
-# 1. Clone and copy env template
-git clone git@github.com:<github-user>/techscreen.git
-cd techscreen
-cp .env.example .env
-
-# 2. Fill the two dev-only signing secrets in .env:
-openssl rand -hex 32   # paste as MAGIC_LINK_SIGNING_KEY=
-openssl rand -hex 32   # paste as SESSION_COOKIE_SECRET=
-# DATABASE_URL is overridden by docker-compose.yml — leave it empty in .env.
-# SENDGRID_API_KEY, GCP_PROJECT, CALIBRATION_DATASET_KEY stay empty for mock-backed dev.
-
-# 3. Start the stack
-docker compose up --build
-
-# 4. Open in your browser:
-#    frontend:     http://localhost:3000
-#    backend API:  http://localhost:8000/health
-#    vertex mock:  http://localhost:8080/healthz
+docker compose --profile db --profile web up --build
+# backend health: http://localhost:8000/health
+# frontend:       http://localhost:3000
 ```
 
-Dev hot-reload (backend + frontend) is wired via volume mounts. To run tests:
+Or run the smoke script for an automated end-to-end check:
 
 ```bash
-docker compose -f docker-compose.test.yml up --abort-on-container-exit
+bash scripts/smoke-docker-stack.sh
 ```
 
-To point dev at real Vertex (rare — most work uses the mock): set `LLM_BACKEND=vertex` in `.env`, authenticate with `gcloud auth application-default login`, and ensure your account has `roles/aiplatform.user` on the TechScreen GCP project.
+For the full Docker contract — profiles, Dockerfile targets, the `LLM_BACKEND` switch, parity guarantees, troubleshooting — see [`docs/engineering/docker.md`](./docs/engineering/docker.md). The Vertex mock is the in-process stub at `app/backend/llm/_mock_backend.py` (T04); there is no HTTP mock service.
 
 ## Repository layout
 

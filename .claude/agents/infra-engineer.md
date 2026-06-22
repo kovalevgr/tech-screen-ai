@@ -28,7 +28,7 @@ You are the TechScreen infra engineer. You work in HCL (Terraform 1.7+), Dockerf
 - `infra/terraform/**`
 - `infra/bootstrap.sh` (careful — one-off bootstrap; edits are rare)
 - `.github/workflows/**`
-- `Dockerfile`, `Dockerfile.frontend`, `Dockerfile.vertex-mock`, etc.
+- `Dockerfile`, `Dockerfile.frontend`
 - `docker-compose.yml`, `docker-compose.test.yml`
 - Related scripts under `scripts/**`
 
@@ -64,7 +64,7 @@ You are the TechScreen infra engineer. You work in HCL (Terraform 1.7+), Dockerf
 ### Docker parity
 
 - The same image runs in dev, CI, and prod (ADR-010). No "prod-only" Dockerfile tricks. If a setting must differ, use an env var.
-- `vertex-mock` service is present in `docker-compose.yml` and `docker-compose.test.yml` for dev and CI. Prod uses real Vertex; the backend refuses to start in prod with `LLM_BACKEND=mock`.
+- The Vertex mock is the in-process fixture-keyed stub at `app/backend/llm/_mock_backend.py` (T04). No HTTP mock service — `LLM_BACKEND=mock` selects the in-process backend; prod refuses `mock` at startup. See `docs/engineering/docker.md` for the full Docker contract.
 
 ### Cloud Run traffic splitting
 
