@@ -1,24 +1,26 @@
 # TechScreen — CI / integration-test stack.
 #
 # Same image shape as dev (Dockerfile `dev` target — pytest, ruff, mypy
-# bundled). Postgres + vertex-mock are profile-gated so today's T02 test
-# run can do `docker compose -f docker-compose.test.yml run --rm backend
-# pytest app/backend/tests` with no DB. T05 lights up the `db` profile
-# and reactivates the `alembic upgrade head` step in the default command.
+# bundled). Postgres is profile-gated.
 #
 # Profiles:
-#   (default)        — `backend` only.
-#   --profile db     — adds Postgres (T05+).
-#   --profile llm    — adds Vertex mock (T04+).
-#   --profile e2e    — adds frontend + Playwright runner (post-T03).
+#   (default)        — `backend` + `frontend`. No-DB pytest + pnpm test.
+#   --profile db     — adds Postgres. Default command applies `alembic
+#                      upgrade head` and runs the full backend suite.
+#   --profile e2e    — adds the Playwright runner (post-T03).
 #
 # Invoked by CI (T10): `docker compose -f docker-compose.test.yml run --rm --build backend pytest app/backend/tests`.
+#
+# T09 (2026-04-28) removed the HTTP `vertex-mock` service. The Vertex
+# mock is the in-process fixture-keyed stub at
+# `app/backend/llm/_mock_backend.py` (T04). See
+# `docs/engineering/docker.md` for the full Docker contract.
 
 name: techscreen-test
 
 services:
   postgres:
-    profiles: ["db", "full"]
+    profiles: ["db"]
     # pgvector/pgvector:pg17 (== docker-compose.yml dev image): constitution §7
     # Docker parity, and required so `CREATE EXTENSION vector` in the baseline
     # migration succeeds in CI (stock postgres images lack the extension files).
@@ -36,21 +38,6 @@ services:
       timeout: 2s
       retries: 15
 
-  vertex-mock:
-    profiles: ["llm", "full"]
-    build:
-      context: .
-      dockerfile: Dockerfile.vertex-mock
-    environment:
-      MOCK_PORT: "8080"
-      LOG_FORMAT: json
-      LOG_LEVEL: warning
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
-      interval: 2s
-      timeout: 2s
-      retries: 15
-
   backend:
     build:
       context: .
@@ -61,16 +48,12 @@ services:
       LLM_BACKEND: mock
       LOG_FORMAT: json
       LOG_LEVEL: info
-      # Used only when their profile is active:
+      # Used only when the `db` profile is active:
       DATABASE_URL: postgresql+asyncpg://techscreen:techscreen@postgres:5432/techscreen_test
-      VERTEX_MOCK_URL: http://vertex-mock:8080
       MAGIC_LINK_SIGNING_KEY: test-signing-key-not-a-real-secret
       SESSION_COOKIE_SECRET: test-cookie-secret-not-a-real-secret
     depends_on:
       postgres:
-        condition: service_healthy
-        required: false
-      vertex-mock:
         condition: service_healthy
         required: false
     # The default command applies the migration (db profile) then runs the
