@@ -13,7 +13,7 @@ Every PR against `main` runs `.github/workflows/ci.yml`. Four jobs gate merge; a
 | **backend** | yes | Inside the test-stack `dev` image: `alembic upgrade head`, the full `pytest app/backend/tests` suite, `ruff check`, `ruff format --check`, `mypy --strict`, and the OpenAPI byte-identical regen (`generate_openapi --check`). |
 | **frontend** | yes | Inside the frontend image: `pnpm install --frozen-lockfile`, `pnpm exec eslint . --max-warnings=0`, `pnpm exec tsc --noEmit`, `pnpm test` (jest), `pnpm tokens:check` (design-token drift). |
 | **smoke** | yes | `bash scripts/smoke-docker-stack.sh` on the runner's host Docker — brings up the dev stack, asserts `/health` 200 + frontend 200, tears down. |
-| **lint** | yes | `pre-commit run --all-files` — gitleaks, detect-secrets, actionlint, terraform_validate, ruff, ruff-format, shellcheck, the pygrep guards, and the project's custom hooks (`no-provider-sdk-imports`, `feature-flag-registered`, `rubric-schema`). The frontend-scoped hooks (`eslint`, `tokens-drift`, `visual-discipline`) are `SKIP`-listed here because the `frontend` job already runs them. |
+| **lint** | yes | `pre-commit run --all-files` — gitleaks, detect-secrets, actionlint, ruff, ruff-format, shellcheck, the pygrep guards, and the project's custom hooks (`no-provider-sdk-imports`, `feature-flag-registered`, `rubric-schema`). `SKIP`-listed here: the frontend-scoped hooks (`eslint`, `tokens-drift`, `visual-discipline`) — covered by the `frontend` job — and `terraform_validate` (see §Terraform validation below). |
 | **migration-sql-render** | no (informational) | Only when a PR touches `alembic/versions/**`: renders the migration SQL into a PR comment + auto-applies `needs-adr` on destructive DDL. |
 
 All jobs run in parallel. The four required jobs target < 5 minutes on warm cache.
@@ -30,6 +30,12 @@ lint
 ```
 
 Do **not** add `migration-sql-render` to the required set — it is skipped on non-migration PRs, and a skipped required check can stall merge. It is informational: its output is a PR comment + a label, not a pass/fail gate. CI cannot self-configure branch protection; this is a one-time operator action.
+
+## Terraform validation (deferred to a dedicated job)
+
+`terraform_validate` lives in `.pre-commit-config.yaml` and runs in **local** pre-commit for contributors who have the `terraform`/`tofu` binary. It is **`SKIP`-listed in the CI `lint` job on purpose**: the hook shells out to `terraform`, and its `terraform init` would try to configure the **`gcs` remote backend** (`infra/terraform/backend.tf`), which needs live GCP credentials the CI runner does not have. Forcing it into the Python-only lint runner would either fail (no binary) or hang/error (no backend auth).
+
+CI enforcement of Terraform is therefore deferred to a **dedicated `terraform` job** — a follow-up task — that does an offline check: `hashicorp/setup-terraform` → `terraform -chdir=infra/terraform init -backend=false` → `terraform validate`. It runs in its own runner with its own settings (`-backend=false` is scoped to that job and never touches real state) and does not affect any other job. Until that job lands, Terraform is **not** validated in CI — only locally. (`infra/terraform` is 222 lines with a committed `.terraform.lock.hcl`; the follow-up is ~15 lines of YAML, no infra-code changes expected. This mirrors the §5 reviewer-agent and the live-GCP-only honesty in the plan.)
 
 ## 3. The migration-approval gate (§10)
 

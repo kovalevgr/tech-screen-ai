@@ -153,7 +153,13 @@ repos:
 
       - id: feature-flag-registered
         name: feature-flag registration (T05a, FR-010 / FR-011)
-        language: system
+        # language: python so pre-commit builds an isolated venv carrying the
+        # script's third-party deps (jsonschema, pyyaml). `language: system`
+        # would run in the ambient interpreter, which in CI (Python + pre-commit
+        # only) lacks these — the T10 lint job surfaced exactly that. Versions
+        # pinned to the project's pyproject ranges to avoid drift.
+        language: python
+        additional_dependencies: ["jsonschema>=4.23,<5", "pyyaml>=6.0,<7"]
         pass_filenames: false
         files: ^(app/backend/.+\.py|configs/feature-flags\.yaml|docs/engineering/feature-flags\.md|docs/contracts/feature-flag\.schema\.json)$
         entry: python3 scripts/check-feature-flag-registration.py
@@ -163,7 +169,10 @@ repos:
 
       - id: rubric-schema
         name: rubric YAML schema (T08, FR-011)
-        language: system
+        # language: python for the same reason as feature-flag-registered above
+        # — the script imports jsonschema + yaml, absent from the ambient CI env.
+        language: python
+        additional_dependencies: ["jsonschema>=4.23,<5", "pyyaml>=6.0,<7"]
         pass_filenames: false
         files: ^(configs/rubric/.+\.yaml|docs/contracts/rubric\.schema\.json)$
         entry: python3 scripts/check-rubric-schema.py
@@ -176,7 +185,11 @@ repos:
         entry: '^\s*print\('
         types: [python]
         files: ^app/backend/.*\.py$
-        exclude: ^app/backend/tests/.*$
+        # Tests and CLI entry points are the legitimate exceptions: a CLI's job
+        # is to write results to stdout / errors to stderr (e.g.
+        # app/backend/cli/import_matrix.py). The hook targets stray debug
+        # prints in service/library code, where structured logging is required.
+        exclude: ^app/backend/(tests|cli)/.*$
 
       - id: forbid-env-values
         name: forbid credential-shaped values in .env.example

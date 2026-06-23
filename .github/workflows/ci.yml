@@ -125,12 +125,17 @@ jobs:
       - name: Install pre-commit
         run: pip install pre-commit
 
-      # Frontend-scoped hooks (eslint, tokens-drift, visual-discipline) need
-      # node+pnpm and are already covered by the `frontend` job — skip them
-      # here to keep the lint runner Python-only (research §9).
+      # Skipped hooks, with their reasons:
+      #  - eslint / tokens-drift / visual-discipline: need node+pnpm; already
+      #    covered by the `frontend` job. Keeps this runner Python-only.
+      #  - terraform_validate: needs the terraform binary + a `terraform init`
+      #    that would touch the gcs backend. Deferred to a dedicated offline
+      #    `terraform` job (init -backend=false + validate) so the lint runner
+      #    stays Python-only. The hook still runs in local pre-commit for devs
+      #    who have terraform. See docs/engineering/ci.md §Terraform validation.
       - name: Run pre-commit (all files)
         env:
-          SKIP: eslint,tokens-drift,visual-discipline
+          SKIP: eslint,tokens-drift,visual-discipline,terraform_validate
         run: pre-commit run --all-files --show-diff-on-failure
 
       - name: Reviewer agent (placeholder — DEFERRED)
