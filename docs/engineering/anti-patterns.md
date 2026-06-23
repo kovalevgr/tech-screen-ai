@@ -196,7 +196,7 @@ Things we have explicitly decided not to do, with the reason. Each entry is shor
 
 **Why.** Flaky, slow, expensive, and impossible to run offline.
 
-**Do instead.** Mocks at the adapter boundary. `vertex-mock` service in dev and CI.
+**Do instead.** Mocks at the adapter boundary. In-process `_mock_backend.py` (T04) selected via `LLM_BACKEND=mock` in dev and CI.
 
 ---
 

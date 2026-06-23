@@ -1,23 +1,26 @@
 # TechScreen — local dev stack.
 #
 # Goal: one `docker compose up backend` brings up just the backend with
-# hot reload — no postgres, no Vertex mock, no `.env` required. Use
-# profiles to opt in to the heavier services as later tasks add them.
+# hot reload — no postgres, no `.env` required. Use profiles to opt in
+# to the heavier services.
 #
 # Profiles:
-#   (default)        — `backend` only (T02 baseline). `docker compose up`.
-#   --profile db     — adds Postgres 17 + pgvector (lights up at T05). Apply
-#                      the schema with:
+#   (default)        — `backend` only. `docker compose up`.
+#   --profile db     — adds Postgres 17 + pgvector. Apply the schema with:
 #                        docker compose --profile db up -d postgres
 #                        docker compose --profile db run --rm backend alembic upgrade head
 #                      and reset a local DB with `alembic downgrade base`.
-#   --profile llm    — adds the Vertex mock (lights up at T04).
-#   --profile web    — adds the Next.js frontend (lights up at T03).
+#   --profile web    — adds the Next.js frontend.
 #   --profile full   — everything above (Tier-1 gate / T11 smoke).
 #
 # Constitution §7 Docker parity: backend uses the multi-stage `dev`
 # target — same image shape that runs in CI (docker-compose.test.yml).
 # Production deploys the `runtime` target (no dev deps); see Dockerfile.
+#
+# T09 (2026-04-28) removed the HTTP `vertex-mock` service. The Vertex
+# mock is now exclusively the in-process fixture-keyed stub at
+# `app/backend/llm/_mock_backend.py` (T04). See
+# `docs/engineering/docker.md` for the full Docker contract.
 
 name: techscreen-dev
 
@@ -40,24 +43,6 @@ services:
       timeout: 3s
       retries: 10
 
-  vertex-mock:
-    profiles: ["llm", "full"]
-    build:
-      context: .
-      dockerfile: Dockerfile.vertex-mock
-    restart: unless-stopped
-    environment:
-      MOCK_PORT: "8080"
-      LOG_FORMAT: json
-      LOG_LEVEL: info
-    ports:
-      - "127.0.0.1:8080:8080"
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   backend:
     build:
       context: .
@@ -72,9 +57,8 @@ services:
       APP_ENV: dev
       LOG_FORMAT: json
       LOG_LEVEL: debug
-      # Optional dev knobs (used only when their profile is active):
+      # Optional dev knob (used only when the `db` profile is active):
       DATABASE_URL: postgresql+asyncpg://techscreen:techscreen@postgres:5432/techscreen
-      VERTEX_MOCK_URL: http://vertex-mock:8080
     ports:
       - "127.0.0.1:8000:8000"
     # depends_on resolves at the profile level: when the dependent
@@ -82,9 +66,6 @@ services:
     # depends_on entry is silently ignored by Compose.
     depends_on:
       postgres:
-        condition: service_healthy
-        required: false
-      vertex-mock:
         condition: service_healthy
         required: false
     # Bind-mount source for hot reload. Uvicorn reload is enabled via

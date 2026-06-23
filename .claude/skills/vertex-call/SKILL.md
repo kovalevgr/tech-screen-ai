@@ -89,7 +89,7 @@ If you need to change the active prompt version, change this file — do **not**
 
 ## Dev / CI vs prod
 
-- Local dev + CI default to `LLM_BACKEND=mock`. The wrapper routes to `vertex-mock` service (see `docker-compose.yml`). Same interface, deterministic canned responses keyed by prompt hash.
+- Local dev + CI default to `LLM_BACKEND=mock`. The wrapper routes to the in-process mock backend `app/backend/llm/_mock_backend.py` (T04). Same interface, deterministic canned responses keyed by prompt hash. No HTTP mock service — T09 removed the unused `vertex-mock` container; see `docs/engineering/docker.md`.
 - Prod refuses `LLM_BACKEND=mock` at startup (`ConfigError` raised in `app/backend/main.py` bootstrap). Constitution §17, ADR-010.
 - The mock returns the same `ModelCallResult` shape so call sites don't branch on environment.
 
@@ -99,12 +99,12 @@ If you need to change the active prompt version, change this file — do **not**
 2. Add a prompt version folder under `prompts/<agent>/v0001/` with `system.md`, `schema.json` (if structured), `notes.md`. Use the `agent-prompt-edit` skill.
 3. Add a builder in `app/backend/llm/agents/<agent>.py`. Its job: take domain objects, return `ModelCallRequest`. Builders never call the model directly — they return a request that the service passes to `call_model`.
 4. Add a service method in `app/backend/services/<agent>_service.py` that invokes the builder, calls `call_model`, handles domain-level errors (schema mismatch → manual-review flag, timeout → retry at the orchestrator layer, etc.).
-5. Add unit tests that mock `call_model` (not Vertex). Add one integration test that goes through `vertex-mock`.
+5. Add unit tests that mock `call_model` (not Vertex). Add one integration test that exercises the in-process mock backend with a fresh fixture under `app/backend/tests/fixtures/llm_responses/<agent>/`.
 
 ## Testing
 
 - **Unit tests.** Patch `app.backend.llm.vertex.call_model`. Assert the builder produces the right `ModelCallRequest`. Assert the service reacts correctly to each `ModelCallResult` shape.
-- **Integration tests.** Run against `vertex-mock` via `docker-compose.test.yml`. Canned responses live in `app/backend/tests/fixtures/vertex-mock/`.
+- **Integration tests.** Run against the in-process mock backend (`LLM_BACKEND=mock`). Canned responses live in `app/backend/tests/fixtures/llm_responses/<agent>/<sha>.json`.
 - **Load shape tests.** A dedicated test asserts the wrapper refuses `timeout_s=31` and `max_output_tokens=4097`.
 
 ## Common mistakes the reviewer will block

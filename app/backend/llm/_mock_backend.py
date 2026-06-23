@@ -1,5 +1,12 @@
 """Deterministic in-process mock backend for the Vertex wrapper.
 
+**This is the project's only Vertex mock.** Earlier scaffolding included an
+HTTP-level `vertex-mock` service (a separate FastAPI container reached via
+``VERTEX_MOCK_URL``), but it never gained a consumer — T09 removed it (see
+``specs/011-t09-docker-stacks/``). If a future task ever needs HTTP-level
+isolation from the wrapper, it will ship its own mock with a real consumer
+rather than resurrect the speculative one.
+
 Used by every backend test and the dev/CI default — production refuses to
 start in mock mode (spec FR-007 / SC-010, enforced by
 :meth:`app.backend.settings.Settings.assert_safe_for_environment`).

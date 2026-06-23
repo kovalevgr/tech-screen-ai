@@ -43,8 +43,8 @@ For completeness — these files are at the repo root and are expected by the tr
 | `.pre-commit-config.yaml` | *(pre-existing)* | Guardrail hooks (constitution §5/§6/§15). T01 does not edit it (FR-009). |
 | `.env.example` | *(pre-existing)* | Env keys with empty secret values + non-secret defaults (ADR-022). |
 | `.gitignore`, `.dockerignore` | *(pre-existing)* | Ignore rules. |
-| `Dockerfile`, `Dockerfile.frontend`, `Dockerfile.vertex-mock` | *(pre-existing)* | Docker build definitions (ADR-010 Docker parity). |
-| `docker-compose.yml`, `docker-compose.test.yml` | *(pre-existing)* | Dev + CI Docker stacks. T09 extends with services as they're added. |
+| `Dockerfile`, `Dockerfile.frontend` | *(pre-existing; `Dockerfile.vertex-mock` removed by T09)* | Docker build definitions (ADR-010 Docker parity). |
+| `docker-compose.yml`, `docker-compose.test.yml` | *(pre-existing)* | Dev + CI Docker stacks. Consolidated and documented by T09 (`docs/engineering/docker.md`). |
 | `pyproject.toml`, `uv.lock` | T01 | Python tooling + dep manifest at repo root (consumed by `Dockerfile`). |
 | `docs/engineering/vertex-quota.md` | T01a | Canonical Vertex AI quota log (region, granted quotas, verification, smoke-test records, follow-ups). Append-only by convention; format pinned at `specs/003-vertex-quota-region/contracts/vertex-quota-log-format.md`. |
 

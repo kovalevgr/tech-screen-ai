@@ -10,7 +10,7 @@ Related: [ADR-009](../../adr/009-prod-only-topology.md), [ADR-012](../../adr/012
 
 - **GCP project:** one, owned by N-iX. Project number `463244185014`. Human-readable project ID confirmed via Cloud Console ("Project info" card). Billing attached to the N-iX billing account for TechScreen.
 - **Region:** `europe-west1` (Belgium). All regional resources live there. See ADR-015.
-- **Environments:** only `prod`. No staging. Local dev runs against Docker Compose with the `vertex-mock` service; tests run in the same Compose stack in CI.
+- **Environments:** only `prod`. No staging. Local dev + CI run against Docker Compose with `LLM_BACKEND=mock` (the in-process fixture-keyed Vertex mock); see `docs/engineering/docker.md`.
 
 ---
 

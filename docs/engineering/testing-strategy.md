@@ -43,12 +43,12 @@ Related: [ADR-009](../../adr/009-prod-only-topology.md), [ADR-010](../../adr/010
 **Scope.**
 
 - Repository queries against a real Postgres schema (applied via `alembic upgrade head`).
-- State-machine flows through multiple agents using `vertex-mock`.
+- State-machine flows through multiple agents using the in-process mock backend (T04, `app/backend/llm/_mock_backend.py`).
 - Feature-flag-gated code paths with both flag states.
 
 **Rules.**
 
-- Runs inside `docker-compose.test.yml`. Postgres, vertex-mock, and the backend under test all live in that compose network.
+- Runs inside `docker-compose.test.yml`. Postgres and the backend under test (with `LLM_BACKEND=mock` selecting the in-process Vertex mock) live in that compose network.
 - Test isolation: each test either uses a transaction rolled back at teardown, or a dedicated schema created per test.
 - No shared mutable fixtures across tests.
 
@@ -83,7 +83,7 @@ Related: [ADR-009](../../adr/009-prod-only-topology.md), [ADR-010](../../adr/010
 
 **Rules.**
 
-- Does NOT call real Vertex. Uses `vertex-mock` with pre-recorded responses for each prompt hash.
+- Does NOT call real Vertex. Uses the in-process mock backend with pre-recorded responses for each prompt hash.
 - Fails only on material drift — exact match is not required because fixtures are sample outputs, not the canonical truth.
 - Updating a fixture is a conscious PR act, not a rubber-stamp.
 
@@ -99,7 +99,7 @@ Related: [ADR-009](../../adr/009-prod-only-topology.md), [ADR-010](../../adr/010
 
 **Rules.**
 
-- Runs in `docker-compose.test.yml` with backend + frontend + Postgres + vertex-mock all live.
+- Runs in `docker-compose.test.yml` with backend + frontend + Postgres all live (backend uses `LLM_BACKEND=mock` — the in-process Vertex mock).
 - Uses stable selectors (`data-testid`), not Tailwind classes or XPath.
 - Screenshots captured on failure, attached to CI output.
 
@@ -171,7 +171,7 @@ The reviewer sub-agent is the last gate. It reads the PR diff and the full floor
 
 - Performance / load tests. We run those manually before pilot milestones and on demand.
 - Security penetration tests. We run these pre-pilot and on major changes to auth or data model, not per-PR.
-- A real Vertex call. Expensive, flaky, and — critically — `vertex-mock` is the contract the backend is written against anyway.
+- A real Vertex call. Expensive, flaky, and — critically — the in-process mock backend is the contract the backend is written against anyway.
 
 ---
 
