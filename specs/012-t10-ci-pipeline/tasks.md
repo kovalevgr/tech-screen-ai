@@ -27,10 +27,10 @@ No setup needed. T10 adds no new dependency to `pyproject.toml` / `uv.lock` / `p
 
 **⚠️ CRITICAL**: `ci.yml` (US1/US2/US3) references these scripts; they must land first.
 
-- [ ] T001 [P] Create `scripts/ci-render-migration-sql.sh` (executable, `set -euo pipefail`). Renders the full migration DDL via the test-stack backend container: `docker compose -f docker-compose.test.yml run --rm backend alembic upgrade head --sql` (offline mode; T05 research §1). Writes the SQL to stdout. Clear stderr + non-zero exit on failure. (spec FR-007)
-- [ ] T002 [P] Create `scripts/ci-detect-destructive-ddl.sh` (executable, `set -euo pipefail`). Accepts changed migration file paths as args (or derives them via `git diff --name-only "${BASE_REF:-origin/main}"...HEAD -- 'alembic/versions/*.py'`). Greps for `DROP[[:space:]]+COLUMN`, `DROP[[:space:]]+TABLE`, `ALTER[[:space:]]+COLUMN[[:space:]]+[A-Za-z_]+[[:space:]]+TYPE` (case-insensitive). Writes `needs_adr=true|false` to `$GITHUB_OUTPUT` (and echoes the matched pattern + file to stdout). Exits 0 always — the label is the signal, not the exit code. (spec FR-008; research §4)
-- [ ] T003 [P] Create `scripts/ci-reviewer.sh` (executable, `set -euo pipefail`). Prints `Reviewer agent invocation DEFERRED — see docs/engineering/ci.md §Reviewer agent` to stdout and exits 0. (spec FR-010; research §1)
-- [ ] T004 Edit `.pre-commit-config.yaml`: add a `shellcheck` hook scoped to `^scripts/.*\.sh$` (use the `koalaman/shellcheck-precommit` mirror or `shellcheck-py`). This covers the three new helpers + T09's `smoke-docker-stack.sh`. (research §10)
+- [x] T001 [P] Create `scripts/ci-render-migration-sql.sh` (executable, `set -euo pipefail`). Renders the full migration DDL via the test-stack backend container: `docker compose -f docker-compose.test.yml run --rm backend alembic upgrade head --sql` (offline mode; T05 research §1). Writes the SQL to stdout. Clear stderr + non-zero exit on failure. (spec FR-007)
+- [x] T002 [P] Create `scripts/ci-detect-destructive-ddl.sh` (executable, `set -euo pipefail`). Accepts changed migration file paths as args (or derives them via `git diff --name-only "${BASE_REF:-origin/main}"...HEAD -- 'alembic/versions/*.py'`). Greps for `DROP[[:space:]]+COLUMN`, `DROP[[:space:]]+TABLE`, `ALTER[[:space:]]+COLUMN[[:space:]]+[A-Za-z_]+[[:space:]]+TYPE` (case-insensitive). Writes `needs_adr=true|false` to `$GITHUB_OUTPUT` (and echoes the matched pattern + file to stdout). Exits 0 always — the label is the signal, not the exit code. (spec FR-008; research §4)
+- [x] T003 [P] Create `scripts/ci-reviewer.sh` (executable, `set -euo pipefail`). Prints `Reviewer agent invocation DEFERRED — see docs/engineering/ci.md §Reviewer agent` to stdout and exits 0. (spec FR-010; research §1)
+- [x] T004 Edit `.pre-commit-config.yaml`: add a `shellcheck` hook scoped to `^scripts/.*\.sh$` (use the `koalaman/shellcheck-precommit` mirror or `shellcheck-py`). This covers the three new helpers + T09's `smoke-docker-stack.sh`. (research §10)
 
 **Checkpoint**: the helpers exist + shellcheck guards them; `ci.yml` can now reference them.
 
@@ -44,10 +44,10 @@ No setup needed. T10 adds no new dependency to `pyproject.toml` / `uv.lock` / `p
 
 ### Implementation for User Story 1
 
-- [ ] T005 [US1] Create `.github/workflows/ci.yml` with the workflow header (`on: pull_request [main] + push [main]`; `concurrency: { group: "${{ github.workflow }}-${{ github.ref }}", cancel-in-progress: true }`; minimal top-level `permissions: { contents: read }`) and the `backend` job: checkout; `docker/setup-buildx-action@v3` with `type=gha` cache; build the test backend image; `docker compose -f docker-compose.test.yml --profile db up -d postgres`; `alembic upgrade head`; `pytest app/backend/tests`; `ruff check app/backend`; `ruff format --check app/backend alembic scripts`; `mypy --strict app/backend`; `python -m app.backend.generate_openapi --check`. (spec FR-001/002/003; research §2/§7)
-- [ ] T006 [US1] Add the `frontend` job to `.github/workflows/ci.yml`: checkout; buildx + `actions/cache` for the pnpm store; build the frontend image; `pnpm install --frozen-lockfile`; `pnpm exec eslint . --max-warnings=0`; `pnpm exec tsc --noEmit`; `pnpm test`; `pnpm tokens:check`. (spec FR-004; research §2)
-- [ ] T007 [US1] Add the `smoke` job to `.github/workflows/ci.yml`: checkout; `bash scripts/smoke-docker-stack.sh` on the host runner (no DinD). (spec FR-005; research §8)
-- [ ] T008 [US1] Add the `lint` job to `.github/workflows/ci.yml`: checkout; `pip install pre-commit`; `actions/cache` for `~/.cache/pre-commit`; `SKIP=eslint,tokens-drift,visual-discipline pre-commit run --all-files` (the `frontend` job owns those three; research §9). (spec FR-006)
+- [x] T005 [US1] Create `.github/workflows/ci.yml` with the workflow header (`on: pull_request [main] + push [main]`; `concurrency: { group: "${{ github.workflow }}-${{ github.ref }}", cancel-in-progress: true }`; minimal top-level `permissions: { contents: read }`) and the `backend` job: checkout; `docker/setup-buildx-action@v3` with `type=gha` cache; build the test backend image; `docker compose -f docker-compose.test.yml --profile db up -d postgres`; `alembic upgrade head`; `pytest app/backend/tests`; `ruff check app/backend`; `ruff format --check app/backend alembic scripts`; `mypy --strict app/backend`; `python -m app.backend.generate_openapi --check`. (spec FR-001/002/003; research §2/§7)
+- [x] T006 [US1] Add the `frontend` job to `.github/workflows/ci.yml`: checkout; buildx + `actions/cache` for the pnpm store; build the frontend image; `pnpm install --frozen-lockfile`; `pnpm exec eslint . --max-warnings=0`; `pnpm exec tsc --noEmit`; `pnpm test`; `pnpm tokens:check`. (spec FR-004; research §2)
+- [x] T007 [US1] Add the `smoke` job to `.github/workflows/ci.yml`: checkout; `bash scripts/smoke-docker-stack.sh` on the host runner (no DinD). (spec FR-005; research §8)
+- [x] T008 [US1] Add the `lint` job to `.github/workflows/ci.yml`: checkout; `pip install pre-commit`; `actions/cache` for `~/.cache/pre-commit`; `SKIP=eslint,tokens-drift,visual-discipline pre-commit run --all-files` (the `frontend` job owns those three; research §9). (spec FR-006)
 
 **Checkpoint**: the four required jobs exist; `actionlint` is clean; a green PR can merge, a broken one cannot.
 
@@ -61,7 +61,7 @@ No setup needed. T10 adds no new dependency to `pyproject.toml` / `uv.lock` / `p
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] Add the conditional `migration-sql-render` job to `.github/workflows/ci.yml`: gated by a `dorny/paths-filter` (or `git diff`) step detecting `alembic/versions/**`; `permissions: { pull-requests: write, contents: read }`; brings up postgres; runs `scripts/ci-render-migration-sql.sh` capturing stdout; an `actions/github-script@v7` step finds the prior comment by the `<!-- ci:migration-sql-render -->` marker and updates-or-creates it, wrapping the SQL in a `<details><summary>Rendered migration SQL</summary>…</details>` block. (spec FR-007/FR-009; research §3/§5)
+- [x] T009 [US2] Add the conditional `migration-sql-render` job to `.github/workflows/ci.yml`: gated by a `dorny/paths-filter` (or `git diff`) step detecting `alembic/versions/**`; `permissions: { pull-requests: write, contents: read }`; brings up postgres; runs `scripts/ci-render-migration-sql.sh` capturing stdout; an `actions/github-script@v7` step finds the prior comment by the `<!-- ci:migration-sql-render -->` marker and updates-or-creates it, wrapping the SQL in a `<details><summary>Rendered migration SQL</summary>…</details>` block. (spec FR-007/FR-009; research §3/§5)
 
 **Checkpoint**: migration PRs surface their SQL; non-migration PRs skip the job.
 
@@ -75,7 +75,7 @@ No setup needed. T10 adds no new dependency to `pyproject.toml` / `uv.lock` / `p
 
 ### Implementation for User Story 3
 
-- [ ] T010 [US3] Extend the `migration-sql-render` job in `.github/workflows/ci.yml` with a destructive-DDL step: run `scripts/ci-detect-destructive-ddl.sh` (reads `$GITHUB_OUTPUT` `needs_adr`); an `actions/github-script@v7` step applies the `needs-adr` label when `needs_adr == 'true'` and emits a workflow `::warning::` naming the offending pattern. Never auto-applies `migration-approved` (FR-009). (spec FR-008; research §4)
+- [x] T010 [US3] Extend the `migration-sql-render` job in `.github/workflows/ci.yml` with a destructive-DDL step: run `scripts/ci-detect-destructive-ddl.sh` (reads `$GITHUB_OUTPUT` `needs_adr`); an `actions/github-script@v7` step applies the `needs-adr` label when `needs_adr == 'true'` and emits a workflow `::warning::` naming the offending pattern. Never auto-applies `migration-approved` (FR-009). (spec FR-008; research §4)
 
 **Checkpoint**: a `DROP COLUMN` PR is auto-labelled `needs-adr`; an additive PR is not.
 
@@ -89,8 +89,8 @@ No setup needed. T10 adds no new dependency to `pyproject.toml` / `uv.lock` / `p
 
 ### Implementation for User Story 4
 
-- [ ] T011 [US4] Create `docs/engineering/ci.md` (7 sections per plan §Phase 1 / data-model.md): (0) Why; (1) The five jobs + what each enforces; (2) Required-status-checks branch-protection contract (backend/frontend/smoke/lint required; migration-render informational) — operator-applied; (3) Migration-approval gate end-to-end (PR → SQL rendered + posted → reviewer applies `migration-approved` → T06a `/deploy` enforces); (4) Destructive-DDL detection + `needs-adr` + ADR requirement (the §10 pattern set); (5) Reviewer agent — DEFERRED placeholder today, follow-up task tracked, rationale (no API key + no cost controls yet); (6) Troubleshooting (failing migration render, cold-cache timing, GITHUB_TOKEN permissions); (7) Caching strategy. (spec FR-013)
-- [ ] T012 [US4] Add a reviewer placeholder step to a job in `.github/workflows/ci.yml` (e.g. an informational `reviewer` step in the `lint` job or its own non-required job) that runs `bash scripts/ci-reviewer.sh` (prints DEFERRED, exits 0, never blocks). Then edit `README.md`: add a short "CI pipeline" subsection (≤ 3 sentences) linking `docs/engineering/ci.md`. (spec FR-010/FR-014)
+- [x] T011 [US4] Create `docs/engineering/ci.md` (7 sections per plan §Phase 1 / data-model.md): (0) Why; (1) The five jobs + what each enforces; (2) Required-status-checks branch-protection contract (backend/frontend/smoke/lint required; migration-render informational) — operator-applied; (3) Migration-approval gate end-to-end (PR → SQL rendered + posted → reviewer applies `migration-approved` → T06a `/deploy` enforces); (4) Destructive-DDL detection + `needs-adr` + ADR requirement (the §10 pattern set); (5) Reviewer agent — DEFERRED placeholder today, follow-up task tracked, rationale (no API key + no cost controls yet); (6) Troubleshooting (failing migration render, cold-cache timing, GITHUB_TOKEN permissions); (7) Caching strategy. (spec FR-013)
+- [x] T012 [US4] Add a reviewer placeholder step to a job in `.github/workflows/ci.yml` (e.g. an informational `reviewer` step in the `lint` job or its own non-required job) that runs `bash scripts/ci-reviewer.sh` (prints DEFERRED, exits 0, never blocks). Then edit `README.md`: add a short "CI pipeline" subsection (≤ 3 sentences) linking `docs/engineering/ci.md`. (spec FR-010/FR-014)
 
 **Checkpoint**: the CI contract is documented in one place; the reviewer deferral is visible + honest.
 
@@ -98,7 +98,7 @@ No setup needed. T10 adds no new dependency to `pyproject.toml` / `uv.lock` / `p
 
 ## Phase 7: Polish & Verification
 
-- [ ] T013 Run the verification matrix (quickstart Part A): `actionlint` on `ci.yml` (SC-009); `shellcheck` on `scripts/ci-*.sh` + `scripts/smoke-docker-stack.sh`; dry-run `ci-render-migration-sql.sh` (produces SQL) + `ci-detect-destructive-ddl.sh` (flags a DROP-COLUMN fixture, passes an ADD-COLUMN fixture); `ci-reviewer.sh` prints DEFERRED + exit 0; re-run the full 138-test backend suite in the test stack (SC-007); `pre-commit run --all-files` clean with the new shellcheck hook (SC-006/SC-008); read `ci.md` and confirm the four contributor questions are answered. Document that quickstart Part B (the GitHub-only first-PR checklist) is the operator's one-time manual step after branch protection is configured (SC-001..005, SC-010).
+- [x] T013 Run the verification matrix (quickstart Part A): `actionlint` on `ci.yml` (SC-009); `shellcheck` on `scripts/ci-*.sh` + `scripts/smoke-docker-stack.sh`; dry-run `ci-render-migration-sql.sh` (produces SQL) + `ci-detect-destructive-ddl.sh` (flags a DROP-COLUMN fixture, passes an ADD-COLUMN fixture); `ci-reviewer.sh` prints DEFERRED + exit 0; re-run the full 138-test backend suite in the test stack (SC-007); `pre-commit run --all-files` clean with the new shellcheck hook (SC-006/SC-008); read `ci.md` and confirm the four contributor questions are answered. Document that quickstart Part B (the GitHub-only first-PR checklist) is the operator's one-time manual step after branch protection is configured (SC-001..005, SC-010).
 
 ---
 
