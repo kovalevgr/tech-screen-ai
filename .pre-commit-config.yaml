@@ -99,6 +99,16 @@ repos:
       - id: actionlint
 
   # -------------------------------------------------------------------------
+  # shellcheck — static analysis for the project's bash helpers (T10). Keeps
+  # scripts/*.sh honest (unquoted expansions, set -e interactions, etc.).
+  # -------------------------------------------------------------------------
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+        files: ^scripts/.*\.sh$
+
+  # -------------------------------------------------------------------------
   # Terraform validate — syntactic/semantic check. `terraform fmt` runs in CI
   # (and editors); we do not auto-format on commit to keep pre-commit
   # non-modifying.

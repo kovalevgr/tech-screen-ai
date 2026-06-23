@@ -32,7 +32,6 @@ if [[ "${1:-}" == "keep" ]]; then
   KEEP_RUNNING=1
 fi
 
-readonly COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME:-techscreen-dev}"
 COMPOSE_CMD=(docker compose --profile db --profile web)
 
 teardown() {
