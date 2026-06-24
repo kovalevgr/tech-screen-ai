@@ -142,6 +142,10 @@ Risky features ship behind a flag that starts `false` (constitution §9). The me
 
 The rubric tree is loaded from Git-tracked YAML (constitution §16). Maintainers convert an authoritative Excel "matrix" with `python -m app.backend.cli.import_matrix convert <xlsx> --out configs/rubric/`, then seed the database with `python -m app.backend.cli.import_matrix seed` — each content change creates a new immutable `rubric_tree_version` (§4 / ADR-018). Contracts: [`docs/contracts/rubric.schema.json`](./docs/contracts/rubric.schema.json) + [`docs/contracts/matrix-format.md`](./docs/contracts/matrix-format.md); source-of-truth YAMLs in [`configs/rubric/`](./configs/rubric/); details in [`specs/010-t08-matrix-importer/`](./specs/010-t08-matrix-importer/).
 
+#### CI pipeline
+
+Every PR against `main` runs [`.github/workflows/ci.yml`](./.github/workflows/ci.yml): four required jobs (backend tests + lint + types + OpenAPI; frontend eslint + tsc + jest + tokens; Docker smoke; the pre-commit chain) gate merge, and a conditional job surfaces Alembic SQL for review + auto-labels destructive DDL (constitution §10). See [`docs/engineering/ci.md`](./docs/engineering/ci.md) for the full contract, the required-checks branch-protection set, and the migration-approval gate.
+
 ### Frontend dev loop (Docker-first)
 
 Constitution §7 (Docker parity dev → CI → prod) is non-negotiable. **All frontend run/test/regen workflows happen inside the same multi-stage image that CI and production use.** No native `pnpm --dir app/frontend …` for the canonical loop — Docker Desktop (or any Docker Engine) is the only contributor prerequisite for this layer.

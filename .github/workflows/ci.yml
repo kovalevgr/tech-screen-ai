@@ -1,0 +1,239 @@
+# TechScreen — CI pipeline (T10).
+#
+# Runs on every PR against main + every push to main. Four required jobs
+# (backend / frontend / smoke / lint) gate merge; a conditional fifth
+# (migration-sql-render) surfaces Alembic SQL for review and auto-labels
+# destructive DDL (constitution §10). See docs/engineering/ci.md for the
+# full contract and the branch-protection required-checks set.
+#
+# Reviewer-agent invocation is a documented placeholder (scripts/ci-reviewer.sh)
+# — the real Claude-in-CI integration lands in a follow-up task with an
+# Anthropic API key + cost controls. See docs/engineering/ci.md §Reviewer agent.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# A force-push cancels the in-flight run for the same ref (research §7).
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+# Least privilege at the workflow level; the migration job elevates locally.
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: backend (tests + lint + types + openapi)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          target: dev
+          load: true
+          tags: techscreen-test-backend:ci
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Start Postgres (db profile)
+        run: docker compose -f docker-compose.test.yml --profile db up -d postgres
+
+      - name: Migrate + test + lint + typecheck + OpenAPI parity
+        run: |
+          docker compose -f docker-compose.test.yml --profile db run --rm \
+            backend sh -c '
+              set -eu
+              alembic upgrade head
+              pytest app/backend/tests
+              ruff check app/backend
+              ruff format --check app/backend alembic scripts
+              mypy --strict app/backend
+              python -m app.backend.generate_openapi --check
+            '
+
+  frontend:
+    name: frontend (eslint + tsc + jest + tokens)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.frontend
+          target: dev
+          load: true
+          tags: techscreen-test-frontend:ci
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: eslint + tsc + jest + tokens drift
+        run: |
+          docker compose -f docker-compose.test.yml run --rm \
+            frontend sh -c '
+              set -eu
+              pnpm install --frozen-lockfile
+              pnpm exec eslint . --max-warnings=0
+              pnpm exec tsc --noEmit
+              pnpm test
+              pnpm tokens:check
+            '
+
+  smoke:
+    name: smoke (dev stack up → health 200)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bring up the dev stack and smoke it
+        run: bash scripts/smoke-docker-stack.sh
+
+  lint:
+    name: lint (pre-commit chain)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pre-commit hook environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      # Skipped hooks, with their reasons:
+      #  - eslint / tokens-drift / visual-discipline: need node+pnpm; already
+      #    covered by the `frontend` job. Keeps this runner Python-only.
+      #  - terraform_validate: needs the terraform binary + a `terraform init`
+      #    that would touch the gcs backend. Deferred to a dedicated offline
+      #    `terraform` job (init -backend=false + validate) so the lint runner
+      #    stays Python-only. The hook still runs in local pre-commit for devs
+      #    who have terraform. See docs/engineering/ci.md §Terraform validation.
+      - name: Run pre-commit (all files)
+        env:
+          SKIP: eslint,tokens-drift,visual-discipline,terraform_validate
+        run: pre-commit run --all-files --show-diff-on-failure
+
+      - name: Reviewer agent (placeholder — DEFERRED)
+        run: bash scripts/ci-reviewer.sh
+
+  migration-sql-render:
+    name: migration SQL render + destructive-DDL gate (§10)
+    runs-on: ubuntu-latest
+    # Only run when a migration changed. On push events the path filter below
+    # determines whether the meaningful steps execute.
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed migrations
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="origin/${{ github.base_ref }}"
+            git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          else
+            base="HEAD~1"
+          fi
+          changed=$(git diff --name-only "${base}"...HEAD -- 'alembic/versions/*.py' || true)
+          if [ -n "${changed}" ]; then
+            {
+              echo "has_migration=true"
+              echo "files<<EOF"
+              echo "${changed}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "has_migration=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Render migration SQL
+        id: render
+        if: steps.changed.outputs.has_migration == 'true'
+        run: |
+          {
+            echo 'sql<<RENDER_EOF'
+            bash scripts/ci-render-migration-sql.sh
+            echo 'RENDER_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post / update the migration-SQL PR comment
+        if: steps.changed.outputs.has_migration == 'true' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- ci:migration-sql-render -->';
+            const sql = process.env.RENDERED_SQL || '(no SQL captured)';
+            const body = [
+              marker,
+              '### Rendered migration SQL (constitution §10)',
+              'A migration changed in this PR. Review the SQL below before applying the',
+              '`migration-approved` label.',
+              '',
+              '<details><summary>Rendered SQL</summary>',
+              '',
+              '```sql',
+              sql.trim(),
+              '```',
+              '',
+              '</details>',
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.data.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+        env:
+          RENDERED_SQL: ${{ steps.render.outputs.sql }}
+
+      - name: Detect destructive DDL
+        id: ddl
+        if: steps.changed.outputs.has_migration == 'true'
+        run: |
+          # shellcheck disable=SC2086
+          bash scripts/ci-detect-destructive-ddl.sh ${{ steps.changed.outputs.files }}
+
+      - name: Apply needs-adr label on destructive DDL
+        if: steps.ddl.outputs.needs_adr == 'true' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            await github.rest.issues.addLabels({
+              owner, repo,
+              issue_number: context.issue.number,
+              labels: ['needs-adr'],
+            });
+            core.warning('Destructive DDL detected — needs-adr label applied; link an ADR before merge (§10).');
