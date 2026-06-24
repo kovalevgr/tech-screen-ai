@@ -40,6 +40,9 @@ EXPECTED_TABLES: frozenset[str] = frozenset(
         "session_decision",
         # 0002_feature_flags (T05a — mutable; explicit §3 carve-out, FR-013)
         "feature_flag",
+        # 0004_position_template (T12 — selection association tables)
+        "position_template_stack",
+        "position_template_competency",
     }
 )
 
