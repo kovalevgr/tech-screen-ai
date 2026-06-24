@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kovalevgr/tech-screen-ai/blob/main/docs/contracts/position-template.schema.json",
+  "title": "TechScreen Position Template contract (T12, FR-009)",
+  "description": "Request/response shapes for a Position Template — the recruiter-authored definition of a role to interview for. The §14 contract T13 (CRUD) and T14 (admin UI) build against. Design copy lives under specs/013-...; the canonical committed file is docs/contracts/position-template.schema.json.",
+  "type": "object",
+  "$defs": {
+    "level": {
+      "type": "string",
+      "description": "Target seniority of the role. Distinct from the rubric tree's per-competency proficiency `level` rows.",
+      "enum": ["Junior", "Middle", "Senior", "Tech Leader"]
+    },
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "create": {
+      "type": "object",
+      "description": "PositionTemplateCreate — the request body T13 POST will accept.",
+      "additionalProperties": false,
+      "required": ["title", "level", "stack_ids", "competency_ids"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Human-readable role title.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "level": {"$ref": "#/$defs/level"},
+        "jd_text": {
+          "type": ["string", "null"],
+          "description": "Optional free-text job description."
+        },
+        "stack_ids": {
+          "type": "array",
+          "description": "Rubric stacks this role covers. Each must exist (FR-003).",
+          "items": {"$ref": "#/$defs/uuid"},
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "competency_ids": {
+          "type": "array",
+          "description": "Selected (optional) competencies to assess. Each must exist and belong to a selected stack (FR-006). At least one required (FR-005).",
+          "items": {"$ref": "#/$defs/uuid"},
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "must_have_competency_ids": {
+          "type": "array",
+          "description": "Mandatory subset of competency_ids (FR-004). Must be a subset of competency_ids; validated server-side.",
+          "items": {"$ref": "#/$defs/uuid"},
+          "uniqueItems": true,
+          "default": []
+        }
+      }
+    },
+    "read": {
+      "type": "object",
+      "description": "PositionTemplateRead — the response body T13 GET will return.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "level",
+        "jd_text",
+        "archived_at",
+        "created_at",
+        "created_by",
+        "stack_ids",
+        "competencies"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"},
+        "title": {"type": "string"},
+        "level": {"$ref": "#/$defs/level"},
+        "jd_text": {"type": ["string", "null"]},
+        "archived_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Soft-delete marker; null = active (FR-007)."
+        },
+        "created_at": {"type": "string", "format": "date-time"},
+        "created_by": {
+          "oneOf": [{"$ref": "#/$defs/uuid"}, {"type": "null"}],
+          "description": "Owning user id; null until authz lands (T13)."
+        },
+        "stack_ids": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/uuid"},
+          "uniqueItems": true
+        },
+        "competencies": {
+          "type": "array",
+          "description": "Selected competencies with their must-have flag.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["competency_id", "must_have"],
+            "properties": {
+              "competency_id": {"$ref": "#/$defs/uuid"},
+              "must_have": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {"$ref": "#/$defs/create"},
+    {"$ref": "#/$defs/read"}
+  ]
+}
