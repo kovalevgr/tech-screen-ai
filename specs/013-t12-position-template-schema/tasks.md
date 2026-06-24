@@ -17,7 +17,7 @@ description: "Task list for T12 — Position Template schema + contract"
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Create the two new backend packages with empty `__init__.py`: `app/backend/schemas/__init__.py` and `app/backend/services/__init__.py`. No new dependency is added to `pyproject.toml` / `uv.lock`.
+- [x] T001 [P] Create the two new backend packages with empty `__init__.py`: `app/backend/schemas/__init__.py` and `app/backend/services/__init__.py`. No new dependency is added to `pyproject.toml` / `uv.lock`.
 
 ---
 
@@ -27,8 +27,8 @@ description: "Task list for T12 — Position Template schema + contract"
 
 **⚠️ CRITICAL**: T004/T005 (schemas, validator) and all tests reference these.
 
-- [ ] T002 Extend `app/backend/db/models/interview.py`: add the domain columns to `PositionTemplate` (`title`, `jd_text`, `level`, `archived_at`, `created_by` FK→`user.id`) and add two new association models — `PositionTemplateStack` (FK→`position_template`, FK→`stack`, UNIQUE pair) and `PositionTemplateCompetency` (FK→`position_template`, FK→`competency`, `must_have BOOLEAN NOT NULL DEFAULT false`, UNIQUE pair). Use the `UUIDPk` + `TimestampCreated` mixins. (data-model.md; FR-001/007/012)
-- [ ] T003 Create `alembic/versions/0004_position_template.py` (`down_revision = "0003_rubric_payload_hash"`). Raw `op.execute(...)` additive DDL only (house style, see `0003`): `ALTER TABLE position_template ADD COLUMN` for the five columns (`title TEXT NOT NULL DEFAULT ''`, `jd_text TEXT`, `level TEXT NOT NULL DEFAULT 'Middle'`, `archived_at TIMESTAMPTZ`, `created_by UUID`); `ADD CONSTRAINT ck_position_template_level CHECK (level IN ('Junior','Middle','Senior','Tech Leader'))`; `ADD CONSTRAINT fk_position_template_created_by_user FOREIGN KEY (created_by) REFERENCES "user"(id)`; `CREATE TABLE position_template_stack` + `position_template_competency` with their FKs and `UNIQUE` constraints. Symmetric `downgrade()` with `IF EXISTS` (dev-only; forward-only in prod, §10). No DROP/type-narrowing → `needs_adr=false`. (data-model.md; FR-010)
+- [x] T002 Extend `app/backend/db/models/interview.py`: add the domain columns to `PositionTemplate` (`title`, `jd_text`, `level`, `archived_at`, `created_by` FK→`user.id`) and add two new association models — `PositionTemplateStack` (FK→`position_template`, FK→`stack`, UNIQUE pair) and `PositionTemplateCompetency` (FK→`position_template`, FK→`competency`, `must_have BOOLEAN NOT NULL DEFAULT false`, UNIQUE pair). Use the `UUIDPk` + `TimestampCreated` mixins. (data-model.md; FR-001/007/012)
+- [x] T003 Create `alembic/versions/0004_position_template.py` (`down_revision = "0003_rubric_payload_hash"`). Raw `op.execute(...)` additive DDL only (house style, see `0003`): `ALTER TABLE position_template ADD COLUMN` for the five columns (`title TEXT NOT NULL DEFAULT ''`, `jd_text TEXT`, `level TEXT NOT NULL DEFAULT 'Middle'`, `archived_at TIMESTAMPTZ`, `created_by UUID`); `ADD CONSTRAINT ck_position_template_level CHECK (level IN ('Junior','Middle','Senior','Tech Leader'))`; `ADD CONSTRAINT fk_position_template_created_by_user FOREIGN KEY (created_by) REFERENCES "user"(id)`; `CREATE TABLE position_template_stack` + `position_template_competency` with their FKs and `UNIQUE` constraints. Symmetric `downgrade()` with `IF EXISTS` (dev-only; forward-only in prod, §10). No DROP/type-narrowing → `needs_adr=false`. (data-model.md; FR-010)
 
 **Checkpoint**: `alembic upgrade head` reaches `0004_position_template`; the schema is queryable.
 
@@ -42,10 +42,10 @@ description: "Task list for T12 — Position Template schema + contract"
 
 ### Implementation for User Story 1
 
-- [ ] T004 [P] [US1] Create `app/backend/schemas/position_template.py`: `PositionLevel` StrEnum {Junior, Middle, Senior, Tech Leader}; `PositionTemplateCreate` (request) and `PositionTemplateRead` (response) Pydantic v2 models with `extra="forbid"` (+ `from_attributes=True` on Read). Stateless validators: `level` enum (FR-002), `must_have_competency_ids ⊆ competency_ids` (FR-004), `≥1 competency_id` (FR-005), de-duplicate `stack_ids`/`competency_ids` (edge case). Shapes match `contracts/position-template.schema.json`. (data-model.md; FR-001/002/004/005)
-- [ ] T005 [P] [US1] Create `app/backend/services/position_template.py`: `PositionTemplateValidationError` (typed, field-specific message — FR-011) and `async def validate_position_template(session, payload)` running the stateful DB rules: every `stack_id` exists (FR-003), every `competency_id` exists, and every selected competency belongs to one of the selected stacks via `competency → competency_block → stack` (FR-006). Raises on the first breach; returns normally when valid. (research §5; FR-003/006/011)
-- [ ] T006 [US1] Create `app/backend/tests/schemas/test_position_template_schema.py`: assert `level='Architect'` rejected; `must_have ⊄ selected` rejected; zero competencies rejected; duplicate ids de-duplicated/rejected; a fully-valid payload accepted. (SC-002)
-- [ ] T007 [US1] Create `app/backend/tests/services/test_position_template_validate.py` (db profile): seed a rubric tree (stack/competency_block/competency), then assert unknown stack rejected, unknown competency rejected, competency-not-in-selected-stack rejected, and a valid selection passes. (SC-002; FR-003/006)
+- [x] T004 [P] [US1] Create `app/backend/schemas/position_template.py`: `PositionLevel` StrEnum {Junior, Middle, Senior, Tech Leader}; `PositionTemplateCreate` (request) and `PositionTemplateRead` (response) Pydantic v2 models with `extra="forbid"` (+ `from_attributes=True` on Read). Stateless validators: `level` enum (FR-002), `must_have_competency_ids ⊆ competency_ids` (FR-004), `≥1 competency_id` (FR-005), de-duplicate `stack_ids`/`competency_ids` (edge case). Shapes match `contracts/position-template.schema.json`. (data-model.md; FR-001/002/004/005)
+- [x] T005 [P] [US1] Create `app/backend/services/position_template.py`: `PositionTemplateValidationError` (typed, field-specific message — FR-011) and `async def validate_position_template(session, payload)` running the stateful DB rules: every `stack_id` exists (FR-003), every `competency_id` exists, and every selected competency belongs to one of the selected stacks via `competency → competency_block → stack` (FR-006). Raises on the first breach; returns normally when valid. (research §5; FR-003/006/011)
+- [x] T006 [US1] Create `app/backend/tests/schemas/test_position_template_schema.py`: assert `level='Architect'` rejected; `must_have ⊄ selected` rejected; zero competencies rejected; duplicate ids de-duplicated/rejected; a fully-valid payload accepted. (SC-002)
+- [x] T007 [US1] Create `app/backend/tests/services/test_position_template_validate.py` (db profile): seed a rubric tree (stack/competency_block/competency), then assert unknown stack rejected, unknown competency rejected, competency-not-in-selected-stack rejected, and a valid selection passes. (SC-002; FR-003/006)
 
 **Checkpoint**: all four validation rules provably reject their bad inputs and accept valid input.
 
@@ -59,9 +59,9 @@ description: "Task list for T12 — Position Template schema + contract"
 
 ### Implementation for User Story 2
 
-- [ ] T008 [US2] Commit the canonical §14 contract to `docs/contracts/position-template.schema.json` (copy of `specs/013-t12-position-template-schema/contracts/position-template.schema.json`; `$id` already points at the `docs/contracts/` path). This is the artefact T13/T14 build against — it lands before any T13/T14 work (§14). (FR-009)
-- [ ] T009 [US2] Create `app/backend/tests/contracts/test_position_template_contract.py`: load `docs/contracts/position-template.schema.json`, assert it is a valid Draft 2020-12 schema, validate a good `create` example, reject a `level='Architect'` example. (SC-003; FR-009)
-- [ ] T010 [US2] Confirm Variant A: T12 registers **no** routes, so `python -m app.backend.generate_openapi --check` is a clean no-op and `test_openapi_regeneration` stays green unchanged. Record this in the PR description (no code change expected for `openapi.yaml`). (plan §Key design decision; FR-009)
+- [x] T008 [US2] Commit the canonical §14 contract to `docs/contracts/position-template.schema.json` (copy of `specs/013-t12-position-template-schema/contracts/position-template.schema.json`; `$id` already points at the `docs/contracts/` path). This is the artefact T13/T14 build against — it lands before any T13/T14 work (§14). (FR-009)
+- [x] T009 [US2] Create `app/backend/tests/contracts/test_position_template_contract.py`: load `docs/contracts/position-template.schema.json`, assert it is a valid Draft 2020-12 schema, validate a good `create` example, reject a `level='Architect'` example. (SC-003; FR-009)
+- [x] T010 [US2] Confirm Variant A: T12 registers **no** routes, so `python -m app.backend.generate_openapi --check` is a clean no-op and `test_openapi_regeneration` stays green unchanged. Record this in the PR description (no code change expected for `openapi.yaml`). (plan §Key design decision; FR-009)
 
 **Checkpoint**: contract committed + provably valid; OpenAPI unchanged (paths deferred to T13).
 
@@ -75,7 +75,7 @@ description: "Task list for T12 — Position Template schema + contract"
 
 ### Implementation for User Story 3
 
-- [ ] T011 [US3] Create `app/backend/tests/db/test_position_template_migration.py` (db profile): assert head == `0004_position_template`; the new columns + association tables exist; the `level` CHECK rejects an invalid value; setting `archived_at` keeps the row (soft-delete, FR-007). Add an assertion (or quickstart-documented grep) that the `0003→0004 --sql` render has no `DROP COLUMN|DROP TABLE|ALTER COLUMN ... TYPE`. (FR-007/010; SC-005)
+- [x] T011 [US3] Create `app/backend/tests/db/test_position_template_migration.py` (db profile): assert head == `0004_position_template`; the new columns + association tables exist; the `level` CHECK rejects an invalid value; setting `archived_at` keeps the row (soft-delete, FR-007). Add an assertion (or quickstart-documented grep) that the `0003→0004 --sql` render has no `DROP COLUMN|DROP TABLE|ALTER COLUMN ... TYPE`. (FR-007/010; SC-005)
 
 **Checkpoint**: a `DROP`-free, forward-only migration with soft-delete verified.
 
@@ -83,7 +83,7 @@ description: "Task list for T12 — Position Template schema + contract"
 
 ## Phase 6: Polish & Verification
 
-- [ ] T012 Run the quickstart verification matrix: `alembic upgrade head` → `0004`; all four new test files pass; `generate_openapi --check` clean (no-op); the full `db`-profile suite (138 baseline + new T12 tests) green; `ruff check` + `ruff format --check` + `mypy --strict` clean; destructive-DDL grep over the `0003→0004` SQL render is additive-only. (quickstart.md §A–E)
+- [x] T012 Run the quickstart verification matrix: `alembic upgrade head` → `0004`; all four new test files pass; `generate_openapi --check` clean (no-op); the full `db`-profile suite (138 baseline + new T12 tests) green; `ruff check` + `ruff format --check` + `mypy --strict` clean; destructive-DDL grep over the `0003→0004` SQL render is additive-only. (quickstart.md §A–E)
 
 ---
 
