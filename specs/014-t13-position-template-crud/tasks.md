@@ -17,7 +17,7 @@ description: "Task list for T13 — Position Template CRUD endpoints"
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Create the API package: `app/backend/api/__init__.py` and the test package `app/backend/tests/api/__init__.py`. No new dependency.
+- [x] T001 [P] Create the API package: `app/backend/api/__init__.py` and the test package `app/backend/tests/api/__init__.py`. No new dependency.
 
 ---
 
@@ -25,10 +25,10 @@ description: "Task list for T13 — Position Template CRUD endpoints"
 
 **Purpose**: The request-scoped DB session, the auth seam, the §9 flag gate, the PATCH schema, and the persistence helpers all underpin the router. They land before any endpoint.
 
-- [ ] T002 Create `app/backend/api/deps.py`: `get_db` (async generator yielding an `AsyncSession` from `db.session.get_sessionmaker()`, commit on success / rollback on exception / always close); `Principal` model + `get_current_user` seam (resolves no identity → raises 401 today; overridable in tests — real SSO is T07); `require_roles(*roles)` (depends on `get_current_user`, raises 403 if role not allowed); `require_crud_enabled` (`await is_enabled("position_template_crud_enabled")` → raise 404 when off). (research §2/§3/§7)
-- [ ] T003 [P] Register the §9 flag: add `position_template_crud_enabled` (state `active`, `default: false`, `owner`, `description`) to `configs/feature-flags.yaml`, and add its row to the `docs/engineering/feature-flags.md` index. Pairs with the `is_enabled(...)` call site in T002 so the `feature-flag-registered` hook passes. (research §7)
-- [ ] T004 [P] Extend `app/backend/schemas/position_template.py` with `PositionTemplateUpdate` (all fields optional; reuse the stateless validators — dedupe, level enum, and a must-have ⊆ resulting-selected check applied when the relevant lists are present). (data-model.md)
-- [ ] T005 Extend `app/backend/services/position_template.py` with persistence helpers callable by the router (single-transaction): `create` (insert template + association rows after `validate_position_template`), `get_one`, `list_templates(include_archived: bool)`, `update` (apply provided fields; replace selection sets wholesale; re-validate), `archive` (set `archived_at`, never delete). Reuse `validate_position_template(await session.connection(), ...)`. (data-model.md; research §1/§4)
+- [x] T002 Create `app/backend/api/deps.py`: `get_db` (async generator yielding an `AsyncSession` from `db.session.get_sessionmaker()`, commit on success / rollback on exception / always close); `Principal` model + `get_current_user` seam (resolves no identity → raises 401 today; overridable in tests — real SSO is T07); `require_roles(*roles)` (depends on `get_current_user`, raises 403 if role not allowed); `require_crud_enabled` (`await is_enabled("position_template_crud_enabled")` → raise 404 when off). (research §2/§3/§7)
+- [x] T003 [P] Register the §9 flag: add `position_template_crud_enabled` (state `active`, `default: false`, `owner`, `description`) to `configs/feature-flags.yaml`, and add its row to the `docs/engineering/feature-flags.md` index. Pairs with the `is_enabled(...)` call site in T002 so the `feature-flag-registered` hook passes. (research §7)
+- [x] T004 [P] Extend `app/backend/schemas/position_template.py` with `PositionTemplateUpdate` (all fields optional; reuse the stateless validators — dedupe, level enum, and a must-have ⊆ resulting-selected check applied when the relevant lists are present). (data-model.md)
+- [x] T005 Extend `app/backend/services/position_template.py` with persistence helpers callable by the router (single-transaction): `create` (insert template + association rows after `validate_position_template`), `get_one`, `list_templates(include_archived: bool)`, `update` (apply provided fields; replace selection sets wholesale; re-validate), `archive` (set `archived_at`, never delete). Reuse `validate_position_template(await session.connection(), ...)`. (data-model.md; research §1/§4)
 
 **Checkpoint**: deps + flag + schema + service exist; the router can be assembled.
 
@@ -42,8 +42,8 @@ description: "Task list for T13 — Position Template CRUD endpoints"
 
 ### Implementation for User Story 1
 
-- [ ] T006 [US1] Create `app/backend/api/position_templates.py` — `APIRouter(prefix="/position-templates", tags=["position-templates"])` with `POST` (create → 201 `PositionTemplateRead`) and `GET /{id}` (read → 200 / 404). All routes depend on `require_crud_enabled` then `require_roles("recruiter","admin")`; map `PositionTemplateValidationError` → 422. Wire `app.include_router(...)` in `app/backend/main.py`. (data-model.md; research §3/§5)
-- [ ] T007 [US1] Create `app/backend/tests/api/test_position_templates.py` (db profile, TestClient with `get_current_user` + `require_crud_enabled` overridden to an enabled recruiter): assert create valid → 201 + round-trip; create with bad level / unknown stack / competency-not-in-stack / must-have⊄selected → 422 and no row written; GET one → 200; unknown id → 404. (SC-001/002)
+- [x] T006 [US1] Create `app/backend/api/position_templates.py` — `APIRouter(prefix="/position-templates", tags=["position-templates"])` with `POST` (create → 201 `PositionTemplateRead`) and `GET /{id}` (read → 200 / 404). All routes depend on `require_crud_enabled` then `require_roles("recruiter","admin")`; map `PositionTemplateValidationError` → 422. Wire `app.include_router(...)` in `app/backend/main.py`. (data-model.md; research §3/§5)
+- [x] T007 [US1] Create `app/backend/tests/api/test_position_templates.py` (db profile, TestClient with `get_current_user` + `require_crud_enabled` overridden to an enabled recruiter): assert create valid → 201 + round-trip; create with bad level / unknown stack / competency-not-in-stack / must-have⊄selected → 422 and no row written; GET one → 200; unknown id → 404. (SC-001/002)
 
 **Checkpoint**: create + read work and reject invalid input.
 
@@ -57,8 +57,8 @@ description: "Task list for T13 — Position Template CRUD endpoints"
 
 ### Implementation for User Story 2
 
-- [ ] T008 [US2] Add to `app/backend/api/position_templates.py`: `GET /` (list; `include_archived: bool = False` query → `WHERE archived_at IS NULL` unless set), `PATCH /{id}` (partial update via `PositionTemplateUpdate`; replace selection sets wholesale; re-validate; 200 / 422 / 404), `DELETE /{id}` (soft-archive: set `archived_at`, return archived `PositionTemplateRead`; 200 / 404). (data-model.md; research §4)
-- [ ] T009 [US2] Extend `tests/api/test_position_templates.py`: list excludes archived by default + includes with `?include_archived=true`; PATCH updates fields + replaces selections + invalid edit → 422 leaves row unchanged; DELETE → `archived_at` set, row still retrievable (include-archived), absent from default list. (SC-003)
+- [x] T008 [US2] Add to `app/backend/api/position_templates.py`: `GET /` (list; `include_archived: bool = False` query → `WHERE archived_at IS NULL` unless set), `PATCH /{id}` (partial update via `PositionTemplateUpdate`; replace selection sets wholesale; re-validate; 200 / 422 / 404), `DELETE /{id}` (soft-archive: set `archived_at`, return archived `PositionTemplateRead`; 200 / 404). (data-model.md; research §4)
+- [x] T009 [US2] Extend `tests/api/test_position_templates.py`: list excludes archived by default + includes with `?include_archived=true`; PATCH updates fields + replaces selections + invalid edit → 422 leaves row unchanged; DELETE → `archived_at` set, row still retrievable (include-archived), absent from default list. (SC-003)
 
 **Checkpoint**: full lifecycle; no row is ever removed.
 
@@ -72,7 +72,7 @@ description: "Task list for T13 — Position Template CRUD endpoints"
 
 ### Implementation for User Story 3
 
-- [ ] T010 [US3] Extend `tests/api/test_position_templates.py` with authorization + flag cases: with `get_current_user` overridden to a non-privileged role → every verb 403; with no identity (seam default) → 401; with `require_crud_enabled` overridden to "off" → every verb 404 (and 404 wins over auth). (SC-004; §9)
+- [x] T010 [US3] Extend `tests/api/test_position_templates.py` with authorization + flag cases: with `get_current_user` overridden to a non-privileged role → every verb 403; with no identity (seam default) → 401; with `require_crud_enabled` overridden to "off" → every verb 404 (and 404 wins over auth). (SC-004; §9)
 
 **Checkpoint**: the authz gate and the kill-switch are proven.
 
@@ -80,8 +80,8 @@ description: "Task list for T13 — Position Template CRUD endpoints"
 
 ## Phase 6: Polish & Verification
 
-- [ ] T011 Regenerate the contract: `python -m app.backend.generate_openapi` to write `app/backend/openapi.yaml` with the `/position-templates` paths + component schemas; confirm `generate_openapi --check` and `test_openapi_regeneration` are green; commit the regenerated `openapi.yaml` (this is the artefact T14 consumes; §14). (FR-009; SC-005)
-- [ ] T012 Run the quickstart verification matrix: full db-profile suite (159 baseline + new T13 tests) green; `ruff check` + `ruff format --check` + `mypy --strict` clean; `generate_openapi --check` clean. (quickstart.md §A–C)
+- [x] T011 Regenerate the contract: `python -m app.backend.generate_openapi` to write `app/backend/openapi.yaml` with the `/position-templates` paths + component schemas; confirm `generate_openapi --check` and `test_openapi_regeneration` are green; commit the regenerated `openapi.yaml` (this is the artefact T14 consumes; §14). (FR-009; SC-005)
+- [x] T012 Run the quickstart verification matrix: full db-profile suite (159 baseline + new T13 tests) green; `ruff check` + `ruff format --check` + `mypy --strict` clean; `generate_openapi --check` clean. (quickstart.md §A–C)
 
 ---
 
