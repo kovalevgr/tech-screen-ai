@@ -18,6 +18,7 @@ from typing import Final, Literal
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from app.backend.api.position_templates import router as position_templates_router
 from app.backend.logging import configure_logging
 from app.backend.services.feature_flags import FeatureFlagService, set_service
 from app.backend.settings import Settings
@@ -75,6 +76,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="TechScreen Backend", version=_project_version(), lifespan=lifespan)
+app.include_router(position_templates_router)
 
 
 @app.get("/health", response_model=HealthResponse)
