@@ -29,3 +29,13 @@ flags:
     state: sunset
     sunset_pr: "#9"
     sunset_date: "2026-04-28"
+
+  # T13 — gates the Position Template CRUD API (/position-templates). Default
+  # false: the endpoints are dark (require_crud_enabled → 404) until an operator
+  # flips the DB row. is_enabled falls back to this default until then.
+  - name: position_template_crud_enabled
+    owner: "@andrii"
+    default: false
+    default_value: null
+    description: "Gates the /position-templates CRUD API (T13). Off by default (§9 dark-launch); flip the DB row to expose the endpoints."
+    state: active
