@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kovalevgr/tech-screen-ai/blob/main/docs/contracts/rubric-snapshot.schema.json",
+  "title": "TechScreen rubric snapshot contract (T15, constitution §4)",
+  "description": "The frozen, self-contained copy of a rubric version's tree, stored on interview_session.rubric_snapshot. Read by the Assessor (Tier 3). Mirrors app/backend/schemas/rubric_snapshot.py. Source ids are carried as plain values (provenance/correlation), not as live foreign keys.",
+  "type": "object",
+  "$defs": {
+    "uuid": {"type": "string", "format": "uuid"},
+    "level": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "rank", "descriptor"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"},
+        "rank": {"type": "integer"},
+        "descriptor": {"type": "string"}
+      }
+    },
+    "topic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"},
+        "name": {"type": "string"}
+      }
+    },
+    "competency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "topics", "levels"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"},
+        "name": {"type": "string"},
+        "topics": {"type": "array", "items": {"$ref": "#/$defs/topic"}},
+        "levels": {"type": "array", "items": {"$ref": "#/$defs/level"}}
+      }
+    },
+    "competency_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "position", "competencies"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"},
+        "name": {"type": "string"},
+        "position": {"type": "integer"},
+        "competencies": {"type": "array", "items": {"$ref": "#/$defs/competency"}}
+      }
+    },
+    "stack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "competency_blocks"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"},
+        "name": {"type": "string"},
+        "competency_blocks": {"type": "array", "items": {"$ref": "#/$defs/competency_block"}}
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": ["rubric_tree_version_id", "label", "stacks"],
+  "properties": {
+    "rubric_tree_version_id": {"$ref": "#/$defs/uuid"},
+    "label": {"type": "string"},
+    "stacks": {"type": "array", "items": {"$ref": "#/$defs/stack"}}
+  }
+}
