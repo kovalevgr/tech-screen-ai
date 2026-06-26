@@ -50,9 +50,7 @@ consistent on every commit.
 
 | name | owner | default | description |
 | ---- | ----- | ------- | ----------- |
-
-*(none yet — T05a ships the mechanism; the first real flag will land with
-its consuming Tier-3+ feature.)*
+| position_template_crud_enabled | @andrii | false | Gates the `/position-templates` CRUD API (T13). Off by default (§9 dark-launch); flip the DB row to expose the endpoints. |
 
 ## Sunset flags
 

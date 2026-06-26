@@ -60,6 +60,43 @@ class PositionTemplateCreate(BaseModel):
         return self
 
 
+class PositionTemplateUpdate(BaseModel):
+    """Partial-update body for a Position Template (the T13 PATCH shape).
+
+    All fields optional; only fields present in the request are applied (the
+    service inspects ``model_fields_set``). Provided selection lists replace the
+    set wholesale. The must-have ⊆ selected rule is checked here when both lists
+    are present; the must-have-without-competency_ids case is rejected at the
+    service layer (it needs the existing selected set to validate against).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    level: PositionLevel | None = None
+    jd_text: str | None = None
+    stack_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
+    competency_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
+    must_have_competency_ids: list[uuid.UUID] | None = None
+
+    @model_validator(mode="after")
+    def _check_consistency(self) -> Self:
+        if self.stack_ids is not None:
+            _reject_duplicates(self.stack_ids, "stack_ids")
+        if self.competency_ids is not None:
+            _reject_duplicates(self.competency_ids, "competency_ids")
+        if self.must_have_competency_ids is not None:
+            _reject_duplicates(self.must_have_competency_ids, "must_have_competency_ids")
+        if self.competency_ids is not None and self.must_have_competency_ids is not None:
+            extra = set(self.must_have_competency_ids) - set(self.competency_ids)
+            if extra:
+                raise ValueError(
+                    "must_have_competency_ids must be a subset of competency_ids; "
+                    f"not selected: {sorted(str(c) for c in extra)}"
+                )
+        return self
+
+
 class CompetencySelection(BaseModel):
     """One selected competency and whether it is mandatory."""
 

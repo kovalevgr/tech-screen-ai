@@ -1,5 +1,30 @@
 components:
   schemas:
+    CompetencySelection:
+      additionalProperties: false
+      description: One selected competency and whether it is mandatory.
+      properties:
+        competency_id:
+          format: uuid
+          title: Competency Id
+          type: string
+        must_have:
+          title: Must Have
+          type: boolean
+      required:
+      - competency_id
+      - must_have
+      title: CompetencySelection
+      type: object
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          title: Detail
+          type: array
+      title: HTTPValidationError
+      type: object
     HealthResponse:
       description: Response body for ``GET /health`` — stable across revisions.
       properties:
@@ -19,6 +44,196 @@ components:
       - service
       - version
       title: HealthResponse
+      type: object
+    PositionLevel:
+      description: Target seniority of a role — distinct from rubric per-competency
+        levels.
+      enum:
+      - Junior
+      - Middle
+      - Senior
+      - Tech Leader
+      title: PositionLevel
+      type: string
+    PositionTemplateCreate:
+      additionalProperties: false
+      description: Request body for creating a Position Template (the T13 POST shape).
+      properties:
+        competency_ids:
+          items:
+            format: uuid
+            type: string
+          minItems: 1
+          title: Competency Ids
+          type: array
+        jd_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Jd Text
+        level:
+          $ref: '#/components/schemas/PositionLevel'
+        must_have_competency_ids:
+          items:
+            format: uuid
+            type: string
+          title: Must Have Competency Ids
+          type: array
+        stack_ids:
+          items:
+            format: uuid
+            type: string
+          minItems: 1
+          title: Stack Ids
+          type: array
+        title:
+          maxLength: 200
+          minLength: 1
+          title: Title
+          type: string
+      required:
+      - title
+      - level
+      - stack_ids
+      - competency_ids
+      title: PositionTemplateCreate
+      type: object
+    PositionTemplateRead:
+      additionalProperties: false
+      description: Response body for reading a Position Template (the T13 GET shape).
+      properties:
+        archived_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          title: Archived At
+        competencies:
+          items:
+            $ref: '#/components/schemas/CompetencySelection'
+          title: Competencies
+          type: array
+        created_at:
+          format: date-time
+          title: Created At
+          type: string
+        created_by:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+          title: Created By
+        id:
+          format: uuid
+          title: Id
+          type: string
+        jd_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Jd Text
+        level:
+          $ref: '#/components/schemas/PositionLevel'
+        stack_ids:
+          items:
+            format: uuid
+            type: string
+          title: Stack Ids
+          type: array
+        title:
+          title: Title
+          type: string
+      required:
+      - id
+      - title
+      - level
+      - jd_text
+      - archived_at
+      - created_at
+      - created_by
+      - stack_ids
+      - competencies
+      title: PositionTemplateRead
+      type: object
+    PositionTemplateUpdate:
+      additionalProperties: false
+      description: 'Partial-update body for a Position Template (the T13 PATCH shape).
+
+
+        All fields optional; only fields present in the request are applied (the
+
+        service inspects ``model_fields_set``). Provided selection lists replace the
+
+        set wholesale. The must-have ⊆ selected rule is checked here when both lists
+
+        are present; the must-have-without-competency_ids case is rejected at the
+
+        service layer (it needs the existing selected set to validate against).'
+      properties:
+        competency_ids:
+          anyOf:
+          - items:
+              format: uuid
+              type: string
+            minItems: 1
+            type: array
+          - type: 'null'
+          title: Competency Ids
+        jd_text:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Jd Text
+        level:
+          anyOf:
+          - $ref: '#/components/schemas/PositionLevel'
+          - type: 'null'
+        must_have_competency_ids:
+          anyOf:
+          - items:
+              format: uuid
+              type: string
+            type: array
+          - type: 'null'
+          title: Must Have Competency Ids
+        stack_ids:
+          anyOf:
+          - items:
+              format: uuid
+              type: string
+            minItems: 1
+            type: array
+          - type: 'null'
+          title: Stack Ids
+        title:
+          anyOf:
+          - maxLength: 200
+            minLength: 1
+            type: string
+          - type: 'null'
+          title: Title
+      title: PositionTemplateUpdate
+      type: object
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          title: Location
+          type: array
+        msg:
+          title: Message
+          type: string
+        type:
+          title: Error Type
+          type: string
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
       type: object
 info:
   title: TechScreen Backend
@@ -46,3 +261,142 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
           description: Successful Response
       summary: Health
+  /position-templates:
+    get:
+      operationId: list_position_templates_position_templates_get
+      parameters:
+      - in: query
+        name: include_archived
+        required: false
+        schema:
+          default: false
+          title: Include Archived
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/PositionTemplateRead'
+                title: Response List Position Templates Position Templates Get
+                type: array
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: List Position Templates
+      tags:
+      - position-templates
+    post:
+      operationId: create_position_template_position_templates_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PositionTemplateCreate'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionTemplateRead'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Create Position Template
+      tags:
+      - position-templates
+  /position-templates/{template_id}:
+    delete:
+      operationId: archive_position_template_position_templates__template_id__delete
+      parameters:
+      - in: path
+        name: template_id
+        required: true
+        schema:
+          format: uuid
+          title: Template Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionTemplateRead'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Archive Position Template
+      tags:
+      - position-templates
+    get:
+      operationId: get_position_template_position_templates__template_id__get
+      parameters:
+      - in: path
+        name: template_id
+        required: true
+        schema:
+          format: uuid
+          title: Template Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionTemplateRead'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Get Position Template
+      tags:
+      - position-templates
+    patch:
+      operationId: update_position_template_position_templates__template_id__patch
+      parameters:
+      - in: path
+        name: template_id
+        required: true
+        schema:
+          format: uuid
+          title: Template Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PositionTemplateUpdate'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionTemplateRead'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Update Position Template
+      tags:
+      - position-templates
