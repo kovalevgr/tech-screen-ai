@@ -25,9 +25,9 @@ No setup needed — `schemas/` and `services/` packages already exist (T12/T13);
 
 **Purpose**: The column + migration + frozen-shape models underpin the snapshot function and every test.
 
-- [ ] T001 Edit `app/backend/db/models/interview.py`: add `rubric_snapshot: Mapped[dict[str, Any]]` to `InterviewSession` (`JSONB`, `nullable=False`, `server_default=text("'{}'::jsonb")`). Create `alembic/versions/0005_rubric_snapshot.py` (`down_revision = "0004_position_template"`): raw `op.execute("ALTER TABLE interview_session ADD COLUMN rubric_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb")`; symmetric dev-only `downgrade()` (`DROP COLUMN IF EXISTS`); docstring noting additive upgrade + the T10 `needs-adr` false-positive (as `0004`). (data-model.md; FR-003/007)
-- [ ] T002 Create `app/backend/tests/db/test_rubric_snapshot_migration.py` (db profile): assert the `rubric_snapshot` column exists, is NOT NULL, and defaults to `{}`; assert a placeholder insert `INSERT INTO interview_session (position_template_id) VALUES (...)` still succeeds (the transitional default covers it). (FR-007; SC-004)
-- [ ] T003 [P] Create `app/backend/schemas/rubric_snapshot.py`: the `RubricSnapshot` family (`RubricSnapshot`, `SnapshotStack`, `SnapshotCompetencyBlock`, `SnapshotCompetency`, `SnapshotTopic`, `SnapshotLevel`), Pydantic v2, `extra="forbid"`, mirroring the data-model shape (ids carried as plain values). (data-model.md; FR-002)
+- [x] T001 Edit `app/backend/db/models/interview.py`: add `rubric_snapshot: Mapped[dict[str, Any]]` to `InterviewSession` (`JSONB`, `nullable=False`, `server_default=text("'{}'::jsonb")`). Create `alembic/versions/0005_rubric_snapshot.py` (`down_revision = "0004_position_template"`): raw `op.execute("ALTER TABLE interview_session ADD COLUMN rubric_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb")`; symmetric dev-only `downgrade()` (`DROP COLUMN IF EXISTS`); docstring noting additive upgrade + the T10 `needs-adr` false-positive (as `0004`). (data-model.md; FR-003/007)
+- [x] T002 Create `app/backend/tests/db/test_rubric_snapshot_migration.py` (db profile): assert the `rubric_snapshot` column exists, is NOT NULL, and defaults to `{}`; assert a placeholder insert `INSERT INTO interview_session (position_template_id) VALUES (...)` still succeeds (the transitional default covers it). (FR-007; SC-004)
+- [x] T003 [P] Create `app/backend/schemas/rubric_snapshot.py`: the `RubricSnapshot` family (`RubricSnapshot`, `SnapshotStack`, `SnapshotCompetencyBlock`, `SnapshotCompetency`, `SnapshotTopic`, `SnapshotLevel`), Pydantic v2, `extra="forbid"`, mirroring the data-model shape (ids carried as plain values). (data-model.md; FR-002)
 
 **Checkpoint**: the column exists and the frozen shape is defined.
 
@@ -41,8 +41,8 @@ No setup needed — `schemas/` and `services/` packages already exist (T12/T13);
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] Create `app/backend/services/rubric_snapshot.py`: `RubricSnapshotError`; `snapshot_rubric(conn, rubric_tree_version_id) -> RubricSnapshot` (deterministic `SELECT`s per level over `AsyncConnection`; raise on a non-existent version — FR-005); `freeze_session_rubric(conn, interview_session_id, rubric_tree_version_id) -> RubricSnapshot` (UPDATE the session's `rubric_snapshot` with `model_dump(mode="json")`). (data-model.md; research §3/§4; FR-001/002/005)
-- [ ] T005 [US1] Create `app/backend/tests/services/test_rubric_snapshot.py` (db profile): seed a full rubric version, assert `snapshot_rubric` reproduces the whole tree (names/ranks/descriptors/positions, child counts); assert the snapshot is self-contained (all values present); assert an unknown version id raises `RubricSnapshotError`. (SC-001/003; FR-005)
+- [x] T004 [US1] Create `app/backend/services/rubric_snapshot.py`: `RubricSnapshotError`; `snapshot_rubric(conn, rubric_tree_version_id) -> RubricSnapshot` (deterministic `SELECT`s per level over `AsyncConnection`; raise on a non-existent version — FR-005); `freeze_session_rubric(conn, interview_session_id, rubric_tree_version_id) -> RubricSnapshot` (UPDATE the session's `rubric_snapshot` with `model_dump(mode="json")`). (data-model.md; research §3/§4; FR-001/002/005)
+- [x] T005 [US1] Create `app/backend/tests/services/test_rubric_snapshot.py` (db profile): seed a full rubric version, assert `snapshot_rubric` reproduces the whole tree (names/ranks/descriptors/positions, child counts); assert the snapshot is self-contained (all values present); assert an unknown version id raises `RubricSnapshotError`. (SC-001/003; FR-005)
 
 **Checkpoint**: a faithful, self-contained snapshot is produced and unknown versions are rejected.
 
@@ -56,7 +56,7 @@ No setup needed — `schemas/` and `services/` packages already exist (T12/T13);
 
 ### Implementation for User Story 2
 
-- [ ] T006 [US2] Extend `app/backend/tests/services/test_rubric_snapshot.py`: seed version V + a session; `freeze_session_rubric`; capture the stored JSON; then rename a stack, insert a new competency, and create a newer `rubric_tree_version`; re-read `interview_session.rubric_snapshot` and assert it equals the captured JSON exactly. (FR-004; SC-002 — the §4 invariant)
+- [x] T006 [US2] Extend `app/backend/tests/services/test_rubric_snapshot.py`: seed version V + a session; `freeze_session_rubric`; capture the stored JSON; then rename a stack, insert a new competency, and create a newer `rubric_tree_version`; re-read `interview_session.rubric_snapshot` and assert it equals the captured JSON exactly. (FR-004; SC-002 — the §4 invariant)
 
 **Checkpoint**: the immutability guarantee is regression-proof.
 
@@ -64,13 +64,13 @@ No setup needed — `schemas/` and `services/` packages already exist (T12/T13);
 
 ## Phase 5: Contract (cross-cutting, §14)
 
-- [ ] T007 Commit the canonical contract `docs/contracts/rubric-snapshot.schema.json` (copy of the design under `specs/015-.../contracts/`; `$id` already points at the `docs/contracts/` path). Create `app/backend/tests/contracts/test_rubric_snapshot_contract.py`: assert it is a valid Draft 2020-12 schema, validates a good snapshot, and rejects a malformed one (e.g. missing `rubric_tree_version_id`). Optionally assert a real `snapshot_rubric` output validates against it. (FR-006; SC-005)
+- [x] T007 Commit the canonical contract `docs/contracts/rubric-snapshot.schema.json` (copy of the design under `specs/015-.../contracts/`; `$id` already points at the `docs/contracts/` path). Create `app/backend/tests/contracts/test_rubric_snapshot_contract.py`: assert it is a valid Draft 2020-12 schema, validates a good snapshot, and rejects a malformed one (e.g. missing `rubric_tree_version_id`). Optionally assert a real `snapshot_rubric` output validates against it. (FR-006; SC-005)
 
 ---
 
 ## Phase 6: Polish & Verification
 
-- [ ] T008 Run the quickstart verification matrix: `alembic upgrade head` → `0005`; all T15 test files pass (incl. the §4 mutation test); the full db-profile suite (171 baseline + new) green; `ruff check` + `ruff format --check` + `mypy --strict` clean; `generate_openapi --check` clean (no-op — no routes); destructive-DDL grep over the `0004→0005` upgrade render is additive-only. (quickstart.md §A–C)
+- [x] T008 Run the quickstart verification matrix: `alembic upgrade head` → `0005`; all T15 test files pass (incl. the §4 mutation test); the full db-profile suite (171 baseline + new) green; `ruff check` + `ruff format --check` + `mypy --strict` clean; `generate_openapi --check` clean (no-op — no routes); destructive-DDL grep over the `0004→0005` upgrade render is additive-only. (quickstart.md §A–C)
 
 ---
 
