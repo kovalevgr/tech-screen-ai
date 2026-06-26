@@ -23,9 +23,18 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import TIMESTAMP, Boolean, CheckConstraint, ForeignKey, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import (
+    TIMESTAMP,
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Text,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.backend.db.base import Base
@@ -91,7 +100,14 @@ class PositionTemplateCompetency(UUIDPk, TimestampCreated, Base):
 
 
 class InterviewSession(UUIDPk, TimestampCreated, Base):
-    """A single interview run (placeholder; extended by T15 / Tier 5)."""
+    """A single interview run (placeholder; extended by Tier 5).
+
+    T15 adds ``rubric_snapshot`` — the frozen, self-contained copy of the rubric
+    tree the session is assessed against (constitution §4). It is NOT NULL with a
+    transitional ``'{}'`` default so the placeholder/seed inserts (which predate
+    real session creation, T28) keep working; every real session overwrites the
+    default via ``services.rubric_snapshot.freeze_session_rubric``.
+    """
 
     __tablename__ = "interview_session"
 
@@ -99,6 +115,11 @@ class InterviewSession(UUIDPk, TimestampCreated, Base):
         UUID(as_uuid=True),
         ForeignKey("position_template.id"),
         nullable=True,
+    )
+    rubric_snapshot: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
     )
 
 
