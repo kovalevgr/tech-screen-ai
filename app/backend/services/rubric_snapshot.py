@@ -149,3 +149,20 @@ async def freeze_session_rubric(
         {"snap": json.dumps(snapshot.model_dump(mode="json")), "sid": interview_session_id},
     )
     return snapshot
+
+
+async def get_active_rubric_snapshot(conn: AsyncConnection) -> RubricSnapshot | None:
+    """Snapshot the active rubric version, or ``None`` if no version is active.
+
+    Read-only view of the current rubric (the ``rubric_tree_version.is_active``
+    row). Powers the rubric read endpoint (T14's form data source). The app
+    maintains at most one active version; ``LIMIT 1`` is defensive.
+    """
+    active = (
+        await conn.execute(
+            text("SELECT id FROM rubric_tree_version WHERE is_active = true LIMIT 1")
+        )
+    ).first()
+    if active is None:
+        return None
+    return await snapshot_rubric(conn, active[0])

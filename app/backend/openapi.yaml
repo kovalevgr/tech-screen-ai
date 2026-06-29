@@ -214,6 +214,135 @@ components:
           title: Title
       title: PositionTemplateUpdate
       type: object
+    RubricSnapshot:
+      additionalProperties: false
+      description: The whole frozen tree for one rubric version.
+      properties:
+        label:
+          title: Label
+          type: string
+        rubric_tree_version_id:
+          format: uuid
+          title: Rubric Tree Version Id
+          type: string
+        stacks:
+          items:
+            $ref: '#/components/schemas/SnapshotStack'
+          title: Stacks
+          type: array
+      required:
+      - rubric_tree_version_id
+      - label
+      - stacks
+      title: RubricSnapshot
+      type: object
+    SnapshotCompetency:
+      additionalProperties: false
+      properties:
+        id:
+          format: uuid
+          title: Id
+          type: string
+        levels:
+          items:
+            $ref: '#/components/schemas/SnapshotLevel'
+          title: Levels
+          type: array
+        name:
+          title: Name
+          type: string
+        topics:
+          items:
+            $ref: '#/components/schemas/SnapshotTopic'
+          title: Topics
+          type: array
+      required:
+      - id
+      - name
+      - topics
+      - levels
+      title: SnapshotCompetency
+      type: object
+    SnapshotCompetencyBlock:
+      additionalProperties: false
+      properties:
+        competencies:
+          items:
+            $ref: '#/components/schemas/SnapshotCompetency'
+          title: Competencies
+          type: array
+        id:
+          format: uuid
+          title: Id
+          type: string
+        name:
+          title: Name
+          type: string
+        position:
+          title: Position
+          type: integer
+      required:
+      - id
+      - name
+      - position
+      - competencies
+      title: SnapshotCompetencyBlock
+      type: object
+    SnapshotLevel:
+      additionalProperties: false
+      properties:
+        descriptor:
+          title: Descriptor
+          type: string
+        id:
+          format: uuid
+          title: Id
+          type: string
+        rank:
+          title: Rank
+          type: integer
+      required:
+      - id
+      - rank
+      - descriptor
+      title: SnapshotLevel
+      type: object
+    SnapshotStack:
+      additionalProperties: false
+      properties:
+        competency_blocks:
+          items:
+            $ref: '#/components/schemas/SnapshotCompetencyBlock'
+          title: Competency Blocks
+          type: array
+        id:
+          format: uuid
+          title: Id
+          type: string
+        name:
+          title: Name
+          type: string
+      required:
+      - id
+      - name
+      - competency_blocks
+      title: SnapshotStack
+      type: object
+    SnapshotTopic:
+      additionalProperties: false
+      properties:
+        id:
+          format: uuid
+          title: Id
+          type: string
+        name:
+          title: Name
+          type: string
+      required:
+      - id
+      - name
+      title: SnapshotTopic
+      type: object
     ValidationError:
       properties:
         loc:
@@ -400,3 +529,16 @@ paths:
       summary: Update Position Template
       tags:
       - position-templates
+  /rubric/active:
+    get:
+      operationId: read_active_rubric_rubric_active_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RubricSnapshot'
+          description: Successful Response
+      summary: Read Active Rubric
+      tags:
+      - rubric
