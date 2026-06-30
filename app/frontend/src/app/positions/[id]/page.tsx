@@ -20,6 +20,7 @@ import {
   type PositionFormInitialValues,
 } from "@/components/positions/position-form";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { positionsUk as t } from "@/messages/positions.uk";
 
 function toInitialValues(
@@ -92,11 +93,7 @@ export default function EditPositionPage() {
               aria-label={t.form.loadingLabel}
             >
               {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-10 w-full animate-pulse rounded-md bg-surface-muted"
-                  aria-hidden="true"
-                />
+                <Skeleton key={i} className="h-10 w-full" aria-hidden="true" />
               ))}
             </div>
           </CardContent>

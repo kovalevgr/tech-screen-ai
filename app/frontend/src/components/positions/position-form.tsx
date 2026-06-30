@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { positionsUk as t } from "@/messages/positions.uk";
 
@@ -87,11 +88,7 @@ function FormSkeleton() {
       aria-label={t.form.loadingLabel}
     >
       {[0, 1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className="h-10 w-full animate-pulse rounded-md bg-surface-muted"
-          aria-hidden="true"
-        />
+        <Skeleton key={i} className="h-10 w-full" aria-hidden="true" />
       ))}
     </div>
   );

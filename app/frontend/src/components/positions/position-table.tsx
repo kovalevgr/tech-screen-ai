@@ -36,11 +36,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
 import { positionsUk as t } from "@/messages/positions.uk";
 
 const COLUMN_HEADER_CLASS =
-  "text-small font-medium uppercase tracking-[0.04em] text-content-muted";
+  "text-small font-medium uppercase tracking-wide text-content-muted";
 
 function StatusPill({ archived }: { archived: boolean }) {
   return (
@@ -77,8 +78,8 @@ function LoadingRows() {
         <TableRow key={i}>
           {[0, 1, 2, 3, 4, 5].map((c) => (
             <TableCell key={c}>
-              <div
-                className="h-4 w-full max-w-32 animate-pulse rounded-sm bg-surface-muted"
+              <Skeleton
+                className="h-4 w-full max-w-32 rounded-sm"
                 aria-hidden="true"
               />
             </TableCell>
@@ -122,7 +123,7 @@ function EmptyState() {
         <h2 className="text-title font-semibold text-content-primary">
           {t.empty.heading}
         </h2>
-        <p className="max-w-[64ch] text-body text-content-secondary">
+        <p className="max-w-prose text-body text-content-secondary">
           {t.empty.prose}
         </p>
         <Button asChild className="mt-2">
