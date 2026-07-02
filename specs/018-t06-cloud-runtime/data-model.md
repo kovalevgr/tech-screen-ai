@@ -23,7 +23,7 @@ Outputs: `backend_service_url`, `frontend_service_url`, `sql_connection_name`, `
 | --- | --- | --- | --- |
 | Cloud SQL instance | `techscreen-pg` | `techscreen-pg-dev` | PG17, `db-f1-micro`, 10 GB SSD, daily backups (7d), PITR on, deletion protection on, flag `cloudsql.iam_authentication=on`, public IP / no authorised networks |
 | SQL databases | `techscreen`, `techscreen_shadow` | same | per instance |
-| SQL users (built-in) | `techscreen_app`, `techscreen_migrator` | same | created **without password** (R6); operator sets out-of-band |
+| SQL users (built-in) | `techscreen_app`, `techscreen_migrator` | same | **operator-created out-of-band with passwords** (R6 amendment: API refuses passwordless create; not Terraform resources) |
 | SQL user (IAM SA) | `techscreen-flag-sync@tech-screen-493720.iam` | same | type `CLOUD_IAM_SERVICE_ACCOUNT` |
 | Cloud Run v2 backend | `techscreen-backend` | `techscreen-backend-dev` | min 0 / max 5, 1 vCPU / 1 GiB, placeholder hello image + `ignore_changes[image]`, public invoker |
 | Cloud Run v2 frontend | `techscreen-frontend` | `techscreen-frontend-dev` | same sizing/posture |

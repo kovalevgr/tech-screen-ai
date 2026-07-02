@@ -32,10 +32,12 @@
 - **Table grants**: IAM DB users start with no table privileges. Ship `scripts/cloud-db-grants.sql` (GRANT `SELECT, INSERT, UPDATE` ON `feature_flag` + future-proof comment) — applied by the operator right after the initial migrations (quickstart step; FR-009's runbook).
 - **Alternatives considered**: password-auth DB user for CI (rejected — a long-lived password secret in GitHub contradicts the WIF-only spirit of §6); running sync as `techscreen_migrator` (rejected — least privilege).
 
-## R6. Database principals + credential mechanism
+## R6. Database principals + credential mechanism **[amended after first apply]**
 
-- **Decision**: per environment, Terraform creates `techscreen_app` and `techscreen_migrator` as `google_sql_user` **without** `password` (login impossible until set). The operator sets passwords out-of-band (`gcloud sql users set-password`) and fills that environment's `DATABASE_URL`/`DATABASE_URL_DEV` secret manually. Nothing credential-shaped enters Git, PR text, or Terraform state.
-- **Alternatives considered**: `random_password` + `google_sql_user.password` (rejected — plaintext-recoverable in the GCS state object; §5's "cheapest prevention is absence"); Secret Manager-generated + data source (same state-exposure problem).
+- **Original decision**: Terraform creates `techscreen_app`/`techscreen_migrator` without `password`. **Disproved live 2026-07-02**: the Cloud SQL API rejects passwordless Postgres user creation (`Error 400: Missing user password for PostgreSQL instance`).
+- **Amended decision**: the two built-in roles are **not Terraform resources at all**. The operator creates them out-of-band per environment (`gcloud sql users create … --password=…` fed from a `read -s` prompt — quickstart §4) and fills that environment's `DATABASE_URL(_DEV)` secret manually. Nothing credential-shaped enters Git, PR text, or Terraform state; the trade-off is two more documented manual steps (FR-012 names them).
+- **Alternatives considered**: `random_password` + `google_sql_user.password` (rejected — plaintext-recoverable in the GCS state object; §5's "cheapest prevention is absence"); placeholder password + `ignore_changes` (rejected — a known credential is briefly live and lands in Git).
+- The `flag_sync` IAM user stays in Terraform (no password involved). Its first-apply failure (`role "cloudsqliamserviceaccount" does not exist`) was a propagation race right after instance creation — the `cloudsql.iam_authentication=on` flag was verified active post-apply; the retry apply succeeds.
 
 ## R7. Placeholder image + image-ownership handoff
 

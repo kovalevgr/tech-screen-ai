@@ -40,14 +40,20 @@ terraform -chdir=infra/terraform plan    # SC-001: zero pending changes
 
 Expected new resources: ~45 (5 API services, registry, flag-sync SA + WIF binding, 2 × [SQL instance + 2 DBs + 3 users + 2 Cloud Run + 2 SAs + 5 secrets + IAM bindings]).
 
-## 4. Set DB passwords (out-of-band; nothing in Git/state)
+## 4. Create DB users with passwords (out-of-band; nothing in Git/state)
+
+The Cloud SQL API refuses passwordless Postgres users, so `techscreen_app` and `techscreen_migrator` are **not** Terraform resources (research R6 amendment) — create them here, once per instance:
 
 ```bash
+read -rs APP_PW && read -rs MIG_PW   # type each password, no echo
 for inst in techscreen-pg techscreen-pg-dev; do
-  gcloud sql users set-password techscreen_app       --instance=$inst --prompt-for-password
-  gcloud sql users set-password techscreen_migrator  --instance=$inst --prompt-for-password
+  gcloud sql users create techscreen_app      --instance=$inst --password="$APP_PW"
+  gcloud sql users create techscreen_migrator --instance=$inst --password="$MIG_PW"
 done
+unset APP_PW MIG_PW
 ```
+
+*(Use distinct passwords per environment if preferred — then run per-instance with fresh `read -s`.)*
 
 ## 5. Fill secret values (per environment)
 

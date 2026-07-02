@@ -39,8 +39,8 @@
 
 ## Phase 6: Operator execution + acceptance (US1+US2+US3+US4 — live GCP, this checkout)
 
-- [ ] T016 [US1] Execute quickstart §§ 1–3: `terraform init`/`state list`, the three `state mv` commands, `plan` (paste summary into PR body), `apply`, repeat `plan` → record SC-001 zero-diff
-- [ ] T017 [US1] Acceptance SC-002: `gcloud run services describe` × 4 + `curl` 200 × 4; record in PR body table
+- [X] T016 [US1] Execute quickstart §§ 1–3: `terraform init`/`state list`, the three `state mv` commands, `plan` (paste summary into PR body), `apply`, repeat `plan` → record SC-001 zero-diff
+- [X] T017 [US1] Acceptance SC-002: `gcloud run services describe` × 4 + `curl` 200 × 4; record in PR body table
 - [ ] T018 [US2] Execute quickstart §§ 4–5 (set `techscreen_app`/`techscreen_migrator` passwords on both instances; fill secret versions per environment) then acceptance SC-003 (`gcloud secrets list` = 10 shells; per-secret IAM = matching env backend SA only) and SC-006 (`gcloud iam service-accounts keys list` per SA = system-managed only; gitleaks clean)
 - [ ] T019 [US4] Execute quickstart § 6 (Auth Proxy + `alembic upgrade head` on `techscreen-pg` and `techscreen-pg-dev`) and § 7 (`scripts/cloud-db-grants.sql` on both), then acceptance SC-004 on both instances (pgvector row present; §3 trigger blocks `UPDATE turn_trace` as `techscreen_app`; `alembic current` = `0005`)
 - [ ] T020 [US3] Trigger `sync-feature-flags.yml` via `workflow_dispatch` after merge-to-main (or branch-dispatch if configured); confirm Guard `skip=false`, both matrix legs green, `feature_flag` rows in both DBs with `updated_by='configs-as-code'` → SC-005; verify orphan-warning path still intact (T05a FR-009)

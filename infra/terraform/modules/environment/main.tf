@@ -72,18 +72,11 @@ resource "google_sql_database" "techscreen_shadow" {
   instance = google_sql_database_instance.pg.name
 }
 
-# Built-in roles are created WITHOUT passwords (research R6): login is
-# impossible until the operator runs `gcloud sql users set-password`
-# out-of-band. No credential ever enters Git, PR text, or Terraform state.
-resource "google_sql_user" "app" {
-  name     = "techscreen_app"
-  instance = google_sql_database_instance.pg.name
-}
-
-resource "google_sql_user" "migrator" {
-  name     = "techscreen_migrator"
-  instance = google_sql_database_instance.pg.name
-}
+# Built-in roles (techscreen_app, techscreen_migrator) are deliberately NOT
+# Terraform resources: the Cloud SQL API refuses to create a Postgres user
+# without a password (verified on first apply, 2026-07-02), and a password in
+# HCL or state would violate §5 (research R6 amendment). The operator creates
+# both users out-of-band — see specs/018-t06-cloud-runtime/quickstart.md §4.
 
 # CI flag-sync identity as an IAM-authenticated DB user (research R5). The
 # Postgres username is the SA email minus ".gserviceaccount.com". Table-level
@@ -245,6 +238,10 @@ resource "google_cloud_run_v2_service" "backend" {
       template[0].containers[0].image,
       client,
       client_version,
+      # API populates an empty service-level scaling block we do not manage
+      # (instance counts live in template.scaling) — ignoring kills the
+      # perpetual in-place diff that would break the SC-001 clean plan.
+      scaling,
     ]
   }
 }
@@ -283,6 +280,10 @@ resource "google_cloud_run_v2_service" "frontend" {
       template[0].containers[0].image,
       client,
       client_version,
+      # API populates an empty service-level scaling block we do not manage
+      # (instance counts live in template.scaling) — ignoring kills the
+      # perpetual in-place diff that would break the SC-001 clean plan.
+      scaling,
     ]
   }
 }
