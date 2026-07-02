@@ -25,17 +25,17 @@
 
 ## Phase 3: US3 wiring — flag-sync workflow + grants (files only; execution in Phase 6)
 
-- [ ] T011 [US3] Rewrite `.github/workflows/sync-feature-flags.yml`: fill `WIF_PROVIDER`/`WIF_SERVICE_ACCOUNT`/`GCP_PROJECT` with the data-model contract values, convert the job to `strategy: matrix: env: [dev, prod]` + `fail-fast: false` with per-env `CLOUD_SQL_INSTANCE` includes, set `DATABASE_USER: techscreen-flag-sync@tech-screen-493720.iam` (correcting the stale `techscreen_migrator` example), update the T05a-inert header comment to a "live since T06" note, keep Guard step semantics; verify with `actionlint` via pre-commit
-- [ ] T012 [US3] Create `scripts/cloud-db-grants.sql` per data-model.md (GRANT `SELECT, INSERT, UPDATE` ON `feature_flag` TO the IAM user; header comment: per-env application, §3 tables untouched)
+- [X] T011 [US3] Rewrite `.github/workflows/sync-feature-flags.yml`: fill `WIF_PROVIDER`/`WIF_SERVICE_ACCOUNT`/`GCP_PROJECT` with the data-model contract values, convert the job to `strategy: matrix: env: [dev, prod]` + `fail-fast: false` with per-env `CLOUD_SQL_INSTANCE` includes, set `DATABASE_USER: techscreen-flag-sync@tech-screen-493720.iam` (correcting the stale `techscreen_migrator` example), update the T05a-inert header comment to a "live since T06" note, keep Guard step semantics; verify with `actionlint` via pre-commit
+- [X] T012 [US3] Create `scripts/cloud-db-grants.sql` per data-model.md (GRANT `SELECT, INSERT, UPDATE` ON `feature_flag` TO the IAM user; header comment: per-env application, §3 tables untouched)
 
 ## Phase 4: Docs (US1–US4 supporting)
 
-- [ ] T013 Rewrite `docs/engineering/cloud-setup.md` for post-T06 reality: dev+prod topology citing ADR-023, updated resource inventory (two instances, four services, ten secrets, registry), actual flat-root + `modules/environment` Terraform layout replacing the aspirational `envs/prod/` tree, updated IAM model (per-env SAs + flag-sync SA), updated cost table (~$22–25/mo), secret-fill + password + migration runbooks aligned with quickstart.md, document-versioning bump
-- [ ] T014 Add correcting notes to `docs/engineering/implementation-plan.md` T06 description (Appendix C compliant — no renumbering): "Two workspaces" → "two environments via module × 2 in a single state (see specs/018 R2)"; `cloudsql.enable_pgvector` flag text → stale, extension created by migration 0001 (R1); acceptance bullet list appended with ADR-023 governance artefacts
+- [X] T013 Rewrite `docs/engineering/cloud-setup.md` for post-T06 reality: dev+prod topology citing ADR-023, updated resource inventory (two instances, four services, ten secrets, registry), actual flat-root + `modules/environment` Terraform layout replacing the aspirational `envs/prod/` tree, updated IAM model (per-env SAs + flag-sync SA), updated cost table (~$22–25/mo), secret-fill + password + migration runbooks aligned with quickstart.md, document-versioning bump
+- [X] T014 Add correcting notes to `docs/engineering/implementation-plan.md` T06 description (Appendix C compliant — no renumbering): "Two workspaces" → "two environments via module × 2 in a single state (see specs/018 R2)"; `cloudsql.enable_pgvector` flag text → stale, extension created by migration 0001 (R1); acceptance bullet list appended with ADR-023 governance artefacts
 
 ## Phase 5: Pre-merge verification (branch-local)
 
-- [ ] T015 Run `pre-commit run --all-files` (terraform_validate, actionlint, gitleaks, shellcheck, prettier) and `terraform -chdir=infra/terraform fmt -check` + `validate`; fix fallout; confirm zero credential-shaped strings and zero `google_sql_user.password` attributes in the diff (`git diff main --stat` review per quickstart § 9)
+- [X] T015 Run `pre-commit run --all-files` (terraform_validate, actionlint, gitleaks, shellcheck, prettier) and `terraform -chdir=infra/terraform fmt -check` + `validate`; fix fallout; confirm zero credential-shaped strings and zero `google_sql_user.password` attributes in the diff (`git diff main --stat` review per quickstart § 9)
 
 ## Phase 6: Operator execution + acceptance (US1+US2+US3+US4 — live GCP, this checkout)
 
