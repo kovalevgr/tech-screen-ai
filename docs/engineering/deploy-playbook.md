@@ -2,7 +2,7 @@
 
 How TechScreen ships code to production. The only long-lived environment is `prod`; there is no staging. Safety comes from Docker parity, traffic splitting, and explicit human approval at the migration checkpoint.
 
-Related: [ADR-009](../../adr/009-prod-only-topology.md), [ADR-010](../../adr/010-docker-first-parity.md), [ADR-012](../../adr/012-cloud-run-traffic-splitting.md), [constitution §8, §10, §19](../../.specify/memory/constitution.md).
+Related: [ADR-023](../../adr/023-dev-prod-environments.md), [ADR-010](../../adr/010-docker-first-parity.md), [ADR-012](../../adr/012-cloud-run-traffic-splitting.md), [constitution §8, §10, §19](../../.specify/memory/constitution.md).
 
 ---
 
