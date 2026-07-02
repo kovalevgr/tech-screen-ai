@@ -18,16 +18,16 @@ Run **after** checking out this branch's HCL, **before** the first plan:
 ```bash
 terraform -chdir=infra/terraform state mv \
   google_service_account.techscreen_backend \
-  'module.env_prod.google_service_account.backend[0]'
+  module.env_prod.google_service_account.backend
 terraform -chdir=infra/terraform state mv \
   google_project_iam_member.techscreen_backend_aiplatform_user \
-  'module.env_prod.google_project_iam_member.backend_aiplatform'
+  module.env_prod.google_project_iam_member.backend_aiplatform
 terraform -chdir=infra/terraform state mv \
   google_service_account_iam_member.techscreen_backend_tokens_for_owner \
-  'module.env_prod.google_service_account_iam_member.backend_tokens_for_owner'
+  module.env_prod.google_service_account_iam_member.backend_tokens_for_operator
 ```
 
-*(Exact target addresses are asserted by `tasks.md` against the final module code; adjust here if the module uses different resource labels — the tasks phase keeps this file in sync.)*
+*(Addresses verified against the final module code — plain resources, no `count`/index. The apply will update the SA's display_name/description in place — expected, non-destructive.)*
 
 ## 3. Plan + apply
 

@@ -11,7 +11,9 @@ Infra feature: the "entities" are cloud resources, identities, and their binding
 | `secret_suffix` | `""` | `"_DEV"` | Secret Manager names |
 | `project_id` / `region` | `tech-screen-493720` / `europe-west1` | same | from root vars |
 | `flag_sync_sa_email` | root-created SA email | same | becomes `CLOUD_IAM_SERVICE_ACCOUNT` SQL user |
-| `backend_sa_create` | `false` (adopts existing via state mv) | `true` | see quickstart § state mv |
+| `operator_email` | `ops_email` tfvar | same | tokenCreator on backend SA (§6 impersonation path) |
+
+*(Both environments declare identical resources — prod's pre-existing backend-SA trio is adopted via `terraform state mv`, not via a create-flag; a `count = 0` shape would plan a destroy.)*
 
 Outputs: `backend_service_url`, `frontend_service_url`, `sql_connection_name`, `backend_sa_email`, `frontend_sa_email`.
 
