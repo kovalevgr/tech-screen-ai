@@ -9,9 +9,9 @@
 
 ## Phase 1: Governance (FR-013 — must precede any HCL that assumes dev+prod)
 
-- [ ] T001 Write `adr/023-dev-prod-environments.md` — context (owner decision 2026-07-02, spec Clarifications), decision (two long-lived envs in single project `tech-screen-493720`; release path keeps 0 %-traffic revision verification per ADR-012), alternatives (prod-only ADR-009 status quo; second GCP project), consequences (cost baseline ~$11–12 → ~$22–25/mo; drift risk owned by module symmetry; §12 interpretation intact), template per `adr/README.md` house style
-- [ ] T002 Flip `adr/009-prod-only-topology.md` status block to `Status: Superseded by ADR-023` (keep body verbatim) and add the ADR-023 row to the `adr/README.md` index table
-- [ ] T003 Amend `.specify/memory/constitution.md` §8 per the documented change procedure: retitle to "Two long-lived environments: dev and prod", rewrite body (single GCP project; no staging/QA/UAT gate; pre-release verification stays 0 %-traffic revisions; link ADR-023), fix the §7 cross-reference sentence ("We do not have a staging environment (see §8)" stays true — verify wording), bump Version section to v1.1 with dated changelog line
+- [X] T001 Write `adr/023-dev-prod-environments.md` — context (owner decision 2026-07-02, spec Clarifications), decision (two long-lived envs in single project `tech-screen-493720`; release path keeps 0 %-traffic revision verification per ADR-012), alternatives (prod-only ADR-009 status quo; second GCP project), consequences (cost baseline ~$11–12 → ~$22–25/mo; drift risk owned by module symmetry; §12 interpretation intact), template per `adr/README.md` house style
+- [X] T002 Flip `adr/009-prod-only-topology.md` status block to `Status: Superseded by ADR-023` (keep body verbatim) and add the ADR-023 row to the `adr/README.md` index table
+- [X] T003 Amend `.specify/memory/constitution.md` §8 per the documented change procedure: retitle to "Two long-lived environments: dev and prod", rewrite body (single GCP project; no staging/QA/UAT gate; pre-release verification stays 0 %-traffic revisions; link ADR-023), fix the §7 cross-reference sentence ("We do not have a staging environment (see §8)" stays true — verify wording), bump Version section to v1.1 with dated changelog line
 
 ## Phase 2: Foundational Terraform (blocks US1–US4)
 
