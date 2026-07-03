@@ -52,6 +52,10 @@ jobs:
       DATABASE_NAME: "techscreen"
       # IAM DB user (auto-iam-authn): SA email minus .gserviceaccount.com.
       DATABASE_USER: "techscreen-flag-sync@tech-screen-493720.iam"
+      # Same username percent-encoded for DSN use — the raw '@' inside the
+      # username otherwise splits the URL at the wrong place and the driver
+      # resolves "tech-screen-493720.iam@127.0.0.1" as a hostname.
+      DATABASE_USER_ENC: "techscreen-flag-sync%40tech-screen-493720.iam"
 
     steps:
       - name: Checkout
@@ -100,5 +104,5 @@ jobs:
       - name: Upsert feature_flag rows + warn on orphans
         if: steps.t06_guard.outputs.skip != 'true'
         env:
-          DATABASE_URL: "postgresql://${{ env.DATABASE_USER }}@127.0.0.1:5432/${{ env.DATABASE_NAME }}"
+          DATABASE_URL: "postgresql://${{ env.DATABASE_USER_ENC }}@127.0.0.1:5432/${{ env.DATABASE_NAME }}"
         run: python scripts/sync_feature_flags_to_db.py
