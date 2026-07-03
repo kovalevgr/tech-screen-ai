@@ -55,6 +55,8 @@ unset APP_PW MIG_PW
 
 *(Use distinct passwords per environment if preferred — then run per-instance with fresh `read -s`.)*
 
+> **Password hygiene (learned 2026-07-03):** never paste terminal output containing generated passwords into chat, PR text, or issue comments — that IS a leak; rotate immediately via `gcloud sql users set-password` if it happens. The migrator password does not need long-term storage at all: the standing pattern is **rotate-on-demand** — each migration session starts with the operator setting a fresh migrator password and discarding it afterwards. (The T06 bootstrap migrator passwords were rotated to discarded random values on 2026-07-03.)
+
 ## 5. Fill secret values (per environment)
 
 ```bash
@@ -88,7 +90,7 @@ psql 'postgresql://techscreen_migrator:<pw>@127.0.0.1:5432/techscreen' \
 | SC-001 | clean plan | `terraform plan` | "No changes" |
 | SC-002 | 4 services live | `gcloud run services list --region europe-west1` + `curl -s -o /dev/null -w '%{http_code}' <url>` ×4 | all listed; 200 ×4 |
 | SC-003 | 10 secret shells + scoped IAM | `gcloud secrets list`; `gcloud secrets get-iam-policy DATABASE_URL` | 10 names; per-secret accessor = matching env backend SA |
-| SC-004 | pgvector + §3 + head | `psql … -c "SELECT extname FROM pg_extension WHERE extname='vector'"`; `UPDATE turn_trace SET agent='x'` as `techscreen_app`; `alembic current` | 1 row; trigger error; `0005` — on **both** instances |
+| SC-004 | pgvector + §3 + head | `psql … -c "SELECT extname FROM pg_extension WHERE extname='vector'"`; as `techscreen_app`: `UPDATE turn_trace SET interview_session_id = interview_session_id` (NB: rich T21 columns don't exist yet; ACL check fires even on an empty table); `SELECT count(*) FROM pg_trigger WHERE tgname LIKE '%\_no\_mutation'`; `alembic current` | 1 row; **`permission denied for table turn_trace`** (REVOKE); trigger count = 6; `0005` — on **both** instances |
 | SC-005 | flag sync live | `gh workflow run sync-feature-flags.yml`; then `SELECT name, enabled, updated_by FROM feature_flag` ×2 | green, `skip=false`, rows `updated_by='configs-as-code'` in both DBs |
 | SC-006 | no keys | `gcloud iam service-accounts keys list --iam-account=<each SA>`; gitleaks via pre-commit | only system-managed; clean |
 | SC-007 | cost | Billing console after 48 h | run-rate consistent with ~$22–25/mo; budgets untouched |
