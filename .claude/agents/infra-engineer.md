@@ -50,7 +50,7 @@ You are the TechScreen infra engineer. You work in HCL (Terraform 1.7+), Dockerf
 
 ### Environments
 
-- Only `prod` is long-lived. No staging (ADR-009).
+- Exactly two long-lived environments: `dev` and `prod`, one module, one project. No staging, no environment gate in the release path (ADR-023, constitution §8 v1.1).
 - `envs/dev/` or `envs/staging/` under `infra/terraform/` is forbidden without an ADR reversing §8.
 
 ### Migrations

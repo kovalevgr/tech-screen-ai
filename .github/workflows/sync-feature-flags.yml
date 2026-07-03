@@ -91,9 +91,15 @@ jobs:
 
       - name: Start Cloud SQL Auth Proxy (IAM auth, ephemeral)
         if: steps.t06_guard.outputs.skip != 'true'
+        env:
+          # Pinned sha256 of cloud-sql-proxy v2.13.0 linux.amd64 — this job can
+          # write the prod feature_flag table, so the binary is checksum-gated
+          # (reviewer PR#18 hardening note).
+          CSP_SHA256: "90fb622971bd8ed650f040dbdbc0f1be65ea528e2c72fa3b4717838e56abdf39"
         run: |
           curl -fsSL -o cloud-sql-proxy \
             https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.13.0/cloud-sql-proxy.linux.amd64
+          echo "${CSP_SHA256}  cloud-sql-proxy" | sha256sum -c -
           chmod +x cloud-sql-proxy
           ./cloud-sql-proxy --auto-iam-authn --port=5432 "$CLOUD_SQL_INSTANCE" &
           for _ in {1..15}; do

@@ -215,7 +215,7 @@ Rotation: the consumer must fetch the secret at startup or cache with a TTL. A 2
 MVP keeps it simple:
 
 - Cloud SQL on public IP with authorised networks = none; access via the Cloud SQL Auth Proxy from Cloud Run using the `roles/cloudsql.client` permission.
-- Cloud Run services are public-facing on `*.run.app` for the MVP. Custom domain deferred (see ADR-009 and the deferred features memory).
+- Cloud Run services are public-facing on `*.run.app` for the MVP. Custom domain deferred (see ADR-023 and the deferred features memory).
 - No VPC Connector yet. Added only when we need to reach a resource that requires private IP (none at MVP).
 
 ---
