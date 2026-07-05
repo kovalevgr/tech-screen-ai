@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Sync ``configs/feature-flags.yaml`` into the ``feature_flag`` DB table (T05a).
 
-Invoked by ``.github/workflows/sync-feature-flags.yml`` after WIF auth +
-Cloud SQL Auth Proxy are up. Reads ``DATABASE_URL`` from the environment.
+Invoked by the ``sync-feature-flags`` job in ``.github/workflows/sync-configs.yml``
+(renamed from ``sync-feature-flags.yml`` in T16) after WIF auth + Cloud SQL
+Auth Proxy are up. Reads ``DATABASE_URL`` from the environment.
 
 For every YAML entry: ``INSERT ... ON CONFLICT DO UPDATE`` — on first sync
 the row gets ``enabled=<yaml.default>``; subsequent syncs leave ``enabled``
