@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kovalevgr/tech-screen-ai/blob/main/docs/contracts/id-token-claims.json",
+  "title": "TechScreen verified ID-token claims (IdTokenClaims, T07)",
+  "description": "The subset of Identity Platform (GCIP) ID-token claims the TechScreen backend consumes AFTER RS256 signature verification against Google's securetoken certs. Producers: GCIP mints the standard claims; the auth-claims blocking function (infra/functions/auth_claims/) injects `role` and `hd` from configs/auth-roles.yaml. Consumer: app/backend/services/auth.py (IdTokenVerifier) enforces every property below and maps failures to HTTP 401 — except an absent/non-staff `role`, which maps to HTTP 403 (valid identity, no authorization). See specs/021-t07-identity-sso/data-model.md and ADR-024.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "iss",
+    "aud",
+    "sub",
+    "email",
+    "email_verified",
+    "hd",
+    "role",
+    "iat",
+    "exp"
+  ],
+  "properties": {
+    "iss": {
+      "type": "string",
+      "description": "Token issuer. Must equal https://securetoken.google.com/<GCP_PROJECT> for the backend's configured project (tech-screen-493720 in both environments — the Identity Platform config is project-global).",
+      "pattern": "^https://securetoken\\.google\\.com/[a-z][a-z0-9-]{4,28}[a-z0-9]$"
+    },
+    "aud": {
+      "type": "string",
+      "description": "Token audience. GCIP sets this to the GCP project ID; must equal the backend's GCP_PROJECT setting.",
+      "pattern": "^[a-z][a-z0-9-]{4,28}[a-z0-9]$"
+    },
+    "sub": {
+      "type": "string",
+      "description": "Stable GCIP user ID (uid) of the signed-in staff member. Non-empty; surfaced as request.state.user['sub'] and the future audit actor reference.",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Workspace account email. Defense in depth: the backend additionally requires the domain suffix to match AUTH_ALLOWED_DOMAIN even though `hd` is also enforced. Staff email is PII-adjacent config: it flows into request.state.user for audit use and must never be logged (constitution §15)."
+    },
+    "email_verified": {
+      "const": true,
+      "description": "Must be literally true. Google-provider sign-ins arrive verified; anything else is rejected with 401."
+    },
+    "hd": {
+      "type": "string",
+      "format": "hostname",
+      "description": "Hosted (Workspace) domain. NOT copied from Google's IdP token by GCIP — injected by the auth-claims blocking function for admitted accounts (research R4). Must equal the backend's AUTH_ALLOWED_DOMAIN (n-ix.com at MVP)."
+    },
+    "role": {
+      "type": "string",
+      "enum": ["admin", "recruiter", "reviewer"],
+      "description": "TechScreen staff role, injected by the auth-claims blocking function from configs/auth-roles.yaml (constitution §16). Feeds Principal.role and the require_roles gate. A token without this claim is a valid identity with no authorization: HTTP 403 with a body naming configs/auth-roles.yaml."
+    },
+    "iat": {
+      "type": "integer",
+      "description": "Issued-at, unix seconds. Must not be in the future (verified by the JWT decode step).",
+      "minimum": 0
+    },
+    "exp": {
+      "type": "integer",
+      "description": "Expiry, unix seconds — GCIP tokens live at most one hour; exp > iat by construction. Must not be in the past (verified by the JWT decode step). Token revocation is not checked at MVP (ADR-024): removing a role takes effect at the next sign-in.",
+      "minimum": 0
+    }
+  }
+}
