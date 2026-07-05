@@ -35,7 +35,7 @@ These are the shortcuts Claude Code is most likely to take that we explicitly fo
 - **No `UPDATE` / `DELETE` on audit tables.** Corrections are new rows. (§3, ADR-019)
 - **Rubric edits never touch existing sessions.** Sessions hold a frozen `rubric_snapshot`. (§4, ADR-018)
 - **No secret ever lands in source, logs, Docker images, or LLM context.** `.env` locally, Secret Manager in prod, no JSON service-account keys anywhere. (§5–6, ADR-013)
-- **No staging environment.** Test via Docker, release via Cloud Run traffic splitting at 0%. (§8, ADR-009/012)
+- **No staging gate.** Two long-lived envs (dev + prod, one project); test via Docker, release via Cloud Run traffic splitting at 0%. (§8 v1.1, ADR-023/012)
 - **Dark-launch by default.** Risky features ship behind a feature flag that starts `false`. (§9, ADR-011)
 - **Forward-only, zero-downtime migrations.** Destructive DDL needs its own ADR. (§10)
 - **Hybrid language in prompts.** English instructions + Ukrainian candidate-facing output. (§11, ADR-008)

@@ -227,12 +227,16 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 - **contract:** `infra/terraform/` module layout
 - **description:**
   Two Cloud Run services (`techscreen-backend`, `techscreen-frontend`), Cloud SQL Postgres 17 instance with **pgvector extension enabled at provisioning** (`database_flags { name = "cloudsql.enable_pgvector", value = "on" }` in Terraform; verify PG17 + pgvector availability in `europe-west1` during this task and fall back to PG16 only if blocked — see ADR-001 amendment 2026-04-19), Secret Manager for every key listed in `.env.example`. Workload Identity Federation only — no JSON service-account keys anywhere (§5–6, ADR-013). Two workspaces: `dev`, `prod` (no staging — ADR-009). Cloud Logging + Error Reporting wired.
+
+  > **Post-implementation corrections (2026-07-02, `specs/018-t06-cloud-runtime/`):** (a) the `cloudsql.enable_pgvector` flag does not exist on Cloud SQL — pgvector is activated by `CREATE EXTENSION IF NOT EXISTS vector`, which migration `0001_baseline` already runs; the only flag set is `cloudsql.iam_authentication=on` (research R1). (b) "Two workspaces" shipped as **two environments from one module in a single state** (`infra/terraform/modules/environment/` × 2, research R2) — same outcome, no Terraform workspaces. (c) The dev+prod topology required ADR-023 superseding ADR-009 and a constitution §8 amendment (v1.1) — shipped in the same PR. (d) Scope also included: Artifact Registry, per-env runtime SAs, the `techscreen-flag-sync@` CI identity, live-binding `.github/workflows/sync-feature-flags.yml` (matrixed over both envs), and `scripts/cloud-db-grants.sql`.
+
 - **acceptance:**
-  - `terraform plan -workspace=dev` clean diff after bootstrap.
+  - `terraform plan -workspace=dev` clean diff after bootstrap. *(2026-07-02: single-state shape — plain `terraform plan` zero-diff covers both envs.)*
   - `gcloud run services describe techscreen-backend` returns the service after `apply`.
   - `gcloud secrets list` shows every key from `.env.example` (values placeholder).
   - `psql -c "SELECT extname FROM pg_extension WHERE extname = 'vector';"` returns one row on the provisioned instance.
   - No `keyfile.json` anywhere in repo (`reviewer` checks via gitleaks + grep).
+  - *(Added 2026-07-02)* ADR-023 merged + ADR-009 superseded + constitution §8 v1.1 — the governance trail for the dev+prod decision.
 
 ### T06a — `/deploy` + `/rollback` slash commands (§19)
 

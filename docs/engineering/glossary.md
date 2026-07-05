@@ -80,7 +80,7 @@ Listed alphabetically within sections.
 
 **Plan (Spec Kit).** The `.specify/specs/<slug>/plan.md` produced by the `/plan` command. Contains task-level agent assignments and parallel groupings. See ADR-014.
 
-**Prod-only topology.** The principle that production is the only long-lived environment. Pre-prod verification happens via Cloud Run revisions at 0% traffic. See ADR-009.
+**Dev + prod topology.** Exactly two long-lived environments — `dev` and `prod` — in a single GCP project, instantiated from the same Terraform module. No staging, and no environment gate in the release path: prod verification happens via Cloud Run revisions at 0% traffic. See ADR-023 (superseded the original prod-only ADR-009 on 2026-07-02).
 
 **Promote.** The `/promote N` slash command that shifts Cloud Run traffic percentage (10 → 50 → 100) to the new revision. Human-initiated on MVP.
 

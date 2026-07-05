@@ -78,13 +78,15 @@ Local development, CI, and production all run the same containers. A test that p
 
 ---
 
-## 8. Production is the only long-lived environment
+## 8. Two long-lived environments: dev and prod — and no staging gate
 
-There is no staging, no QA, no UAT. A single GCP project, `<PROJECT_ID>`, hosts production. Pre-prod testing happens locally via Docker; pre-release verification happens via Cloud Run revisions receiving 0% traffic.
+*(Amended 2026-07-02 by [ADR-023](../../adr/023-dev-prod-environments.md), superseding [ADR-009](../../adr/009-prod-only-topology.md); original text preserved there.)*
 
-**Why.** Staging drifts from prod, is expensive, and gives false confidence. Our compensating controls — Docker parity, dark launches, traffic splitting, calibration — are stronger than a stale staging environment would be.
+Exactly two long-lived environments — `dev` and `prod` — live in a single GCP project. There is no staging, no QA, no UAT, and **no environment gate in the release path**: prod releases are verified via Cloud Run revisions receiving 0% traffic (ADR-012), not by "passing dev". `dev` exists for development and infrastructure rehearsal (deploy tooling, IAM, migrations), never as a release approval step. Pre-prod application testing still happens locally via Docker.
 
-**Enforcement.** No second GCP project for long-lived environments. Ephemeral preview revisions at 0% traffic are allowed and encouraged.
+**Why.** Staging-as-a-gate drifts from prod, is expensive, and gives false confidence — that reasoning survives from ADR-009. But infrastructure-level work (traffic-shift commands, IAM changes, proxy wiring) needs a rehearsal space that is not the environment users depend on; 0%-traffic revisions cannot cover it.
+
+**Enforcement.** No second GCP project for long-lived environments. Both environments are instantiated from the same Terraform module — structural drift is impossible by construction. No release process may require dev sign-off before a prod deploy. Ephemeral preview revisions at 0% traffic are allowed and encouraged.
 
 ---
 
@@ -212,4 +214,5 @@ These principles describe what must hold. They do not describe what must be buil
 
 ## Version
 
+- **v1.1** — 2026-07-02 — §8 amended by ADR-023: two long-lived environments (dev + prod) in a single project; no-staging-gate release philosophy retained. Owner decision recorded in `specs/018-t06-cloud-runtime/spec.md` Clarifications.
 - **v1.0** — 2026-04-18 — Initial ratification.

@@ -1,8 +1,8 @@
 # Cloud Setup
 
-How TechScreen uses Google Cloud. Single project, single region, prod-only, Terraform-managed after a one-shot manual bootstrap. Everything here is written so a new engineer can reconstruct the topology end-to-end.
+How TechScreen uses Google Cloud. Single project, single region, **two long-lived environments (`dev` + `prod`)**, Terraform-managed after a one-shot manual bootstrap. Everything here is written so a new engineer can reconstruct the topology end-to-end.
 
-Related: [ADR-009](../../adr/009-prod-only-topology.md), [ADR-012](../../adr/012-cloud-run-traffic-splitting.md), [ADR-013](../../adr/013-no-plaintext-secrets.md), [ADR-015](../../adr/015-region-europe-west1.md), [constitution §5, §6, §8](../../.specify/memory/constitution.md).
+Related: [ADR-023](../../adr/023-dev-prod-environments.md) (supersedes [ADR-009](../../adr/009-prod-only-topology.md)), [ADR-012](../../adr/012-cloud-run-traffic-splitting.md), [ADR-013](../../adr/013-no-plaintext-secrets.md), [ADR-015](../../adr/015-region-europe-west1.md), [constitution §5, §6, §8 (v1.1)](../../.specify/memory/constitution.md).
 
 ---
 
@@ -10,7 +10,8 @@ Related: [ADR-009](../../adr/009-prod-only-topology.md), [ADR-012](../../adr/012
 
 - **GCP project:** one, owned by N-iX. Project number `463244185014`. Human-readable project ID confirmed via Cloud Console ("Project info" card). Billing attached to the N-iX billing account for TechScreen.
 - **Region:** `europe-west1` (Belgium). All regional resources live there. See ADR-015.
-- **Environments:** only `prod`. No staging. Local dev + CI run against Docker Compose with `LLM_BACKEND=mock` (the in-process fixture-keyed Vertex mock); see `docs/engineering/docker.md`.
+- **Environments:** `dev` and `prod`, both in this project, both instantiated from the same Terraform module (`infra/terraform/modules/environment/`) — structural drift is impossible by construction (ADR-023). **No staging, and no environment gate in the release path**: prod releases are verified via Cloud Run revisions at 0% traffic (ADR-012), never by "passing dev". Local dev + CI still run against Docker Compose with `LLM_BACKEND=mock`; see `docs/engineering/docker.md`.
+- **Naming:** prod keeps canonical names (`techscreen-backend`, `techscreen-pg`, secret `DATABASE_URL`); dev appends `-dev` to resources and `_DEV` to secret names.
 
 ---
 
@@ -18,18 +19,18 @@ Related: [ADR-009](../../adr/009-prod-only-topology.md), [ADR-012](../../adr/012
 
 | Resource                                           | Purpose                                            | Size / tier                            |
 | -------------------------------------------------- | -------------------------------------------------- | -------------------------------------- |
-| Cloud Run service `techscreen-backend`             | FastAPI API                                        | min 0, max 5 instances, 1 vCPU / 1 GiB |
-| Cloud Run service `techscreen-frontend`            | Next.js SSR                                        | min 0, max 5 instances, 1 vCPU / 1 GiB |
-| Cloud SQL Postgres 17 instance `techscreen-pg`     | App DB + pgvector                                  | `db-f1-micro`, 10 GB SSD, PITR on      |
-| Cloud SQL database `techscreen`                    | Application schema                                 |                                        |
-| Cloud SQL database `techscreen_shadow`             | Alembic autogenerate target                        |                                        |
-| Secret Manager                                     | All secrets (DB URL, magic-link signing key, etc.) |                                        |
-| Artifact Registry `techscreen`                     | Docker images for both services                    | `europe-west1`                         |
+| Cloud Run `techscreen-backend` / `-dev`            | FastAPI API (per env)                              | min 0, max 5 instances, 1 vCPU / 1 GiB |
+| Cloud Run `techscreen-frontend` / `-dev`           | Next.js SSR (per env)                              | min 0, max 5 instances, 1 vCPU / 1 GiB |
+| Cloud SQL PG17 `techscreen-pg` / `-dev`            | App DB + pgvector (per env)                        | `db-f1-micro`, 10 GB SSD, PITR on      |
+| Cloud SQL databases `techscreen`, `techscreen_shadow` | Application schema + Alembic autogenerate target | per instance                           |
+| Secret Manager (10 shells)                         | 5 secret keys × 2 envs (`_DEV` suffix for dev)     |                                        |
+| Artifact Registry `techscreen`                     | Docker images, both services, both envs (tag-level separation) | `europe-west1`             |
 | Cloud Storage bucket `<project>-tfstate`           | Terraform remote state                             | versioned, 30-day lifecycle            |
-| Cloud Storage bucket `<project>-techscreen-assets` | Generated artefacts, exports                       | Standard, versioning off               |
-| Cloud Monitoring workspace                         | Dashboards, alert policies                         |                                        |
+| Cloud Monitoring workspace                         | Dashboards, alert policies (T38)                   |                                        |
 | Cloud Logging                                      | All services                                       | 30-day retention                       |
-| IAM Workload Identity Pool `github-actions`        | CI auth via OIDC                                   |                                        |
+| IAM Workload Identity Pool `github-actions`        | CI auth via OIDC (terraform SA + flag-sync SA)     |                                        |
+
+*(The formerly listed `<project>-techscreen-assets` bucket is deferred until a task actually consumes it — see `specs/018-t06-cloud-runtime/` Assumptions.)*
 
 Vertex AI is accessed as a managed API (no dedicated resource is provisioned). Granted per-model rate quotas, region verification, and the smoke-test record live in [`docs/engineering/vertex-quota.md`](./vertex-quota.md), seeded by T01a.
 
@@ -37,17 +38,17 @@ Vertex AI is accessed as a managed API (no dedicated resource is provisioned). G
 
 ## Rough monthly cost
 
-For the MVP pilot volume (≤ 50 completed sessions / month):
+For the MVP pilot volume (≤ 50 completed sessions / month), across **both** environments (ADR-023 doubled the infra baseline):
 
-| Line item                              | Approx USD/mo  |
-| -------------------------------------- | -------------- |
-| Cloud Run (both services, mostly idle) | $2             |
-| Cloud SQL `db-f1-micro` + 10 GB + PITR | $9             |
-| Artifact Registry storage              | negligible     |
-| Cloud Storage (state + assets)         | < $1           |
-| Secret Manager                         | < $1           |
-| Vertex AI (Gemini 2.5 Flash/Pro)       | $4 – $10       | (full quota state in [`vertex-quota.md`](./vertex-quota.md)) |
-| Total                                  | **~$20 – $25** | |
+| Line item                                        | Approx USD/mo  |
+| ------------------------------------------------ | -------------- |
+| Cloud Run (4 services, mostly idle)              | $2 – $4        |
+| Cloud SQL `db-f1-micro` + 10 GB + PITR × 2       | $18            |
+| Artifact Registry storage                        | negligible     |
+| Cloud Storage (state)                            | < $1           |
+| Secret Manager                                   | < $1           |
+| Vertex AI (Gemini 2.5 Flash/Pro)                 | $4 – $10       | (full quota state in [`vertex-quota.md`](./vertex-quota.md)) |
+| Total                                            | **~$26 – $34** | |
 
 **Two budget alerts** are configured (T01a, declared in `infra/terraform/billing.tf`):
 
@@ -84,25 +85,28 @@ After bootstrap, everything else is managed by Terraform.
 
 ## Terraform layout
 
+Actual layout (post-T06): a flat root (project-global resources + two module instantiations) and one reusable environment module. **One state** (the bootstrap GCS bucket, default workspace) covers everything — there are no per-env state files or workspaces.
+
 ```
 infra/terraform/
-├── main.tf                provider + backend config (GCS)
-├── variables.tf
-├── outputs.tf
-├── network.tf             VPC connector for Cloud SQL private IP, if used
-├── sql.tf                 Cloud SQL instance + dbs + user
-├── artifact_registry.tf
-├── cloud_run.tf           backend + frontend services + traffic split
-├── secrets.tf             Secret Manager secret resources (names only)
-├── iam.tf                 SA bindings, WIF pool + provider
-├── monitoring.tf          alert policies, dashboards
-└── envs/
-    └── prod/
-        ├── terraform.tfvars
-        └── backend.tf     bucket = "<project>-tfstate", prefix = "prod"
+├── backend.tf              GCS state backend (bucket <project>-tf-state)
+├── versions.tf             terraform + google provider constraints
+├── provider.tf
+├── variables.tf            project_id, region, project_number, billing_account, ops_email
+├── terraform.tfvars        committed (organizational identifiers only — ADR-022)
+├── services.tf             google_project_service × 5 (run, sqladmin, secretmanager, artifactregistry, clouderrorreporting)
+├── billing.tf              budget alerts (T01a)
+├── iam.tf                  project-global identity: flag-sync SA + WIF binding
+├── artifact_registry.tf    shared docker repo `techscreen`
+├── environments.tf         module "env_prod" + module "env_dev"
+├── outputs.tf              service URLs, SQL connection names
+└── modules/environment/    per-env: Cloud SQL + dbs + users, SAs + IAM, secrets, Cloud Run × 2
+    ├── main.tf
+    ├── variables.tf
+    └── outputs.tf
 ```
 
-Only `prod` exists. No `envs/dev/` or `envs/staging/` will be added without an ADR reversing §8.
+Exactly two module instantiations exist (constitution §8 v1.1). No third environment will be added without an ADR superseding ADR-023.
 
 ### Operator pre-flight (one-time per laptop)
 
@@ -141,7 +145,7 @@ These steps were tribal knowledge through T01a's debug cycle and are captured he
 3. `terraform -chdir=infra/terraform init -upgrade` (once per clone).
 4. `terraform -chdir=infra/terraform plan` — `terraform.tfvars` is auto-loaded from the working dir; backend bucket is hardcoded in `backend.tf` so no `-backend-config=` or `-var-file=` flag is needed.
 5. Paste the plan summary into the PR description.
-6. On merge, CI runs `terraform apply -auto-approve` against `prod`, authenticated via WIF.
+6. The **operator** runs `terraform apply` from the PR-branch checkout (see the warning above). CI auto-apply via WIF is a T06a-era follow-up — not wired yet.
 
 Destructive plans (resource deletions) require a `[destructive]` tag in the PR title and a linked ADR. The CI workflow refuses to auto-apply without it.
 
@@ -160,13 +164,16 @@ Human access is via Workspace SSO (N-iX). No direct IAM user accounts.
 ### Service accounts
 
 - **`terraform@<project>`:** `roles/owner` at MVP (will be tightened to least-privilege after the IaC shape is stable). Impersonated by CI via WIF; no JSON keys issued.
-- **`techscreen-backend@<project>`:** runtime identity for the backend Cloud Run service.
+- **`techscreen-backend@` / `techscreen-backend-dev@`:** runtime identities for the backend Cloud Run services (one per environment).
   - `roles/cloudsql.client`
-  - `roles/secretmanager.secretAccessor` on: `DATABASE_URL`, `MAGIC_LINK_SIGNING_KEY`, `SENDGRID_API_KEY`, `SESSION_COOKIE_SECRET`, `VERTEX_SA_IMPERSONATION_TARGET` (if used)
+  - `roles/secretmanager.secretAccessor` on **their own environment's** secrets only: `DATABASE_URL(_DEV)`, `MAGIC_LINK_SIGNING_KEY(_DEV)`, `SENDGRID_API_KEY(_DEV)`, `SESSION_COOKIE_SECRET(_DEV)` — per-secret bindings, never project-level
   - `roles/aiplatform.user` for Vertex AI calls
   - `roles/logging.logWriter`, `roles/monitoring.metricWriter`
-- **`techscreen-frontend@<project>`:** runtime identity for the frontend Cloud Run service.
-  - Minimal: `roles/logging.logWriter`, `roles/monitoring.metricWriter`. Does not talk to SQL or Secret Manager directly.
+- **`techscreen-frontend@` / `techscreen-frontend-dev@`:** runtime identities for the frontend Cloud Run services.
+  - Minimal: `roles/logging.logWriter`, `roles/monitoring.metricWriter`. Do not talk to SQL or Secret Manager directly.
+- **`techscreen-flag-sync@`:** CI identity for `.github/workflows/sync-feature-flags.yml` (both environments).
+  - `roles/cloudsql.client` + `roles/cloudsql.instanceUser`; WIF-bound to this repository
+  - In-database privileges limited to the `feature_flag` table (`scripts/cloud-db-grants.sql`)
 
 No JSON keys for any service account. Ever. See ADR-013 and the anti-pattern entry.
 
@@ -181,21 +188,23 @@ No JSON keys for any service account. Ever. See ADR-013 and the anti-pattern ent
 
 ## Secret Manager inventory
 
+Each key exists **twice**: the canonical name for prod, `<NAME>_DEV` for dev. Values differ per environment — dev never reuses prod key material.
+
 | Secret                    | Owner   | Consumer        | Notes                                         |
 | ------------------------- | ------- | --------------- | --------------------------------------------- |
-| `DATABASE_URL`            | infra   | backend         | `postgres://` with `techscreen` user          |
-| `MAGIC_LINK_SIGNING_KEY`  | backend | backend         | HMAC key for candidate magic links            |
-| `SESSION_COOKIE_SECRET`   | backend | backend         | Signs internal SSO session cookies            |
-| `SENDGRID_API_KEY`        | infra   | backend         | Transactional email                           |
-| `CALIBRATION_DATASET_KEY` | ops     | calibration-run | Optional, if the dataset is encrypted at rest |
+| `DATABASE_URL(_DEV)`      | infra   | backend         | `postgres://` with `techscreen_app` user      |
+| `MAGIC_LINK_SIGNING_KEY(_DEV)` | backend | backend    | HMAC key for candidate magic links            |
+| `SESSION_COOKIE_SECRET(_DEV)`  | backend | backend    | Signs internal SSO session cookies            |
+| `SENDGRID_API_KEY(_DEV)`  | infra   | backend         | Transactional email                           |
+| `CALIBRATION_DATASET_KEY(_DEV)` | ops | calibration-run | Optional, if the dataset is encrypted at rest; no backend accessor |
 
 Adding a secret:
 
 1. Add the key to `.env.example` with an empty value (secrets always empty; non-secret defaults are allowed per ADR-022).
-2. Add a `google_secret_manager_secret` resource in `infra/terraform/secrets.tf`.
-3. Deploy via Terraform — this creates an empty secret.
-4. Fill the secret value **manually** via Cloud Console or `gcloud secrets versions add`. Never commit the value. Never pass it in a PR description.
-5. Grant the consumer SA `roles/secretmanager.secretAccessor` on that specific secret, not at project level.
+2. Add the name to `local.secret_names` in `infra/terraform/modules/environment/main.tf` (and to `local.backend_readable_secrets` if the backend consumes it) — both environments get the shell automatically.
+3. Apply via Terraform — this creates empty secrets in both environments.
+4. Fill each environment's value **manually** via Cloud Console or `gcloud secrets versions add`. Never commit the value. Never pass it in a PR description. Dev and prod values must differ.
+5. Accessor grants are per-secret and generated by the module; never grant at project level.
 
 Rotation: the consumer must fetch the secret at startup or cache with a TTL. A 24-hour TTL is the target for keys used on every request.
 
@@ -206,7 +215,7 @@ Rotation: the consumer must fetch the secret at startup or cache with a TTL. A 2
 MVP keeps it simple:
 
 - Cloud SQL on public IP with authorised networks = none; access via the Cloud SQL Auth Proxy from Cloud Run using the `roles/cloudsql.client` permission.
-- Cloud Run services are public-facing on `*.run.app` for the MVP. Custom domain deferred (see ADR-009 and the deferred features memory).
+- Cloud Run services are public-facing on `*.run.app` for the MVP. Custom domain deferred (see ADR-023 and the deferred features memory).
 - No VPC Connector yet. Added only when we need to reach a resource that requires private IP (none at MVP).
 
 ---
@@ -255,7 +264,7 @@ Disaster drill: restore `techscreen-pg` from backup to a new instance, update th
 
 ## What is explicitly NOT set up
 
-- Staging environment. ADR-009.
+- Staging / QA / UAT environment or any environment gate in the release path. ADR-023 (which added `dev`) keeps this exclusion.
 - Separate vector database. ADR-007.
 - VPC Service Controls. Overhead vs value is wrong for MVP pilot.
 - Cloud Armor / WAF. MVP is internal-only behind SSO for recruiters; candidate traffic is magic-link gated.
@@ -279,5 +288,6 @@ Each of these becomes a candidate for ADR-reversal when the pilot graduates.
 
 ## Document versioning
 
+- v2.0 — 2026-07-02 — T06: dev+prod topology (ADR-023), real Terraform layout (flat root + environment module), per-env secrets/IAM, flag-sync identity, cost table doubled, assets bucket deferred.
 - v1.0 — 2026-04-18.
 - Update this file when: a resource is added/removed, a secret is added/removed, region changes, IAM model changes, or the bootstrap procedure changes.

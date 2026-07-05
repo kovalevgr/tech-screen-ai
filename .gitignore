@@ -100,3 +100,7 @@ calibration/runs-raw/
 # ---------------------------------------------------------------------------
 .claude/worktrees/
 .claude/.run/
+
+# Module-level provider locks are stray artifacts of running init/validate
+# inside a module dir — the root lock is authoritative (reviewer PR#18 W5).
+infra/terraform/modules/**/.terraform.lock.hcl

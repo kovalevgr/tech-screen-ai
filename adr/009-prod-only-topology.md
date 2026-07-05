@@ -1,6 +1,6 @@
 # ADR-009: Production-only topology, no staging
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-023](./023-dev-prod-environments.md)
 - **Date:** 2026-04-18
 
 ## Context

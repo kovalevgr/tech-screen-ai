@@ -28,7 +28,7 @@ Proposed → Accepted → (Deprecated | Superseded by ADR-NNN)
 | [006](./006-hybrid-pre-interview-plan.md)            | Accepted | Hybrid pre-interview InterviewPlan (Variant C)            |
 | [007](./007-pgvector-in-same-database.md)            | Accepted | pgvector in same PostgreSQL, no separate vector DB        |
 | [008](./008-hybrid-prompt-language.md)               | Accepted | English system prompts, Ukrainian candidate output        |
-| [009](./009-prod-only-topology.md)                   | Accepted | Production-only topology, no staging                      |
+| [009](./009-prod-only-topology.md)                   | Superseded by [023](./023-dev-prod-environments.md) | Production-only topology, no staging |
 | [010](./010-docker-first-parity.md)                  | Accepted | Docker-first dev / CI / prod parity                       |
 | [011](./011-feature-flags-self-hosted.md)            | Accepted | Feature flags self-hosted in application database         |
 | [012](./012-cloud-run-traffic-splitting.md)          | Accepted | Cloud Run traffic splitting as canary mechanism           |
@@ -42,3 +42,4 @@ Proposed → Accepted → (Deprecated | Superseded by ADR-NNN)
 | [020](./020-correctness-variant-a-mvp.md)            | Accepted | Correctness evaluation: Variant A for MVP                 |
 | [021](./021-configs-as-code.md)                      | Accepted | Configs as code: rubrics, prompts, flags in Git           |
 | [022](./022-env-example-non-secret-defaults.md)      | Accepted | Non-secret defaults permitted in `.env.example`           |
+| [023](./023-dev-prod-environments.md)                | Accepted | Dev and prod environments in a single project             |
