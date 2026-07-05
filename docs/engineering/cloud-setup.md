@@ -59,6 +59,29 @@ Both budgets target a single Cloud Monitoring email channel: **Ihor's personal N
 
 ---
 
+## Cost-idle mode — the SQL instances sleep by default (until real usage)
+
+**Owner decision 2026-07-05:** until the project has real traffic, **both Cloud SQL instances stay STOPPED** (`activation-policy=NEVER`). Cloud SQL vCPU/RAM bills 24/7 regardless of use and is ~95 % of the current bill; stopped instances bill storage + backups only (**~$4–5/mo for both** instead of ~$18–20). Cloud Run already scales to zero and needs no such toggle.
+
+Operator commands (also documented in the script header):
+
+```bash
+scripts/cloud-sql-power.sh status          # who's awake
+scripts/cloud-sql-power.sh wake  [all|prod|dev]   # ~60–90 s until RUNNABLE
+scripts/cloud-sql-power.sh sleep [all|prod|dev]
+```
+
+Rules of the road:
+
+1. **Wake before anything that dials a DB**: migrations, `scripts/cloud-db-grants.sql`, `/deploy` smokes (T06a), and **merges to `main` that touch `configs/feature-flags.yaml`** — the sync workflow will fail against a sleeping instance (wake, then re-run via `workflow_dispatch`).
+2. **Sleep after the work session.** Waking costs ~$0.01; forgetting costs ~$0.60/day per instance.
+3. Terraform deliberately **ignores `settings.activation_policy`** (module lifecycle block) — sleeping/waking never shows up as plan drift; the declared shape stays `ALWAYS` for the day real usage starts and this section is retired.
+4. Nothing is lost while asleep: data, schema, users, PITR history, and secrets all persist.
+
+**Retire this mode** (flip both to `wake` permanently and delete this section) at T49 pilot dry-run at the latest — anything user-facing needs always-on databases.
+
+---
+
 ## Bootstrap — one-off manual steps
 
 A chicken-and-egg problem: Terraform needs a GCS bucket for state, and service-account auth, both of which we want Terraform to manage. We solve it by creating the absolute minimum by hand.
