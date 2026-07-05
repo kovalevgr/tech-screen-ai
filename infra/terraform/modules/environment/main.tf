@@ -26,6 +26,17 @@ resource "google_sql_database_instance" "pg" {
   # A bad day must not silently drop an interview database (§1, §3).
   deletion_protection = true
 
+  # Cost-idle mode (owner decision 2026-07-05): the operator sleeps/wakes
+  # instances via scripts/cloud-sql-power.sh (activation policy NEVER/ALWAYS)
+  # while the project has no real traffic. Same ownership split as the Cloud
+  # Run image: Terraform owns the shape, the operator owns the on/off toggle.
+  # See docs/engineering/cloud-setup.md § Cost-idle mode.
+  lifecycle {
+    ignore_changes = [
+      settings[0].activation_policy,
+    ]
+  }
+
   settings {
     tier      = "db-f1-micro"
     edition   = "ENTERPRISE"
