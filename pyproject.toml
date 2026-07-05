@@ -39,7 +39,7 @@ select = ["E", "F", "I", "B", "UP"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["app/backend/tests"]
+testpaths = ["app/backend/tests", "infra/functions"]
 asyncio_mode = "auto"
 
 [tool.mypy]

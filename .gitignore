@@ -104,3 +104,9 @@ calibration/runs-raw/
 # Module-level provider locks are stray artifacts of running init/validate
 # inside a module dir — the root lock is authoritative (reviewer PR#18 W5).
 infra/terraform/modules/**/.terraform.lock.hcl
+
+# T07: the auth-claims blocking function reads a VENDORED COPY of
+# configs/auth-roles.yaml placed by the deploy runbook step
+# (specs/021-t07-identity-sso/quickstart.md §4). The Git source of truth is
+# configs/auth-roles.yaml; the copy must never be committed.
+infra/functions/auth_claims/auth-roles.yaml
