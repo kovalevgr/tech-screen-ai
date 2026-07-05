@@ -18,8 +18,13 @@ consistent on every commit.
 3. Add a row to the **Active flags** table below (name, owner, default,
    description).
 4. Commit and open a PR. After merge to `main`, the post-merge workflow
-   ([`.github/workflows/sync-feature-flags.yml`](../../.github/workflows/sync-feature-flags.yml))
+   ([`.github/workflows/sync-configs.yml`](../../.github/workflows/sync-configs.yml) —
+   renamed from `sync-feature-flags.yml` in T16; it now carries every §16
+   configs-as-code surface, flags and rubric alike)
    creates a `feature_flag` row with `enabled=false`, `updated_by='configs-as-code'`.
+   The Cloud SQL instances sleep by default (cost-idle mode) — wake the
+   targets first (`scripts/cloud-sql-power.sh wake all`) or the sync jobs
+   fail fast until you wake and re-run them.
 
 ### Flip a flag (enable in production)
 1. Open a PR that sets `default: true` for the entry (mostly documentation —

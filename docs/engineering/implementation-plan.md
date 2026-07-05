@@ -203,7 +203,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
   - `feature_flag` table: `name TEXT PK, enabled BOOL NOT NULL DEFAULT false, owner TEXT NOT NULL, default_value JSONB, updated_at TIMESTAMPTZ, updated_by TEXT`. Migration in `0002_feature_flags.py`.
   - `app/backend/services/feature_flags.py`: `is_enabled(name, *, session_id=None) -> bool` with in-process cache (60s TTL) + Postgres LISTEN/NOTIFY for invalidation.
   - `configs/feature-flags.yaml`: source-of-truth file under §16 Configs-as-Code. Schema validated by JSON schema (the contract above).
-  - **Self-contained GHA workflow** `.github/workflows/sync-feature-flags.yml` (does not depend on T16): on `main` merge, diff `configs/feature-flags.yaml` against DB, upsert with `updated_by = 'configs-as-code'`. T16 (Configs-as-Code sync for rubric) extends this same workflow with rubric-sync as a second job — see T16.
+  - **Self-contained GHA workflow** `.github/workflows/sync-feature-flags.yml` (does not depend on T16): on `main` merge, diff `configs/feature-flags.yaml` against DB, upsert with `updated_by = 'configs-as-code'`. T16 (Configs-as-Code sync for rubric) extends this same workflow with rubric-sync as a second job — see T16. *(T16 note: the file is now `.github/workflows/sync-configs.yml` — renamed when the second job landed; history via `git log --follow -M30%` — the rewrite sits below the default rename threshold.)*
   - `docs/engineering/feature-flags.md`: index of every flag, owner, default, "what flipping it does". Each entry has lifecycle state: `active` or `sunset` (with `sunset_pr:` back-reference and `sunset_date:`).
   - Pre-commit hook `feature-flag-registered` is **bidirectional**:
     - Any new `is_enabled("xxx")` call must have `xxx:` in `configs/feature-flags.yaml`.
@@ -399,6 +399,8 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
   Extends `.github/workflows/sync-feature-flags.yml` (created in T05a) with a second job `sync-rubric` that diffs `configs/rubric/` against DB and applies validated changes via the importer. Guarded: destructive changes (removed topic, retyped level) require the PR body to include `ADR-xxx` citation; otherwise the job fails.
 
   After T16: the same workflow handles **all** Configs-as-Code surfaces (feature flags from T05a, rubric from T16, and any future `configs/*.yaml` added by Phase 2). Single source of truth for the §16 invariant.
+
+  > **T16 implementation notes (2026-07-05, specs/022-t16-rubric-sync):** the workflow was renamed to `.github/workflows/sync-configs.yml` to match its post-T16 all-surfaces role. The destructive diff runs against the push's `before` commit (not the DB — the DB stores no `retired` flags or level labels to diff against); the importer's DB-side rename rejection (specs/010 FR-009) remains the structural backstop, and deleting a stable id outright fails regardless of ADR citation (retire instead). The ADR citation is accepted from the merged PR body **or** the head commit message — a push-triggered run carries no `github.event.pull_request`, so PR bodies are fetched via the `commits/{sha}/pulls` API with the commit message as the documented fallback.
 
 - **acceptance:**
   - Merging a benign YAML change applies on `dev` without manual steps.

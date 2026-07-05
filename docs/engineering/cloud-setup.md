@@ -194,9 +194,9 @@ Human access is via Workspace SSO (N-iX). No direct IAM user accounts.
   - `roles/logging.logWriter`, `roles/monitoring.metricWriter`
 - **`techscreen-frontend@` / `techscreen-frontend-dev@`:** runtime identities for the frontend Cloud Run services.
   - Minimal: `roles/logging.logWriter`, `roles/monitoring.metricWriter`. Do not talk to SQL or Secret Manager directly.
-- **`techscreen-flag-sync@`:** CI identity for `.github/workflows/sync-feature-flags.yml` (both environments).
+- **`techscreen-flag-sync@`:** CI identity for `.github/workflows/sync-configs.yml` (both environments; the workflow was renamed from `sync-feature-flags.yml` when T16 added the rubric surface — the SA name keeps its historical `flag-sync` id, renaming a live SA is not worth the churn).
   - `roles/cloudsql.client` + `roles/cloudsql.instanceUser`; WIF-bound to this repository
-  - In-database privileges limited to the `feature_flag` table (`scripts/cloud-db-grants.sql`)
+  - In-database privileges limited to the configs-as-code tables (`scripts/cloud-db-grants.sql`): `feature_flag` (SELECT/INSERT/UPDATE — the only mutable surface), the six rubric-tree tables (SELECT/INSERT or INSERT-only; the importer never UPDATEs — §4/ADR-018), and INSERT-only on `audit_log` (the one §3-permitted verb, for the FR-010 receipt row; migration 0001's trigger keeps UPDATE/DELETE impossible for every role)
 
 No JSON keys for any service account. Ever. See ADR-013 and the anti-pattern entry.
 
@@ -206,6 +206,21 @@ No JSON keys for any service account. Ever. See ADR-013 and the anti-pattern ent
 - Attribute condition pins the pool to a single repository: `attribute.repository == '<owner>/techscreen'`.
 - The runner impersonates `terraform@<project>` for infra changes and `techscreen-backend@<project>` (restricted subset) for deploy-time smoke calls if needed.
 - No long-lived secrets stored in GitHub. Only the WIF provider resource name and SA email.
+
+### Configs-as-code sync — one workflow, all surfaces (§16)
+
+[`.github/workflows/sync-configs.yml`](../../.github/workflows/sync-configs.yml) (renamed from `sync-feature-flags.yml` in T16) is the single place where Git-canonical configuration lands in the databases. Two independent jobs — no `needs:` between them, each matrixed over `dev`+`prod` with `fail-fast: false` — so one surface failing never blocks the other:
+
+| Job | Source of truth | Target tables | Semantics |
+| --- | --- | --- | --- |
+| `sync-feature-flags` (T05a) | `configs/feature-flags.yaml` | `feature_flag` | upsert; orphan rows warned, never deleted |
+| `sync-rubric` (T16) | `configs/rubric/*.yaml` | `rubric_tree_version` + tree tables (+ 1 `audit_log` receipt) | new immutable version per content change (§4/ADR-018); no-op on identical payload hash |
+
+Any future `configs/*` surface (Phase 2 position templates, prompt registries, …) gets a **third job in this same workflow**, not a new workflow.
+
+**Destructive-change gate (`sync-rubric` only).** Before touching the cloud, the job diffs `configs/rubric/` against the push's `before` commit. Retiring or un-retiring a node, removing a level, or changing a level's `descriptor_en` is *destructive* — the job fails unless the merged PR body or the head commit message cites an `ADR-xxx`. Deleting a stable id outright always fails — retire it instead (specs/010 FR-009); the importer's DB-side rename check backstops the gate.
+
+**Wake the DB first (cost-idle mode).** The Cloud SQL instances sleep by default; both jobs fail fast against a stopped instance. Before merging anything that touches `configs/feature-flags.yaml` or `configs/rubric/**`: `scripts/cloud-sql-power.sh wake all`, merge, let the workflow finish, then `sleep all`. If a merge already landed against sleeping instances: wake, then use **Re-run failed jobs** on the run — a re-run keeps the original push payload; a fresh `workflow_dispatch` loses `github.event.before` and degrades the destructive-gate baseline to `HEAD~1`.
 
 ---
 
@@ -311,6 +326,7 @@ Each of these becomes a candidate for ADR-reversal when the pilot graduates.
 
 ## Document versioning
 
+- v2.1 — 2026-07-05 — T16: configs-as-code sync section (workflow renamed to `sync-configs.yml`, rubric surface + destructive-change gate), flag-sync SA in-database privileges extended to the rubric tables + INSERT-only `audit_log`.
 - v2.0 — 2026-07-02 — T06: dev+prod topology (ADR-023), real Terraform layout (flat root + environment module), per-env secrets/IAM, flag-sync identity, cost table doubled, assets bucket deferred.
 - v1.0 — 2026-04-18.
 - Update this file when: a resource is added/removed, a secret is added/removed, region changes, IAM model changes, or the bootstrap procedure changes.
