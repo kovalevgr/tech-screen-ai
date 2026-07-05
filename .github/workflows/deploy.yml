@@ -1,0 +1,367 @@
+# T06a — /deploy: build → push → Cloud Run revision at 0% traffic → smoke.
+#
+# Dispatch (the playbook's `/deploy` verb):
+#   gh workflow run deploy.yml -f env=dev -f service=both -f git_ref=main
+#
+# What it does, per selected service:
+#   1. Gate job: prod-ancestry check (prod deploys must come from main
+#      history), the constitution §10 migration gate (any alembic/versions/**
+#      change between the currently-deployed backend SHA — parsed from the
+#      image tag — and the target ref must come from a PR carrying the
+#      `migration-approved` label, T10 mechanic), and the Cloud SQL cost-idle
+#      guard (fail fast with a wake instruction when a step needs an asleep
+#      DB; see docs/engineering/deploy-playbook.md § Cost-idle mode).
+#   2. Build the `runtime` Docker target (linux/amd64) and push it to
+#      Artifact Registry under the immutable tag <full-git-sha>-<env>.
+#   3. `gcloud run deploy --no-traffic`: new revision, 0% traffic, existing
+#      traffic untouched (ADR-012 dark deploy). Only the image (+container
+#      port) changes — env vars/secrets/scaling stay Terraform-owned.
+#   4. Move the `candidate` revision tag to the new revision and smoke its
+#      tag-specific URL (backend /health, frontend /) within a 60s budget.
+#   5. Job summary: revision name, image, candidate URL, smoke verdict.
+#
+# Identity: techscreen-deployer@ via Workload Identity Federation ONLY —
+# no JSON keys, no repository secrets (constitution §5–6). Free-text inputs
+# (git_ref) reach shell steps via env-mapping only, never inline ${{ }}.
+#
+# This workflow NEVER applies alembic migrations — schema application is
+# operator-run (specs/020-t06a-deploy-commands/research.md D2).
+
+name: Deploy (/deploy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [dev, prod]
+      service:
+        description: "Service(s) to deploy"
+        required: true
+        type: choice
+        options: [backend, frontend, both]
+        default: both
+      git_ref:
+        description: "Git ref to deploy (branch/tag/SHA). prod requires a ref reachable from main."
+        required: true
+        default: main
+
+permissions:
+  contents: read
+  id-token: write # WIF (google-github-actions/auth)
+  pull-requests: read # §10 migration gate reads PR labels
+
+# One traffic-affecting operation per environment at a time. /rollback shares
+# this group with cancel-in-progress:true and therefore preempts deploys.
+concurrency:
+  group: "cloud-run-${{ inputs.env }}"
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  GCP_PROJECT: "tech-screen-493720"
+  REGION: "europe-west1"
+  AR_HOST: "europe-west1-docker.pkg.dev"
+  AR_REPO: "europe-west1-docker.pkg.dev/tech-screen-493720/techscreen"
+  WIF_PROVIDER: "projects/463244185014/locations/global/workloadIdentityPools/github-actions/providers/github"
+  DEPLOYER_SA: "techscreen-deployer@tech-screen-493720.iam.gserviceaccount.com"
+  TARGET_ENV: ${{ inputs.env }} # choice input (enum) — safe
+  SERVICE_INPUT: ${{ inputs.service }} # choice input (enum) — safe
+  GIT_REF: ${{ inputs.git_ref }} # free text — env-mapped ONLY (never inline in run:)
+
+jobs:
+  gate:
+    name: gate (ancestry + §10 migration label + DB state)
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.meta.outputs.sha }}
+    steps:
+      - name: Checkout target ref (full history for baseline diffs)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_ref }}
+          fetch-depth: 0
+
+      - name: Resolve target SHA + environment naming
+        id: meta
+        run: |
+          sha="$(git rev-parse HEAD)"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "TARGET_SHA=${sha}" >> "$GITHUB_ENV"
+          if [ "$TARGET_ENV" = "dev" ]; then suffix="-dev"; else suffix=""; fi
+          echo "NAME_SUFFIX=${suffix}" >> "$GITHUB_ENV"
+          echo "Deploying ref '${GIT_REF}' = ${sha} to ${TARGET_ENV} (service: ${SERVICE_INPUT})"
+
+      - name: Prod ancestry guard — prod deploys come from main history
+        run: |
+          if [ "$TARGET_ENV" != "prod" ]; then
+            echo "dev deploy: any ref is allowed (rehearsal environment, ADR-023)."
+            exit 0
+          fi
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "$TARGET_SHA" origin/main; then
+            echo "::error::prod deploys must use a ref reachable from origin/main (got ${TARGET_SHA}). Merge first, then /deploy."
+            exit 1
+          fi
+          echo "Ancestry OK: ${TARGET_SHA} is on main history."
+
+      - name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Migration gate — §10 migration-approved label
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          backend_svc="techscreen-backend${NAME_SUFFIX}"
+          img="$(gcloud run services describe "$backend_svc" --region "$REGION" \
+                 --format='value(spec.template.spec.containers[0].image)')"
+          baseline=""
+          case "$img" in
+            */techscreen/backend:*)
+              tag="${img##*:}"
+              sha_candidate="${tag%%-*}"
+              if git cat-file -e "${sha_candidate}^{commit}" 2>/dev/null; then
+                baseline="$sha_candidate"
+              fi
+              ;;
+          esac
+          if [ -z "$baseline" ]; then
+            git fetch --quiet origin main
+            baseline="$(git rev-parse origin/main~1)"
+            echo "::notice::No deployed git SHA recoverable from image '${img}' (placeholder or foreign tag) — migration-gate baseline falls back to origin/main~1 (${baseline}). See specs/020-t06a-deploy-commands/research.md D7."
+          fi
+          echo "Migration-gate baseline: ${baseline}"
+          changed="$(git diff --name-only "${baseline}..${TARGET_SHA}" -- 'alembic/versions/' || true)"
+          if [ -z "$changed" ]; then
+            echo "No alembic/versions/** changes between baseline and target — §10 gate passes."
+            echo "MIGRATION_GATE=pass (no migration changes)" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "Changed migration files:"
+          echo "$changed"
+          fail=0
+          while IFS= read -r commit; do
+            [ -n "$commit" ] || continue
+            prs="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${commit}/pulls" --jq '.[].number' || true)"
+            if [ -z "$prs" ]; then
+              echo "::error::Migration commit ${commit} has no associated PR — nothing can carry the §10 approval."
+              fail=1
+              continue
+            fi
+            approved=0
+            while IFS= read -r pr; do
+              [ -n "$pr" ] || continue
+              if gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr}" --jq '.labels[].name' | grep -qx 'migration-approved'; then
+                echo "Commit ${commit}: PR #${pr} carries migration-approved."
+                approved=1
+                break
+              fi
+            done <<< "$prs"
+            if [ "$approved" -eq 0 ]; then
+              pr_list="$(printf '%s' "$prs" | tr '\n' ' ')"
+              echo "::error::Migration commit ${commit} (PRs: ${pr_list}) lacks the migration-approved label (constitution §10)."
+              fail=1
+            fi
+          done < <(git log --format=%H "${baseline}..${TARGET_SHA}" -- 'alembic/versions/')
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::§10 migration gate FAILED — review the rendered SQL on the PR (ci.yml comment), apply the migration-approved label, then re-dispatch. /deploy never applies migrations itself; schema application is operator-run (deploy-playbook.md § Migrations)."
+            exit 1
+          fi
+          echo "MIGRATION_GATE=pass (labels verified)" >> "$GITHUB_ENV"
+
+      - name: Cost-idle guard — Cloud SQL instance state
+        run: |
+          instance="techscreen-pg${NAME_SUFFIX}"
+          read -r state policy < <(gcloud sql instances describe "$instance" \
+            --format='value(state,settings.activationPolicy)')
+          if [ "${state:-}" = "RUNNABLE" ] && [ "${policy:-}" = "ALWAYS" ]; then
+            echo "Cloud SQL ${instance} is awake (state=${state}, activationPolicy=${policy})."
+            echo "DB_STATE=awake" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "DB_STATE=asleep (state=${state:-unknown}, policy=${policy:-unknown})" >> "$GITHUB_ENV"
+          db_wired="$(gcloud run services describe "techscreen-backend${NAME_SUFFIX}" --region "$REGION" --format=json \
+            | jq '[.spec.template.spec.containers[]?.env[]? | select(.name == "DATABASE_URL")] | length')"
+          if [ "$SERVICE_INPUT" != "frontend" ] && [ "${db_wired:-0}" -gt 0 ]; then
+            echo "::error::Cloud SQL instance ${instance} is asleep — run scripts/cloud-sql-power.sh wake ${TARGET_ENV} and re-dispatch. The backend template wires DATABASE_URL, so the new backend revision connects to the database at startup (feature-flag service) and its readiness probe would fail against a stopped instance."
+            exit 1
+          fi
+          echo "::notice::Cloud SQL instance ${instance} is asleep (cost-idle mode). No step in this deploy needs it: the backend template does not wire DATABASE_URL yet, and migrations are operator-run. Steps that DO need the DB when present: backend revision startup once DATABASE_URL is wired; alembic upgrade head (operator). To wake: scripts/cloud-sql-power.sh wake ${TARGET_ENV}."
+
+      - name: Gate summary
+        if: always()
+        run: |
+          {
+            echo "## /deploy gate — ${TARGET_ENV}"
+            echo ""
+            echo "| check | result |"
+            echo "| --- | --- |"
+            echo "| target | \`${GIT_REF}\` → \`${TARGET_SHA:-unresolved}\` |"
+            echo "| prod ancestry | ${TARGET_ENV} ($([ "$TARGET_ENV" = "prod" ] && echo "enforced" || echo "n/a for dev")) |"
+            echo "| §10 migration gate | ${MIGRATION_GATE:-FAILED — see step log} |"
+            echo "| Cloud SQL | ${DB_STATE:-unchecked} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: deploy ${{ matrix.service }} → ${{ inputs.env }} (0% traffic)
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(inputs.service == 'both' && '["backend","frontend"]' || format('["{0}"]', inputs.service)) }}
+    env:
+      SVC: ${{ matrix.service }}
+      TARGET_SHA: ${{ needs.gate.outputs.sha }}
+    steps:
+      - name: Checkout the gated SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+
+      - name: Derive service configuration
+        id: cfg
+        run: |
+          if [ "$SVC" = "backend" ]; then
+            echo "dockerfile=Dockerfile" >> "$GITHUB_OUTPUT"
+            echo "port=8000" >> "$GITHUB_OUTPUT" # uvicorn CMD in the runtime stage
+          else
+            echo "dockerfile=Dockerfile.frontend" >> "$GITHUB_OUTPUT"
+            echo "port=3000" >> "$GITHUB_OUTPUT" # next start honours PORT=containerPort
+          fi
+          if [ "$TARGET_ENV" = "dev" ]; then suffix="-dev"; else suffix=""; fi
+          echo "NAME_SUFFIX=${suffix}" >> "$GITHUB_ENV"
+          echo "SERVICE_NAME=techscreen-${SVC}${suffix}" >> "$GITHUB_ENV"
+          echo "IMAGE=${AR_REPO}/${SVC}:${TARGET_SHA}-${TARGET_ENV}" >> "$GITHUB_ENV"
+          echo "REV_SUFFIX=${TARGET_SHA:0:7}-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+
+      - name: Authenticate to GCP (Workload Identity Federation)
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+          token_format: access_token
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Docker login to Artifact Registry (short-lived OAuth token)
+        uses: docker/login-action@v3
+        with:
+          registry: europe-west1-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # NEXT_PUBLIC_* values are inlined into the client bundle at build time,
+      # which is why frontend images are env-specific (research D3).
+      - name: Resolve backend URL for the frontend build
+        id: burl
+        if: matrix.service == 'frontend'
+        run: |
+          url="$(gcloud run services describe "techscreen-backend${NAME_SUFFIX}" \
+            --region "$REGION" --format='value(status.url)')"
+          echo "url=${url}" >> "$GITHUB_OUTPUT"
+          echo "Frontend will be built against backend URL: ${url}"
+
+      - name: Build and push the runtime image (linux/amd64, immutable tag)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ steps.cfg.outputs.dockerfile }}
+          target: runtime
+          platforms: linux/amd64
+          push: true
+          provenance: false # one manifest per tag — the tag IS the provenance link (research D3)
+          tags: ${{ env.IMAGE }}
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=${{ steps.burl.outputs.url }}
+            NEXT_PUBLIC_APP_ENV=${{ inputs.env }}
+          cache-from: type=gha,scope=deploy-${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=deploy-${{ matrix.service }}
+
+      # Only the image (and container port) changes relative to the
+      # Terraform-owned template — env vars, secrets, scaling, SAs stay in
+      # infra/terraform/modules/environment/ (T06 ignore_changes contract).
+      - name: Deploy new revision at 0% traffic
+        env:
+          PORT: ${{ steps.cfg.outputs.port }}
+        run: |
+          gcloud run deploy "$SERVICE_NAME" \
+            --image "$IMAGE" \
+            --region "$REGION" \
+            --port "$PORT" \
+            --no-traffic \
+            --revision-suffix "$REV_SUFFIX" \
+            --quiet
+          rev="$(gcloud run services describe "$SERVICE_NAME" --region "$REGION" \
+            --format='value(status.latestCreatedRevisionName)')"
+          echo "REVISION=${rev}" >> "$GITHUB_ENV"
+          echo "New revision at 0% traffic: ${rev}"
+
+      - name: Move the candidate tag to the new revision
+        run: |
+          gcloud run services update-traffic "$SERVICE_NAME" \
+            --region "$REGION" \
+            --update-tags "candidate=${REVISION}" \
+            --quiet
+          tag_url="$(gcloud run services describe "$SERVICE_NAME" --region "$REGION" --format=json \
+            | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')"
+          echo "TAG_URL=${tag_url}" >> "$GITHUB_ENV"
+          echo "Candidate URL: ${tag_url}"
+
+      - name: Smoke the candidate revision (60s budget)
+        run: |
+          if [ "$SVC" = "backend" ]; then path="/health"; else path="/"; fi
+          deadline=$(( $(date +%s) + 60 ))
+          ok=0
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            code="$(curl -s -o /tmp/smoke-body -w '%{http_code}' --max-time 10 "${TAG_URL}${path}" || echo "000")"
+            if [ "$code" = "200" ]; then
+              if [ "$SVC" = "backend" ]; then
+                if grep -q '"status":"ok"' /tmp/smoke-body; then ok=1; break; fi
+              else
+                ok=1
+                break
+              fi
+            fi
+            sleep 5
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "SMOKE_RESULT=FAILED (${TAG_URL}${path}, last HTTP ${code})" >> "$GITHUB_ENV"
+            echo "::error::Smoke FAILED for ${SERVICE_NAME} at ${TAG_URL}${path} within 60s (last HTTP ${code}). The revision stays at 0% traffic — investigate logs, then fix-forward or abandon. Do NOT promote."
+            exit 1
+          fi
+          echo "SMOKE_RESULT=passed (${TAG_URL}${path})" >> "$GITHUB_ENV"
+          echo "Smoke passed: ${TAG_URL}${path}"
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## /deploy — ${SERVICE_NAME:-techscreen-${SVC}} (${TARGET_ENV})"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| git sha | \`${TARGET_SHA}\` |"
+            echo "| image | \`${IMAGE:-not built}\` |"
+            echo "| revision | \`${REVISION:-none — deploy step did not complete}\` |"
+            echo "| candidate URL | ${TAG_URL:-n/a} |"
+            echo "| smoke | ${SMOKE_RESULT:-not reached} |"
+            echo "| traffic | unchanged (new revision at 0% — use /promote to ramp) |"
+          } >> "$GITHUB_STEP_SUMMARY"

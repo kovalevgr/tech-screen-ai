@@ -1,0 +1,143 @@
+# T06a — /promote: shift a percentage of live traffic to the latest READY
+# revision (ADR-012 ramp: 10 → 50 → 100).
+#
+# Dispatch (the playbook's `/promote N` verb):
+#   gh workflow run promote.yml -f env=dev -f service=both -f percent=10
+#
+# Semantics (specs/020-t06a-deploy-commands/research.md D8):
+#   - The target revision is resolved BY NAME from status.latestReadyRevisionName
+#     and pinned with `update-traffic --to-revisions=<name>=<percent>`. We never
+#     leave a floating LATEST allocation — that would silently hand traffic to
+#     the NEXT deploy's un-promoted candidate.
+#   - The remaining percentage redistributes proportionally across revisions
+#     that currently serve traffic (gcloud behaviour). Promoting <100% when
+#     only one revision serves traffic cannot distribute the remainder and
+#     fails — deploy first, then promote.
+#   - If a newer revision exists but is not ready (failed deploy), the latest
+#     READY revision is promoted and a warning names the failed one.
+#
+# Identity: techscreen-deployer@ via WIF only (constitution §5–6). All inputs
+# are choice enums; nothing free-text reaches a run: block.
+
+name: Promote (/promote)
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [dev, prod]
+      service:
+        description: "Service(s) to promote"
+        required: true
+        type: choice
+        options: [backend, frontend, both]
+        default: both
+      percent:
+        description: "Traffic percentage for the latest ready revision"
+        required: true
+        type: choice
+        options: ["10", "50", "100"]
+        default: "10"
+
+permissions:
+  contents: read
+  id-token: write # WIF
+
+concurrency:
+  group: "cloud-run-${{ inputs.env }}"
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  REGION: "europe-west1"
+  WIF_PROVIDER: "projects/463244185014/locations/global/workloadIdentityPools/github-actions/providers/github"
+  DEPLOYER_SA: "techscreen-deployer@tech-screen-493720.iam.gserviceaccount.com"
+  TARGET_ENV: ${{ inputs.env }} # choice input (enum) — safe
+  PERCENT: ${{ inputs.percent }} # choice input (enum) — safe
+
+jobs:
+  promote:
+    name: promote ${{ matrix.service }} → ${{ inputs.env }} @ ${{ inputs.percent }}%
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(inputs.service == 'both' && '["backend","frontend"]' || format('["{0}"]', inputs.service)) }}
+    env:
+      SVC: ${{ matrix.service }}
+    steps:
+      - name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Shift traffic to the latest ready revision (pinned by name)
+        run: |
+          if [ "$TARGET_ENV" = "dev" ]; then suffix="-dev"; else suffix=""; fi
+          service_name="techscreen-${SVC}${suffix}"
+          echo "SERVICE_NAME=${service_name}" >> "$GITHUB_ENV"
+
+          ready="$(gcloud run services describe "$service_name" --region "$REGION" \
+            --format='value(status.latestReadyRevisionName)')"
+          created="$(gcloud run services describe "$service_name" --region "$REGION" \
+            --format='value(status.latestCreatedRevisionName)')"
+          if [ -z "$ready" ]; then
+            echo "::error::${service_name} has no ready revision to promote."
+            exit 1
+          fi
+          if [ "$ready" != "$created" ]; then
+            echo "::warning::Latest created revision (${created}) is not ready — promoting the latest READY revision (${ready}) instead. Investigate the failed deploy."
+          fi
+          echo "TARGET_REVISION=${ready}" >> "$GITHUB_ENV"
+
+          split_json="$(gcloud run services describe "$service_name" --region "$REGION" --format=json)"
+          before="$(printf '%s' "$split_json" | jq -r \
+            '[.status.traffic[] | "\(.revisionName // "LATEST")=\(.percent // 0)%"] | join(", ")')"
+          echo "TRAFFIC_BEFORE=${before}" >> "$GITHUB_ENV"
+          current="$(printf '%s' "$split_json" | jq -r --arg rev "$ready" \
+            '[.status.traffic[] | select(.revisionName == $rev) | .percent // 0] | add // 0')"
+
+          if [ "$current" = "$PERCENT" ]; then
+            echo "No-op: ${ready} already serves ${PERCENT}% — nothing to change."
+            echo "TRAFFIC_AFTER=${before}" >> "$GITHUB_ENV"
+            echo "PROMOTE_RESULT=no-op (already at ${PERCENT}%)" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          gcloud run services update-traffic "$service_name" \
+            --region "$REGION" \
+            --to-revisions "${ready}=${PERCENT}" \
+            --quiet
+
+          after="$(gcloud run services describe "$service_name" --region "$REGION" --format=json \
+            | jq -r '[.status.traffic[] | "\(.revisionName // "LATEST")=\(.percent // 0)%"] | join(", ")')"
+          echo "TRAFFIC_AFTER=${after}" >> "$GITHUB_ENV"
+          echo "PROMOTE_RESULT=shifted" >> "$GITHUB_ENV"
+          echo "Traffic now: ${after}"
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## /promote ${PERCENT} — ${SERVICE_NAME:-techscreen-${SVC}} (${TARGET_ENV})"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| target revision | \`${TARGET_REVISION:-unresolved}\` |"
+            echo "| result | ${PROMOTE_RESULT:-FAILED — see step log} |"
+            echo "| traffic before | ${TRAFFIC_BEFORE:-n/a} |"
+            echo "| traffic after | ${TRAFFIC_AFTER:-n/a} |"
+            echo ""
+            echo "Observe per docs/engineering/deploy-playbook.md (error rate, p95, LLM cost) before the next step. Rollback at any point: \`gh workflow run rollback.yml -f env=${TARGET_ENV} -f service=${SVC}\`."
+          } >> "$GITHUB_STEP_SUMMARY"
