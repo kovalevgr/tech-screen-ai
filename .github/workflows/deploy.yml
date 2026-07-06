@@ -233,17 +233,23 @@ jobs:
         id: cfg
         run: |
           if [ "$SVC" = "backend" ]; then
-            echo "dockerfile=Dockerfile" >> "$GITHUB_OUTPUT"
-            echo "port=8000" >> "$GITHUB_OUTPUT" # uvicorn CMD in the runtime stage
+            {
+              echo "dockerfile=Dockerfile"
+              echo "port=8000" # uvicorn CMD in the runtime stage
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "dockerfile=Dockerfile.frontend" >> "$GITHUB_OUTPUT"
-            echo "port=3000" >> "$GITHUB_OUTPUT" # next start honours PORT=containerPort
+            {
+              echo "dockerfile=Dockerfile.frontend"
+              echo "port=3000" # next start honours PORT=containerPort
+            } >> "$GITHUB_OUTPUT"
           fi
           if [ "$TARGET_ENV" = "dev" ]; then suffix="-dev"; else suffix=""; fi
-          echo "NAME_SUFFIX=${suffix}" >> "$GITHUB_ENV"
-          echo "SERVICE_NAME=techscreen-${SVC}${suffix}" >> "$GITHUB_ENV"
-          echo "IMAGE=${AR_REPO}/${SVC}:${TARGET_SHA}-${TARGET_ENV}" >> "$GITHUB_ENV"
-          echo "REV_SUFFIX=${TARGET_SHA:0:7}-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+          {
+            echo "NAME_SUFFIX=${suffix}"
+            echo "SERVICE_NAME=techscreen-${SVC}${suffix}"
+            echo "IMAGE=${AR_REPO}/${SVC}:${TARGET_SHA}-${TARGET_ENV}"
+            echo "REV_SUFFIX=${TARGET_SHA:0:7}-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          } >> "$GITHUB_ENV"
 
       - name: Authenticate to GCP (Workload Identity Federation)
         id: auth
