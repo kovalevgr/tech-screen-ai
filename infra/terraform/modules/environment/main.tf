@@ -226,15 +226,67 @@ resource "google_cloud_run_v2_service" "backend" {
       max_instance_count = 5
     }
 
+    # Cloud SQL connector (unix socket under /cloudsql) — the DATABASE_URL
+    # secret's DSN uses ?host=/cloudsql/<connection_name> (specs/020 D12).
+    # Conditional on wire_runtime: a connector volume against a STOPPED
+    # instance keeps new revisions from becoming ready (cost-idle mode).
+    dynamic "volumes" {
+      for_each = var.wire_runtime ? [1] : []
+      content {
+        name = "cloudsql"
+        cloud_sql_instance {
+          instances = [google_sql_database_instance.pg.connection_name]
+        }
+      }
+    }
+
     containers {
       # Placeholder until T06a's /deploy pushes the real image; Terraform
       # permanently ignores image drift below so deploys never fight state.
+      # The env/secret wiring below is real from day one: the placeholder
+      # ignores it, the first real backend image boots on it (D12).
       image = "us-docker.pkg.dev/cloudrun/container/hello"
 
       resources {
         limits = {
           cpu    = "1"
           memory = "1Gi"
+        }
+      }
+
+      dynamic "volume_mounts" {
+        for_each = var.wire_runtime ? [1] : []
+        content {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.wire_runtime ? {
+          APP_ENV             = var.env
+          LLM_BACKEND         = var.llm_backend
+          GCP_PROJECT         = var.project_id
+          GCP_LOCATION        = var.region
+          AUTH_MODE           = var.auth_mode
+          AUTH_ALLOWED_DOMAIN = var.auth_allowed_domain
+        } : {}
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.wire_runtime ? [1] : []
+        content {
+          name = "DATABASE_URL"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.env["DATABASE_URL"].secret_id
+              version = "latest"
+            }
+          }
         }
       }
     }
@@ -247,9 +299,6 @@ resource "google_cloud_run_v2_service" "backend" {
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
-      # The /deploy workflow names revisions explicitly (sha-run-attempt);
-      # Terraform must not null it back — deploys own revision naming (T06a).
-      template[0].revision,
       client,
       client_version,
       # API populates an empty service-level scaling block we do not manage
@@ -292,9 +341,6 @@ resource "google_cloud_run_v2_service" "frontend" {
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
-      # The /deploy workflow names revisions explicitly (sha-run-attempt);
-      # Terraform must not null it back — deploys own revision naming (T06a).
-      template[0].revision,
       client,
       client_version,
       # API populates an empty service-level scaling block we do not manage
