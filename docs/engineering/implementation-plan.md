@@ -272,6 +272,8 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
   - Non-`@n-ix.com` tokens are rejected with 401.
   - Middleware unit-tested against three role fixtures.
 
+  > **Correcting note (2026-07-06, T07 implementation — see `specs/021-t07-identity-sso/` research R2 and [ADR-024](../../adr/024-identity-platform-internal-sso.md)):** role membership is **configs-as-code** (`configs/auth-roles.yaml`, §16) read by the blocking function — not Workspace groups; the Groups API (domain-wide delegation) is the documented upgrade path, consistent with ADR-016's "not via Workspace groups at MVP". The acceptance token's `role` claim therefore matches the committed mapping, not a Workspace group. The middleware ships dark behind the `AUTH_MODE` env seam (default `disabled`; research R6 justifies env-var over a DB feature flag), and the Identity Platform config is project-global — one identity plane shared by dev and prod (research R8).
+
 ### T08 — Matrix importer (xlsx → YAML → DB)
 
 - **agent:** `backend-engineer`
