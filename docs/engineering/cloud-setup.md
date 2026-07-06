@@ -196,7 +196,7 @@ Human access is via Workspace SSO (N-iX). No direct IAM user accounts.
   - Minimal: `roles/logging.logWriter`, `roles/monitoring.metricWriter`. Do not talk to SQL or Secret Manager directly.
 - **`techscreen-flag-sync@`:** CI identity for `.github/workflows/sync-configs.yml` (both environments; the workflow was renamed from `sync-feature-flags.yml` when T16 added the rubric surface — the SA name keeps its historical `flag-sync` id, renaming a live SA is not worth the churn).
   - `roles/cloudsql.client` + `roles/cloudsql.instanceUser`; WIF-bound to this repository
-  - In-database privileges limited to the configs-as-code tables (`scripts/cloud-db-grants.sql`): `feature_flag` (SELECT/INSERT/UPDATE — the only mutable surface), the six rubric-tree tables (SELECT/INSERT or INSERT-only; the importer never UPDATEs — §4/ADR-018), and INSERT-only on `audit_log` (the one §3-permitted verb, for the FR-010 receipt row; migration 0001's trigger keeps UPDATE/DELETE impossible for every role)
+  - In-database privileges limited to the configs-as-code tables (`scripts/cloud-db-grants.sql`): `feature_flag` (SELECT/INSERT/UPDATE — the only mutable surface), the six rubric-tree tables (SELECT/INSERT or INSERT-only; the importer never UPDATEs — §4/ADR-018), and INSERT-only on `audit_log` (the one §3-permitted verb, for the FR-010 receipt row; migration 0001's trigger keeps UPDATE/DELETE impossible for every non-migrator role — the migrator exemption exists for §10 human-approved migrations)
 
 No JSON keys for any service account. Ever. See ADR-013 and the anti-pattern entry.
 

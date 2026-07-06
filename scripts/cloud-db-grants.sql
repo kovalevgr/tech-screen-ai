@@ -63,8 +63,10 @@ GRANT INSERT ON TABLE level
 -- (action='rubric.versioned') per new version; INSERT is the single verb §3
 -- permits, and it is the only verb granted here (no SELECT — the importer
 -- never reads audit_log, and the INSERT has no RETURNING clause). UPDATE and
--- DELETE stay impossible for EVERY role — including this one — via migration
--- 0001's reject_audit_mutation() trigger; this grant cannot weaken §3.
+-- DELETE stay impossible for every non-migrator role — including this one —
+-- via migration 0001's reject_audit_mutation() trigger (techscreen_migrator is
+-- exempt by design, for §10 human-approved migrations); this grant cannot
+-- weaken §3.
 -- The other five §3 tables (turn_trace, assessment, assessment_correction,
 -- turn_annotation, session_decision) get NOTHING.
 -- ---------------------------------------------------------------------------
