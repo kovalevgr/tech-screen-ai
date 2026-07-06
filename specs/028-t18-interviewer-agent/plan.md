@@ -70,7 +70,7 @@ app/backend/agents/__init__.py                 # new (backend-engineer)
 app/backend/agents/interviewer.py              # new (backend-engineer)
 app/backend/tests/agents/__init__.py           # new, empty
 app/backend/tests/agents/test_interviewer.py   # new (backend-engineer)
-docs/engineering/vertex-integration.md         # commit 3 — Interviewer retry line aligned (reviewer finding 1)
+docs/engineering/vertex-integration.md         # commit 3 — Interviewer retry line (finding 1); commit 4 — Assessor bullet (T19 reviewer)
 docs/engineering/implementation-plan.md        # commit 3 — T17 stale schema sketch → schema.json as source of truth (finding 2)
 docs/engineering/coding-conventions.md         # commit 3 — backend layout gains agents/ line (finding 3)
 ```
@@ -81,3 +81,4 @@ docs/engineering/coding-conventions.md         # commit 3 — backend layout gai
 - **Phase 1**: wrapper module + typed models + retry policy.
 - **Phase 2**: unit suite (mock only at the `call_model` boundary) + full quality gates.
 - **Phase 3**: reviewer findings (PASS-WITH-FINDINGS, commit 3) — three doc-drift fixes, notes.md bounds clause, schema deepcopy, mixed-sequence + cache-independence tests.
+- **Phase 4**: T19-reviewer cross-branch doc fix (commit 4) — vertex-integration.md Assessor bullet aligned with the shipped T19 wrapper; carried on this branch because it owns the file's edits (T19 stays purely additive).

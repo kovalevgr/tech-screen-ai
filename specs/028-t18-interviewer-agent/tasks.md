@@ -38,3 +38,8 @@
 - [X] T018 `interviewer.py`: `_load_output_schema` now returns `copy.deepcopy` of the `lru_cache`d file read — downstream mutation cannot poison the module cache; guarded by a new cache-independence test
 - [X] T019 Mixed-sequence test: `VertexSchemaError` then invalid parsed output → `InterviewerOutputInvalid`, exactly 2 `call_model` invocations, `__cause__` is the second (validation) failure
 - [X] T020 Spec artefacts updated for truthfulness (spec.md Clarifications + SC-003, plan.md gate note / source tree / phases, this phase) and all four quality gates re-run green
+
+## Phase 4: T19-reviewer cross-branch doc fix — commit 4 (2026-07-07)
+
+- [X] T021 `docs/engineering/vertex-integration.md` § "JSON mode": Assessor bullet rewritten to the shipped T19 policy — single retry with an identical fresh request (no temperature bump: `ModelCallRequest` has no temperature field; it comes from agent config), second failure → typed `AssessorOutputInvalid` to the orchestrator, which owns escalation (e.g. `needs_manual_review`, a §2 routing decision the wrapper must not make). Carried on this branch because it owns the file's edits; T19 stays purely additive
+- [X] T022 spec.md Clarifications + SC-003 updated (four doc amendments, not three); all four quality gates re-run green
