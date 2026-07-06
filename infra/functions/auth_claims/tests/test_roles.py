@@ -139,3 +139,20 @@ def test_decide_blocks_everyone_else(mapping, email: object, verified: object) -
 
 def test_decision_claims_default_empty() -> None:
     assert dict(Decision(allowed=False, reason="x").claims) == {}
+
+
+def test_before_created_never_persists_custom_claims() -> None:
+    """Regression tripwire for reviewer PR#22 finding 1 (stale persistent role).
+
+    ``firebase_functions`` is not a dev dependency, so the trigger wrappers are
+    pinned at the source level: creation must never write persistent
+    ``custom_claims`` (session claims merge over persistent ones, so an absent
+    session ``role`` cannot erase a persisted one after removal from
+    ``configs/auth-roles.yaml``). Roles are session-claims-only, delivered by
+    ``before_signed_in`` on every sign-in.
+    """
+    src = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
+    assert "BeforeCreateResponse(custom_claims" not in src
+    create_body = src.split("def before_created", 1)[1].split("def before_signed_in", 1)[0]
+    assert "return None" in create_body
+    assert "BeforeSignInResponse(session_claims" in src

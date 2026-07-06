@@ -51,9 +51,18 @@ def _decision_for(event: identity_fn.AuthBlockingEvent) -> Decision:
 def before_created(
     event: identity_fn.AuthBlockingEvent,
 ) -> identity_fn.BeforeCreateResponse | None:
-    """Gate account creation and persist the initial claims."""
-    decision = _decision_for(event)
-    return identity_fn.BeforeCreateResponse(custom_claims=dict(decision.claims))
+    """Gate account creation. Deliberately sets NO persistent claims.
+
+    Persistent ``custom_claims`` written here would survive removal from
+    ``configs/auth-roles.yaml``: session claims merge over persistent ones and
+    an *absent* session ``role`` cannot erase a persisted ``role``, so a
+    removed staff member would keep their old role forever (reviewer PR#22
+    finding 1). Both blocking triggers fire on the first sign-in, so
+    :func:`before_signed_in`'s session claims already deliver the role for
+    every session — creation only needs the allow/deny gate.
+    """
+    _decision_for(event)
+    return None
 
 
 @identity_fn.before_user_signed_in(region="europe-west1")

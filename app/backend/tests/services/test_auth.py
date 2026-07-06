@@ -236,6 +236,66 @@ async def test_verify_refreshes_certs_once_on_unknown_kid() -> None:
     assert len(calls) == 2  # initial fetch + one rotation refresh
 
 
+async def test_unknown_kid_forced_refresh_respects_cooldown() -> None:
+    """Reviewer PR#22 finding 2: garbage-kid spray must not amplify cert fetches.
+
+    Within the cooldown an unknown ``kid`` fails fast against the cache; only
+    after the window may the next unknown ``kid`` force one more refetch.
+    """
+    calls: list[int] = []
+    now = [1000.0]
+
+    def _fetch() -> Mapping[str, str]:
+        calls.append(1)
+        return _CERTS  # never contains the rogue kid
+
+    verifier = IdTokenVerifier(
+        project_id=_PROJECT,
+        allowed_domain=_DOMAIN,
+        certs_fetcher=_fetch,
+        forced_refresh_cooldown_seconds=30.0,
+        clock=lambda: now[0],
+    )
+    rogue_priv, _ = _pem_pair()
+    rogue_signer = crypt.RSASigner.from_string(rogue_priv, "rogue-kid")  # type: ignore[no-untyped-call]
+    wall = int(time.time())
+    rogue_token: str = google_jwt.encode(  # type: ignore[no-untyped-call]
+        rogue_signer,
+        {
+            "iss": f"https://securetoken.google.com/{_PROJECT}",
+            "aud": _PROJECT,
+            "sub": "rogue",
+            "email": f"rogue@{_DOMAIN}",
+            "email_verified": True,
+            "hd": _DOMAIN,
+            "role": "recruiter",
+            "iat": wall - 60,
+            "exp": wall + 3600,
+        },
+    ).decode("utf-8")
+
+    with pytest.raises(TokenVerificationError):
+        await verifier.verify(rogue_token)
+    assert len(calls) == 2  # initial fill + one forced refresh
+
+    with pytest.raises(TokenVerificationError):
+        await verifier.verify(rogue_token)
+    assert len(calls) == 2  # inside the cooldown: no extra fetch
+
+    now[0] += 31.0
+    with pytest.raises(TokenVerificationError):
+        await verifier.verify(rogue_token)
+    assert len(calls) == 3  # cooldown elapsed: one more forced refresh allowed
+
+
+async def test_small_clock_skew_is_tolerated() -> None:
+    """Reviewer PR#22 finding 3: iat marginally ahead of a lagging clock is OK."""
+    wall = int(time.time())
+    identity = await _verifier().verify(_mint(iat=wall + 5))
+
+    assert identity.role == "recruiter"
+
+
 async def test_verify_reuses_cached_certs_within_ttl() -> None:
     calls: list[int] = []
     verifier = _verifier(fetch_counter=calls)

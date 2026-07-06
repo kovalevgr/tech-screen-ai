@@ -88,6 +88,12 @@ class IdTokenVerifier:
             the kid → PEM mapping. Defaults to fetching Google's published
             certs via stdlib ``urllib`` inside ``asyncio.to_thread``.
         certs_ttl_seconds: Cache lifetime for fetched certs.
+        forced_refresh_cooldown_seconds: Minimum spacing between unknown-kid
+            forced refetches. Without it, a spray of garbage JWTs with
+            fabricated ``kid`` values would queue the whole authenticated
+            surface behind serialized outbound cert fetches (reviewer PR#22
+            finding 2). Within the cooldown an unknown ``kid`` fails fast
+            against the cached certs (→ 401).
         clock: Monotonic clock injection seam for tests.
     """
 
@@ -98,6 +104,7 @@ class IdTokenVerifier:
         allowed_domain: str,
         certs_fetcher: Callable[[], Mapping[str, str]] | None = None,
         certs_ttl_seconds: float = _DEFAULT_CERTS_TTL_S,
+        forced_refresh_cooldown_seconds: float = 30.0,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         if not project_id:
@@ -112,6 +119,8 @@ class IdTokenVerifier:
         self._clock = clock
         self._certs: Mapping[str, str] | None = None
         self._certs_deadline: float = 0.0
+        self._forced_cooldown = forced_refresh_cooldown_seconds
+        self._forced_ok_after: float = 0.0
         self._certs_lock = asyncio.Lock()
 
     async def verify(self, token: str) -> VerifiedIdentity:
@@ -137,7 +146,13 @@ class IdTokenVerifier:
             # google-auth ships py.typed but jwt.decode is unannotated —
             # narrow ignore per coding-conventions (no blanket override).
             claims = google_jwt.decode(  # type: ignore[no-untyped-call]
-                token, certs=dict(certs), audience=self._project_id
+                token,
+                certs=dict(certs),
+                audience=self._project_id,
+                # Google's own verifiers tolerate small skew; 0 rejects a
+                # token minted with iat == now on a 1 s-lagging clock
+                # (reviewer PR#22 finding 3).
+                clock_skew_in_seconds=10,
             )
         except ValueError as exc:
             raise TokenVerificationError("token failed signature/audience/lifetime checks") from exc
@@ -146,10 +161,17 @@ class IdTokenVerifier:
     async def _get_certs(self, *, force_refresh: bool = False) -> Mapping[str, str]:
         async with self._certs_lock:
             certs = self._certs
-            if force_refresh or certs is None or self._clock() >= self._certs_deadline:
+            now = self._clock()
+            if force_refresh and now < self._forced_ok_after:
+                # Unknown-kid refresh inside the cooldown window: fail fast
+                # against the cache instead of refetching (finding 2).
+                force_refresh = False
+            if force_refresh or certs is None or now >= self._certs_deadline:
                 certs = await asyncio.to_thread(self._certs_fetcher)
                 self._certs = certs
                 self._certs_deadline = self._clock() + self._certs_ttl
+                if force_refresh:
+                    self._forced_ok_after = self._clock() + self._forced_cooldown
             return certs
 
     @staticmethod
