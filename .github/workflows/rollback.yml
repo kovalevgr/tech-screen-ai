@@ -1,0 +1,182 @@
+# T06a — /rollback: one-call traffic shift back to the previous serving
+# revision (constitution §19: reversible in under five minutes; ADR-012
+# working target for the traffic call itself: 30–60 seconds).
+#
+# Dispatch (the playbook's `/rollback` verb):
+#   gh workflow run rollback.yml -f env=prod -f service=both
+#   gh workflow run rollback.yml -f env=prod -f service=backend -f revision=techscreen-backend-abc1234-17-1
+#
+# Semantics (specs/020-t06a-deploy-commands/research.md D9):
+#   - Primary = the revision currently holding the highest traffic percent.
+#   - Target  = the `revision` input if given (readiness-verified), else the
+#     newest READY revision strictly older than the primary. Failed deploys
+#     (not Ready) are skipped automatically.
+#   - One `update-traffic --to-revisions=<target>=100` call, wall-clock
+#     measured and reported in the job summary.
+#   - Rollback PREEMPTS: it shares the cloud-run-<env> concurrency group with
+#     deploy/promote and sets cancel-in-progress, so an in-flight deploy or
+#     promote for the same environment is cancelled rather than queued ahead
+#     of the recovery.
+#   - Rollback does NOT reverse migrations (§10 forward-only) and does not
+#     touch feature flags — see deploy-playbook.md § What rollback cannot do.
+#
+# Identity: techscreen-deployer@ via WIF only (constitution §5–6). The
+# free-text `revision` input reaches the shell via env-mapping only.
+
+name: Rollback (/rollback)
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [dev, prod]
+      service:
+        description: "Service(s) to roll back"
+        required: true
+        type: choice
+        options: [backend, frontend, both]
+        default: both
+      revision:
+        description: "Optional explicit revision to receive 100% (default: auto-detect the previous serving revision)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write # WIF
+
+# Same group as deploy/promote, but rollback cancels whatever is in flight:
+# at 02:00 the recovery must not queue behind a half-finished deploy.
+concurrency:
+  group: "cloud-run-${{ inputs.env }}"
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  REGION: "europe-west1"
+  WIF_PROVIDER: "projects/463244185014/locations/global/workloadIdentityPools/github-actions/providers/github"
+  DEPLOYER_SA: "techscreen-deployer@tech-screen-493720.iam.gserviceaccount.com"
+  TARGET_ENV: ${{ inputs.env }} # choice input (enum) — safe
+  ROLLBACK_TO: ${{ inputs.revision }} # free text — env-mapped ONLY (never inline in run:)
+
+jobs:
+  rollback:
+    name: rollback ${{ matrix.service }} → ${{ inputs.env }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(inputs.service == 'both' && '["backend","frontend"]' || format('["{0}"]', inputs.service)) }}
+    env:
+      SVC: ${{ matrix.service }}
+    steps:
+      - name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Resolve the rollback target
+        run: |
+          if [ "$TARGET_ENV" = "dev" ]; then suffix="-dev"; else suffix=""; fi
+          service_name="techscreen-${SVC}${suffix}"
+          echo "SERVICE_NAME=${service_name}" >> "$GITHUB_ENV"
+
+          split_json="$(gcloud run services describe "$service_name" --region "$REGION" --format=json)"
+          # sort_by(percent, revisionName) + last: on an exact traffic tie
+          # (e.g. a 50/50 mid-ramp split) the NEWEST revision wins as primary,
+          # so the auto-target is its predecessor — never two steps back.
+          # Revision names sort chronologically (zero-padded sequence numbers).
+          primary="$(printf '%s' "$split_json" | jq -r \
+            '[.status.traffic[]] | sort_by((.percent // 0), .revisionName) | last | .revisionName // empty')"
+          before="$(printf '%s' "$split_json" | jq -r \
+            '[.status.traffic[] | "\(.revisionName // "LATEST")=\(.percent // 0)%"] | join(", ")')"
+          echo "TRAFFIC_BEFORE=${before}" >> "$GITHUB_ENV"
+          if [ -z "$primary" ]; then
+            echo "::error::${service_name}: could not determine the current primary revision from the traffic split."
+            exit 1
+          fi
+          echo "PRIMARY=${primary}" >> "$GITHUB_ENV"
+
+          revision_ready() {
+            gcloud run revisions describe "$1" --region "$REGION" --format=json \
+              | jq -r '.status.conditions[]? | select(.type == "Ready") | .status'
+          }
+
+          if [ -n "$ROLLBACK_TO" ]; then
+            target="$ROLLBACK_TO"
+            if [ "$(revision_ready "$target")" != "True" ]; then
+              echo "::error::Requested revision ${target} is not Ready — refusing to shift traffic to it."
+              exit 1
+            fi
+            echo "Explicit rollback target: ${target}"
+          else
+            target=""
+            past_primary=0
+            while IFS= read -r rev; do
+              [ -n "$rev" ] || continue
+              if [ "$rev" = "$primary" ]; then
+                past_primary=1
+                continue
+              fi
+              if [ "$past_primary" -eq 1 ]; then
+                if [ "$(revision_ready "$rev")" = "True" ]; then
+                  target="$rev"
+                  break
+                fi
+                echo "Skipping ${rev} (not Ready — likely a failed deploy)."
+              fi
+            done < <(gcloud run revisions list --service "$service_name" --region "$REGION" \
+                       --sort-by='~metadata.creationTimestamp' --format='value(metadata.name)')
+            if [ -z "$target" ]; then
+              echo "::error::${service_name}: no READY revision older than the primary (${primary}) — nothing to roll back to. Use the explicit revision input if the heuristic is wrong."
+              exit 1
+            fi
+            echo "Auto-detected rollback target: ${target} (previous serving revision before ${primary})"
+          fi
+          echo "TARGET_REVISION=${target}" >> "$GITHUB_ENV"
+
+      - name: Shift 100% of traffic (single call, timed)
+        run: |
+          start="$(date +%s)"
+          gcloud run services update-traffic "$SERVICE_NAME" \
+            --region "$REGION" \
+            --to-revisions "${TARGET_REVISION}=100" \
+            --quiet
+          end="$(date +%s)"
+          duration=$((end - start))
+          echo "SHIFT_SECONDS=${duration}" >> "$GITHUB_ENV"
+          after="$(gcloud run services describe "$SERVICE_NAME" --region "$REGION" --format=json \
+            | jq -r '[.status.traffic[] | "\(.revisionName // "LATEST")=\(.percent // 0)%"] | join(", ")')"
+          echo "TRAFFIC_AFTER=${after}" >> "$GITHUB_ENV"
+          echo "Rolled back in ${duration}s. Traffic now: ${after}"
+          if [ "$duration" -gt 60 ]; then
+            echo "::warning::Traffic shift took ${duration}s — above the 60s working target (ADR-012). Still well under the §19 five-minute ceiling, but worth a look."
+          fi
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## /rollback — ${SERVICE_NAME:-techscreen-${SVC}} (${TARGET_ENV})"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| rolled back from | \`${PRIMARY:-unresolved}\` |"
+            echo "| now serving 100% | \`${TARGET_REVISION:-FAILED — see step log}\` |"
+            echo "| traffic before | ${TRAFFIC_BEFORE:-n/a} |"
+            echo "| traffic after | ${TRAFFIC_AFTER:-n/a} |"
+            echo "| update-traffic wall-clock | ${SHIFT_SECONDS:-n/a}s (target ≤60s; §19 ceiling 5min) |"
+            echo ""
+            echo "Post-rollback duties (deploy-playbook.md): incident note within 24h; rollback does NOT reverse migrations or flag flips."
+          } >> "$GITHUB_STEP_SUMMARY"
