@@ -34,3 +34,15 @@ N/A — initial version.
 ## Author
 
 Ihor — 2026-04-18.
+
+## Addendum — 2026-07-06
+
+`schema.json` added to this version directory to codify the §4 output
+contract of `system.md` as a machine-readable file — the T17 deliverable
+named as T18's contract in `docs/engineering/implementation-plan.md` but
+never created (assessor and planner already had one). No behavioural
+change to the prompt text, hence no new prompt version. One caveat: the
+1..1200-character `utterance` bounds are derived from guardrail §7
+(~80 Ukrainian words), not stated in §4 itself — i.e. they are new
+normative content introduced by `schema.json`, chosen conservatively as
+a hard backstop above the prompt-level word cap.

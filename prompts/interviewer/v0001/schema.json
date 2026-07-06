@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://techscreen.nix.internal/schemas/interviewer-output.v1.json",
+  "title": "InterviewerOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["utterance", "internal_move_executed"],
+  "properties": {
+    "utterance": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1200,
+      "description": "Ukrainian text the candidate reads next. Plain prose, no markdown. The prompt caps this at ~80 Ukrainian words; 1200 chars is the hard backstop."
+    },
+    "internal_move_executed": {
+      "type": "string",
+      "enum": ["ask_seed", "depth_probe", "acknowledge_and_transition", "redirect", "close_competency"],
+      "description": "Must equal next_planned_move unless a contradictory input forced a redirect. The orchestrator uses this to detect drift."
+    }
+  }
+}

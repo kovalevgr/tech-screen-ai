@@ -426,7 +426,7 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 - **depends_on:** [T04]
 - **contract:** `prompts/interviewer/v0001/schema.json`, `prompts/assessor/v0001/schema.json`
 - **description:**
-  `prompts/interviewer/v0001/{system.md, schema.json, few_shot.md, notes.md}` and same for `assessor/`. System prompt in English; candidate-facing examples in Ukrainian (§11, ADR-008). Output schema is strict JSON: Interviewer `{message_uk, intent, next_topic_hint, end_of_phase}`; Assessor `{concepts_covered, concepts_missing, red_flags, level_estimate, confidence}`.
+  `prompts/interviewer/v0001/{system.md, schema.json, few_shot.md, notes.md}` and same for `assessor/`. System prompt in English; candidate-facing examples in Ukrainian (§11, ADR-008). Output schemas are strict JSON objects (`additionalProperties: false`); the committed per-agent `prompts/<agent>/v0001/schema.json` files are the source of truth for field names and constraints — do not duplicate them here.
 
   **Ownership note:** per-agent schema files under `prompts/<agent>/v0001/schema.json` are the single source of truth. **There is no `docs/contracts/agent-interfaces.schema.json` aggregate** — backend agent wrappers (T18/T19/T24) import directly from the per-agent files. This simplifies ownership: prompt-engineer fully owns agent schemas.
 
