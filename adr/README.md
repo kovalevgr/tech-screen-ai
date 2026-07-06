@@ -35,7 +35,7 @@ Proposed → Accepted → (Deprecated | Superseded by ADR-NNN)
 | [013](./013-no-plaintext-secrets.md)                 | Accepted | No plaintext secrets; Secret Manager + WIF                |
 | [014](./014-multi-agent-orchestration.md)            | Accepted | Multi-agent orchestration is explicit, not automatic      |
 | [015](./015-region-europe-west1.md)                  | Accepted | Cloud region: europe-west1 (Belgium)                      |
-| [016](./016-auth-split-sso-magic-link.md)            | Accepted | Auth split: Workspace SSO internal, magic link candidates |
+| [016](./016-auth-split-sso-magic-link.md)            | Amended by [024](./024-identity-platform-internal-sso.md) | Auth split: Workspace SSO internal, magic link candidates |
 | [017](./017-spec-driven-github-spec-kit.md)          | Accepted | Spec-driven development via GitHub Spec Kit               |
 | [018](./018-immutable-rubric-snapshots.md)           | Accepted | Immutable rubric snapshots per session                    |
 | [019](./019-append-only-audit-trail.md)              | Accepted | Append-only audit trail                                   |
@@ -43,3 +43,4 @@ Proposed → Accepted → (Deprecated | Superseded by ADR-NNN)
 | [021](./021-configs-as-code.md)                      | Accepted | Configs as code: rubrics, prompts, flags in Git           |
 | [022](./022-env-example-non-secret-defaults.md)      | Accepted | Non-secret defaults permitted in `.env.example`           |
 | [023](./023-dev-prod-environments.md)                | Accepted | Dev and prod environments in a single project             |
+| [024](./024-identity-platform-internal-sso.md)       | Accepted | Identity Platform internal SSO; roles from configs        |

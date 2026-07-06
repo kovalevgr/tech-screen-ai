@@ -1,0 +1,7 @@
+# Runtime dependencies for the auth-claims blocking function ONLY (T07).
+# Deployed via `gcloud functions deploy` (gen2, python312) — see
+# specs/021-t07-identity-sso/quickstart.md §4. These packages are NOT part
+# of the backend closure (pyproject.toml); the repo test suite imports only
+# the SDK-free roles.py.
+firebase-functions>=0.4.1,<1
+pyyaml>=6.0,<7

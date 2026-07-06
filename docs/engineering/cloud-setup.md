@@ -29,6 +29,8 @@ Related: [ADR-023](../../adr/023-dev-prod-environments.md) (supersedes [ADR-009]
 | Cloud Monitoring workspace                         | Dashboards, alert policies (T38)                   |                                        |
 | Cloud Logging                                      | All services                                       | 30-day retention                       |
 | IAM Workload Identity Pool `github-actions`        | CI auth via OIDC (terraform SA + flag-sync SA)     |                                        |
+| Identity Platform (project-global, T07)            | Staff SSO — Google provider, `n-ix.com` gated; **one identity plane shared by dev + prod** (ADR-024) | free tier |
+| Cloud Functions gen2 `techscreen-auth-claims-*`    | GCIP blocking function: domain gate + `role`/`hd` claims from `configs/auth-roles.yaml` (operator-deployed, `infra/functions/auth_claims/`) | 256 Mi, max 3 |
 
 *(The formerly listed `<project>-techscreen-assets` bucket is deferred until a task actually consumes it — see `specs/018-t06-cloud-runtime/` Assumptions.)*
 
@@ -184,6 +186,8 @@ Destructive plans (resource deletions) require a `[destructive]` tag in the PR t
 
 Human access is via Workspace SSO (N-iX). No direct IAM user accounts.
 
+**Application-level staff access (T07, ADR-024):** recruiters/reviewers/admins sign in to TechScreen itself through **Identity Platform** (Google provider, `n-ix.com` only). Roles come from [`configs/auth-roles.yaml`](../../configs/auth-roles.yaml) as a `role` token claim (contract: [`docs/contracts/id-token-claims.json`](../contracts/id-token-claims.json)); the backend enforces per environment via `AUTH_MODE` (default `disabled`). Operator runbook: `specs/021-t07-identity-sso/quickstart.md`.
+
 ### Service accounts
 
 - **`terraform@<project>`:** `roles/owner` at MVP (will be tightened to least-privilege after the IaC shape is stable). Impersonated by CI via WIF; no JSON keys issued.
@@ -197,6 +201,8 @@ Human access is via Workspace SSO (N-iX). No direct IAM user accounts.
 - **`techscreen-flag-sync@`:** CI identity for `.github/workflows/sync-configs.yml` (both environments; the workflow was renamed from `sync-feature-flags.yml` when T16 added the rubric surface — the SA name keeps its historical `flag-sync` id, renaming a live SA is not worth the churn).
   - `roles/cloudsql.client` + `roles/cloudsql.instanceUser`; WIF-bound to this repository
   - In-database privileges limited to the configs-as-code tables (`scripts/cloud-db-grants.sql`): `feature_flag` (SELECT/INSERT/UPDATE — the only mutable surface), the six rubric-tree tables (SELECT/INSERT or INSERT-only; the importer never UPDATEs — §4/ADR-018), and INSERT-only on `audit_log` (the one §3-permitted verb, for the FR-010 receipt row; migration 0001's trigger keeps UPDATE/DELETE impossible for every non-migrator role — the migrator exemption exists for §10 human-approved migrations)
+- **`techscreen-auth-claims@`:** runtime identity for the Identity Platform blocking function (T07).
+  - `roles/logging.logWriter` only — the function reads its vendored YAML and writes logs, nothing else
 
 No JSON keys for any service account. Ever. See ADR-013 and the anti-pattern entry.
 
@@ -326,6 +332,7 @@ Each of these becomes a candidate for ADR-reversal when the pilot graduates.
 
 ## Document versioning
 
+- v2.2 — 2026-07-06 — T07: Identity Platform staff SSO (ADR-024) — inventory rows (GCIP config + auth-claims blocking function), application-level access note in the IAM model, `techscreen-auth-claims@` SA.
 - v2.1 — 2026-07-05 — T16: configs-as-code sync section (workflow renamed to `sync-configs.yml`, rubric surface + destructive-change gate), flag-sync SA in-database privileges extended to the rubric tables + INSERT-only `audit_log`.
 - v2.0 — 2026-07-02 — T06: dev+prod topology (ADR-023), real Terraform layout (flat root + environment module), per-env secrets/IAM, flag-sync identity, cost table doubled, assets bucket deferred.
 - v1.0 — 2026-04-18.
