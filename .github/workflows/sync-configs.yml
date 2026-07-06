@@ -1,0 +1,263 @@
+# Configs-as-code sync (constitution §16). After T16 this ONE workflow owns
+# every Git-canonical config surface that lands in the databases:
+#
+#   sync-feature-flags (T05a; live since T06) — upserts every entry from
+#     configs/feature-flags.yaml into the feature_flag table with
+#     updated_by='configs-as-code'. Orphan rows (in DB but not in YAML) are
+#     surfaced as warning annotations — NEVER auto-deleted (specs/009 FR-009).
+#
+#   sync-rubric (T16) — seeds configs/rubric/*.yaml through the T08 importer
+#     (app/backend/services/rubric_importer.py): a NEW immutable
+#     rubric_tree_version per content change (§4 / ADR-018), payload-hash
+#     no-op otherwise, one audit_log receipt row (INSERT only — the single
+#     verb §3 permits). Before any cloud step, a policy gate diffs the pushed
+#     rubric against the push's `before` commit: DESTRUCTIVE edits (node
+#     retired or un-retired, level removed, level descriptor_en retyped) fail
+#     unless the head commit message or the merged PR body cites an ADR
+#     (regex `ADR-\d{3}`); outright REMOVAL of a stable id always fails —
+#     retire it instead (specs/010 FR-009). Any future configs/* surface gets
+#     a third job here, not a new workflow.
+#
+# Renamed from sync-feature-flags.yml in T16. History: `git log --follow
+# -M30% -- <this file>` — the T16 rewrite drops similarity below git's
+# default 50% rename threshold, so plain --follow stops at the rename.
+# The two jobs share triggers but are fully independent — no
+# `needs:`, and fail-fast:false on each matrix — so one surface failing never
+# blocks the other (T16 acceptance).
+#
+# DB identity (both jobs): techscreen-flag-sync@ authenticates as itself via
+# WIF (NO JSON service-account key; constitution §6) + the Auth Proxy's
+# --auto-iam-authn (Postgres username = SA email minus .gserviceaccount.com).
+# Per-table privileges live in scripts/cloud-db-grants.sql.
+#
+# COST-IDLE MODE: the Cloud SQL instances are STOPPED by default until real
+# usage starts. Against a sleeping instance both jobs fail fast with a wake
+# hint. Recovery: `scripts/cloud-sql-power.sh wake <env>` (~60–90 s), then
+# use "Re-run failed jobs" on the run — a re-run keeps the original push
+# payload, which the destructive-gate baseline (`github.event.before`)
+# depends on; a fresh workflow_dispatch degrades the baseline to HEAD~1.
+
+name: Sync configs-as-code
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "configs/feature-flags.yaml"
+      - "docs/contracts/feature-flag.schema.json"
+      - "configs/rubric/**"
+      - "docs/contracts/rubric.schema.json"
+      - ".github/workflows/sync-configs.yml"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write # required by google-github-actions/auth (WIF)
+  contents: read
+  pull-requests: read # sync-rubric ADR gate lists PRs associated with the head commit
+
+jobs:
+  sync-feature-flags:
+    name: Upsert flags into Cloud SQL (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, prod]
+        include:
+          - env: dev
+            cloud_sql_instance: "tech-screen-493720:europe-west1:techscreen-pg-dev"
+          - env: prod
+            cloud_sql_instance: "tech-screen-493720:europe-west1:techscreen-pg"
+    env:
+      WIF_PROVIDER: "projects/463244185014/locations/global/workloadIdentityPools/github-actions/providers/github"
+      WIF_SERVICE_ACCOUNT: "techscreen-flag-sync@tech-screen-493720.iam.gserviceaccount.com"
+      GCP_PROJECT: "tech-screen-493720"
+      CLOUD_SQL_INSTANCE: ${{ matrix.cloud_sql_instance }}
+      DATABASE_NAME: "techscreen"
+      # IAM DB user (auto-iam-authn): SA email minus .gserviceaccount.com.
+      DATABASE_USER: "techscreen-flag-sync@tech-screen-493720.iam"
+      # Same username percent-encoded for DSN use — the raw '@' inside the
+      # username otherwise splits the URL at the wrong place and the driver
+      # resolves "tech-screen-493720.iam@127.0.0.1" as a hostname.
+      DATABASE_USER_ENC: "techscreen-flag-sync%40tech-screen-493720.iam"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install validation deps
+        run: pip install "jsonschema>=4.23,<5" "pyyaml>=6.0,<7" "asyncpg>=0.30,<0.31"
+
+      - name: Validate YAML against committed schema (defence in depth; FR-006)
+        run: python scripts/check-feature-flag-registration.py
+
+      - name: Guard — verify WIF / Cloud SQL binding values present
+        id: t06_guard
+        run: |
+          if [ -z "$WIF_PROVIDER" ] || [ -z "$WIF_SERVICE_ACCOUNT" ] || [ -z "$GCP_PROJECT" ] || [ -z "$CLOUD_SQL_INSTANCE" ]; then
+            echo "::warning::Binding values missing (should not happen post-T06)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        if: steps.t06_guard.outputs.skip != 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Start Cloud SQL Auth Proxy (IAM auth, ephemeral)
+        if: steps.t06_guard.outputs.skip != 'true'
+        env:
+          # Pinned sha256 of cloud-sql-proxy v2.13.0 linux.amd64 — this job can
+          # write the prod feature_flag table, so the binary is checksum-gated
+          # (reviewer PR#18 hardening note).
+          CSP_SHA256: "90fb622971bd8ed650f040dbdbc0f1be65ea528e2c72fa3b4717838e56abdf39"
+        run: |
+          curl -fsSL -o cloud-sql-proxy \
+            https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.13.0/cloud-sql-proxy.linux.amd64
+          echo "${CSP_SHA256}  cloud-sql-proxy" | sha256sum -c -
+          chmod +x cloud-sql-proxy
+          ./cloud-sql-proxy --auto-iam-authn --port=5432 "$CLOUD_SQL_INSTANCE" &
+          for _ in {1..15}; do
+            if (echo > /dev/tcp/127.0.0.1/5432) 2>/dev/null; then break; fi
+            sleep 1
+          done
+
+      - name: Upsert feature_flag rows + warn on orphans
+        if: steps.t06_guard.outputs.skip != 'true'
+        env:
+          DATABASE_URL: "postgresql://${{ env.DATABASE_USER_ENC }}@127.0.0.1:5432/${{ env.DATABASE_NAME }}"
+        run: python scripts/sync_feature_flags_to_db.py
+
+  sync-rubric:
+    name: Seed rubric into Cloud SQL (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, prod]
+        include:
+          - env: dev
+            cloud_sql_instance: "tech-screen-493720:europe-west1:techscreen-pg-dev"
+          - env: prod
+            cloud_sql_instance: "tech-screen-493720:europe-west1:techscreen-pg"
+    env:
+      WIF_PROVIDER: "projects/463244185014/locations/global/workloadIdentityPools/github-actions/providers/github"
+      WIF_SERVICE_ACCOUNT: "techscreen-flag-sync@tech-screen-493720.iam.gserviceaccount.com"
+      GCP_PROJECT: "tech-screen-493720"
+      CLOUD_SQL_INSTANCE: ${{ matrix.cloud_sql_instance }}
+      DATABASE_NAME: "techscreen"
+      DATABASE_USER: "techscreen-flag-sync@tech-screen-493720.iam"
+      # Percent-encoded for DSN use — see the sync-feature-flags job comment.
+      DATABASE_USER_ENC: "techscreen-flag-sync%40tech-screen-493720.iam"
+
+    steps:
+      - name: Checkout (full history — baseline resolution needs the pre-push commit)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install validation deps
+        run: pip install "jsonschema>=4.23,<5" "pyyaml>=6.0,<7" "asyncpg>=0.30,<0.31"
+
+      - name: Validate rubric YAML against committed schema (T08 hook, defence in depth)
+        run: python scripts/check-rubric-schema.py
+
+      - name: Extract baseline rubric YAMLs (the push's `before` commit)
+        env:
+          # Event field consumed via env indirection only — never interpolated
+          # into the script text (untrusted-input hygiene).
+          BASE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          ZEROS="0000000000000000000000000000000000000000"
+          BASELINE=""
+          if [ -n "${BASE_SHA:-}" ] && [ "$BASE_SHA" != "$ZEROS" ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            BASELINE="$BASE_SHA"
+          elif git rev-parse -q --verify 'HEAD~1^{commit}' >/dev/null 2>&1; then
+            BASELINE="HEAD~1"
+            echo "::warning::push 'before' SHA unavailable (event: ${GITHUB_EVENT_NAME}); destructive-gate baseline falls back to HEAD~1. For multi-commit pushes prefer 'Re-run failed jobs' over workflow_dispatch."
+          else
+            echo "::warning::no baseline commit exists (initial commit?); every rubric node is treated as new."
+          fi
+          mkdir -p "$RUNNER_TEMP/rubric-baseline"
+          if [ -n "$BASELINE" ]; then
+            git ls-tree -r --name-only "$BASELINE" -- configs/rubric/ | while IFS= read -r f; do
+              case "$f" in
+                *.yaml) git show "${BASELINE}:${f}" > "$RUNNER_TEMP/rubric-baseline/$(basename "$f")" ;;
+              esac
+            done
+          fi
+
+      - name: Collect ADR citation sources (head commit message + associated PR bodies)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          {
+            git log -1 --format=%B "$GITHUB_SHA"
+            gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+              --jq '.[] | (.title // "") + "\n" + (.body // "")' \
+              || echo "::warning::could not list PRs for ${GITHUB_SHA}; ADR gate falls back to the head commit message alone." >&2
+          } > "$RUNNER_TEMP/adr-context.txt"
+
+      - name: Destructive-change gate (fails without an ADR-xxx citation)
+        run: |
+          python scripts/sync_rubric_to_db.py check \
+            --baseline-dir "$RUNNER_TEMP/rubric-baseline" \
+            --rubric-dir configs/rubric \
+            --adr-context-file "$RUNNER_TEMP/adr-context.txt"
+
+      - name: Guard — verify WIF / Cloud SQL binding values present
+        id: guard
+        run: |
+          if [ -z "$WIF_PROVIDER" ] || [ -z "$WIF_SERVICE_ACCOUNT" ] || [ -z "$GCP_PROJECT" ] || [ -z "$CLOUD_SQL_INSTANCE" ]; then
+            echo "::warning::Binding values missing (should not happen post-T06)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        if: steps.guard.outputs.skip != 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Start Cloud SQL Auth Proxy (IAM auth, ephemeral)
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          # Same pinned binary as the flags job — this job writes the prod
+          # rubric tables, so the checksum gate applies identically.
+          CSP_SHA256: "90fb622971bd8ed650f040dbdbc0f1be65ea528e2c72fa3b4717838e56abdf39"
+        run: |
+          curl -fsSL -o cloud-sql-proxy \
+            https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.13.0/cloud-sql-proxy.linux.amd64
+          echo "${CSP_SHA256}  cloud-sql-proxy" | sha256sum -c -
+          chmod +x cloud-sql-proxy
+          ./cloud-sql-proxy --auto-iam-authn --port=5432 "$CLOUD_SQL_INSTANCE" &
+          for _ in {1..15}; do
+            if (echo > /dev/tcp/127.0.0.1/5432) 2>/dev/null; then break; fi
+            sleep 1
+          done
+
+      - name: Seed rubric (new immutable version per content change; no-op on identical hash)
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          DATABASE_URL: "postgresql://${{ env.DATABASE_USER_ENC }}@127.0.0.1:5432/${{ env.DATABASE_NAME }}"
+          SYNC_ENV: ${{ matrix.env }}
+        run: python scripts/sync_rubric_to_db.py sync

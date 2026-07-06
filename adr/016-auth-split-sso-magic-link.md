@@ -48,3 +48,7 @@ Two separate auth paths:
 
 - Use a reputable transactional email provider (SendGrid / Postmark) with DKIM, SPF, and DMARC properly configured for the sender domain.
 - Email template is visually consistent with N-iX brand, sent from a dedicated subdomain (e.g. `screen.n-ix.com`), and explicitly names the recipient and the role they applied to.
+
+## Amendment (2026-07-05 — ADR-024)
+
+The **internal-user path changed at T07**: staff sign in through **Identity Platform** (Google provider, `n-ix.com` accounts) and RBAC arrives as a `role` custom claim minted at sign-in from `configs/auth-roles.yaml` — not via the `user_role` DB table above, and still not via Workspace groups. The signed-session-cookie plan for internal users is dropped in favour of bearer ID tokens (the `SESSION_COOKIE_SECRET` shell stays reserved). The "No Identity Platform bill" consequence survives in practice (free tier at MVP volume). **The candidate magic-link path above is unchanged.** See [ADR-024](./024-identity-platform-internal-sso.md).

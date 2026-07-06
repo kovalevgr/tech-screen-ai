@@ -28,3 +28,14 @@ billing_account = "01FD59-751466-B7F7A5"
 # Swap to a shared group alias here once N-iX IT provisions one — see
 # Follow-ups in docs/engineering/vertex-quota.md.
 ops_email = "ikovalov@n-ix.com"
+
+# -----------------------------------------------------------------------------
+# T07 (specs/021-t07-identity-sso/): auth-claims blocking-function URIs.
+# Left empty until the operator deploys the function (quickstart §4); paste
+# the two `gcloud functions describe … --format='value(serviceConfig.uri)'`
+# values here and re-apply to register the Identity Platform blocking
+# triggers (quickstart §5). Public run.app URLs — not credentials (ADR-022).
+# -----------------------------------------------------------------------------
+
+auth_before_create_uri  = ""
+auth_before_sign_in_uri = ""

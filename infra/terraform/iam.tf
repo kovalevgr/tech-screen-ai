@@ -16,14 +16,16 @@
 # (short-lived, per-run, repository-pinned); humans via ADC impersonation.
 # =============================================================================
 
-# CI identity for .github/workflows/sync-feature-flags.yml (T05a workflow,
-# bound live by T06). Reaches Cloud SQL through the Auth Proxy with
+# CI identity for .github/workflows/sync-configs.yml (T05a workflow, bound
+# live by T06, renamed from sync-feature-flags.yml + extended with the
+# rubric-sync job by T16). Reaches Cloud SQL through the Auth Proxy with
 # --auto-iam-authn; its in-database privileges are limited to the
-# feature_flag table (scripts/cloud-db-grants.sql).
+# configs-as-code tables — feature_flag, the rubric-tree tables, and
+# INSERT-only on audit_log (scripts/cloud-db-grants.sql).
 resource "google_service_account" "flag_sync" {
   account_id   = "techscreen-flag-sync"
   display_name = "TechScreen configs-as-code sync (CI)"
-  description  = "GitHub Actions identity for syncing configs/*.yaml into Cloud SQL (both environments). WIF-only; DB access limited to the feature_flag table via SQL grants."
+  description  = "GitHub Actions identity for syncing configs/*.yaml into Cloud SQL (both environments). WIF-only; DB access limited to the configs-as-code tables via SQL grants."
 }
 
 resource "google_project_iam_member" "flag_sync_cloudsql_client" {

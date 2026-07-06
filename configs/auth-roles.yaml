@@ -1,0 +1,30 @@
+# TechScreen staff role mapping — source of truth (constitution §16, ADR-024).
+#
+# Consumed by the auth-claims blocking function
+# (infra/functions/auth_claims/ — a VENDORED COPY is placed next to the
+# function at deploy time; see specs/021-t07-identity-sso/quickstart.md §4).
+# The blocking function injects `role` + `hd` custom claims into every
+# Identity Platform ID token at sign-in; the backend middleware
+# (app/backend/services/auth.py) enforces them per
+# docs/contracts/id-token-claims.json.
+#
+# To change a role:   open a PR editing `roles:` below, then redeploy the
+#                     blocking function (quickstart §4). Takes effect at the
+#                     person's NEXT sign-in (tokens live <= 1 h; no
+#                     revocation at MVP — ADR-024).
+# To onboard someone: same. Until their email is mapped, they can sign in
+#                     (domain permitting) but every API call answers 403
+#                     with a body pointing at this file.
+# To offboard:        remove the entry AND suspend the Workspace account —
+#                     the domain gate keys off Workspace account validity.
+#
+# Shape (validated by infra/functions/auth_claims/roles.py and the repo
+# test suite — an invalid mapping cannot merge):
+#   domain: <workspace hosted domain admitted at sign-in>
+#   roles:  <lower-cased email> : <admin | recruiter | reviewer>
+
+domain: n-ix.com
+
+roles:
+  # Owner / operator (see infra/terraform/terraform.tfvars ops_email).
+  ikovalov@n-ix.com: admin

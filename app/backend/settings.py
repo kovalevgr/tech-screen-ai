@@ -14,6 +14,16 @@ non-secret keys (per ADR-022):
   consumed by :mod:`app.backend.db.session` (T05). Unset by default so the
   no-DB unit run and module-import smoke tests need no database.
 
+T07 adds the staff-SSO keys (all non-secret per ADR-022):
+
+- ``AUTH_MODE``             — ``"disabled"`` | ``"identity_platform"``; the §9
+  dark-launch seam (env var, not a feature flag — specs/021 research R6).
+  ``disabled`` (default) keeps every authenticated endpoint 401.
+- ``GCP_PROJECT``           — ID-token audience + issuer suffix; required when
+  ``AUTH_MODE=identity_platform`` (boot guard below).
+- ``AUTH_ALLOWED_DOMAIN``   — Workspace hosted domain admitted by the
+  middleware (``n-ix.com`` at MVP).
+
 The :meth:`Settings.assert_safe_for_environment` method is invoked once at
 ``app/backend/main.py`` module init. Production startup fails fast with a
 clear error when the configuration would violate spec FR-007 / SC-010 or
@@ -41,6 +51,9 @@ class Settings(BaseSettings):
     llm_budget_per_session_usd: Decimal = Decimal("5.00")
     llm_fixtures_dir: Path = Path("app/backend/tests/fixtures/llm_responses")
     database_url: str | None = None
+    auth_mode: Literal["disabled", "identity_platform"] = "disabled"
+    gcp_project: str = ""
+    auth_allowed_domain: str = "n-ix.com"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -61,6 +74,11 @@ class Settings(BaseSettings):
         2. ``LLM_BUDGET_PER_SESSION_USD > $5.00`` in production →
            constitution §12 sets the per-session ceiling at $5.00.
 
+        And one every-environment check (T07): ``AUTH_MODE=identity_platform``
+        without a ``GCP_PROJECT`` cannot verify any token (no audience/issuer)
+        — refuse to boot rather than answer 401 to everything while claiming
+        SSO is on.
+
         Raises :class:`RuntimeError` so the failure is unambiguous in
         Cloud Run logs (a non-zero exit on first import).
         """
@@ -73,3 +91,8 @@ class Settings(BaseSettings):
                     f"exceed ${_PROD_BUDGET_CEILING_USD} in production "
                     f"(got {self.llm_budget_per_session_usd})"
                 )
+        if self.auth_mode == "identity_platform" and not self.gcp_project.strip():
+            raise RuntimeError(
+                "T07: AUTH_MODE=identity_platform requires GCP_PROJECT "
+                "(the ID-token audience — see specs/021-t07-identity-sso)"
+            )

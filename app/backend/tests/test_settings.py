@@ -29,6 +29,9 @@ def _clear_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "APP_ENV",
         "LLM_BUDGET_PER_SESSION_USD",
         "LLM_FIXTURES_DIR",
+        "AUTH_MODE",
+        "GCP_PROJECT",
+        "AUTH_ALLOWED_DOMAIN",
     ):
         monkeypatch.delenv(key, raising=False)
 
@@ -113,5 +116,46 @@ def test_production_with_vertex_backend_and_budget_at_ceiling_passes(
         llm_backend="vertex",
         app_env="prod",
         llm_budget_per_session_usd=Decimal("5.00"),
+    )
+    settings.assert_safe_for_environment()  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# T07 — staff-SSO settings (AUTH_MODE dark-launch seam, specs/021 research R6)
+# ---------------------------------------------------------------------------
+
+
+def test_auth_defaults_are_dark(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """§9: no auth env → the pre-T07 posture (disabled, n-ix.com domain)."""
+    _clear_env(monkeypatch)
+    monkeypatch.chdir(tmp_path)  # ensure no .env is picked up
+    settings = Settings()
+    assert settings.auth_mode == "disabled"
+    assert settings.gcp_project == ""
+    assert settings.auth_allowed_domain == "n-ix.com"
+    settings.assert_safe_for_environment()  # disabled needs no GCP_PROJECT
+
+
+def test_identity_platform_without_gcp_project_refuses_to_boot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """T07 boot guard: enabled SSO without an audience is a misconfiguration."""
+    _clear_env(monkeypatch)
+    settings = Settings(auth_mode="identity_platform", gcp_project="  ")
+    with pytest.raises(RuntimeError) as excinfo:
+        settings.assert_safe_for_environment()
+    assert "GCP_PROJECT" in str(excinfo.value)
+
+
+def test_identity_platform_with_gcp_project_passes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The enabled shape the operator deploys (quickstart §7)."""
+    _clear_env(monkeypatch)
+    settings = Settings(
+        llm_backend="vertex",
+        app_env="prod",
+        auth_mode="identity_platform",
+        gcp_project="tech-screen-493720",
     )
     settings.assert_safe_for_environment()  # must not raise
