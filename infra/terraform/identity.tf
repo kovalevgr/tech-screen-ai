@@ -83,6 +83,14 @@ resource "google_identity_platform_config" "default" {
     trimprefix(module.env_dev.frontend_service_url, "https://"),
   ]
 
+  # Declared explicitly (false is also the API default) so the block the API
+  # returns never shows up as a perpetual in-place diff — same normalization
+  # family as the Cloud Run service-level scaling block (specs/018).
+  # ADR-024 accepts one shared identity plane; tenants would be its reversal.
+  multi_tenant {
+    allow_tenants = false
+  }
+
   # Registered only once the operator has deployed the function and pasted
   # its URIs into terraform.tfvars (empty defaults keep the first apply
   # clean). From the apply that registers them on, ALL sign-ins pass the
