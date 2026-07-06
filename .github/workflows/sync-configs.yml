@@ -62,12 +62,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        env: [dev, prod]
+        # prod temporarily excluded (owner decision 2026-07-06): the prod
+        # instance sleeps in cost-idle mode until real usage, and a sleeping
+        # instance fails the sync. Re-enable BOTH lines below (and wake prod)
+        # when prod goes always-on — by T49 pilot dry-run at the latest.
+        # Catch-up is automatic: the sync is a full-state upsert, so the first
+        # re-enabled run replays the current configs; no history is lost.
+        env: [dev]
         include:
           - env: dev
             cloud_sql_instance: "tech-screen-493720:europe-west1:techscreen-pg-dev"
-          - env: prod
-            cloud_sql_instance: "tech-screen-493720:europe-west1:techscreen-pg"
+          # - env: prod
+          #   cloud_sql_instance: "tech-screen-493720:europe-west1:techscreen-pg"
     env:
       WIF_PROVIDER: "projects/463244185014/locations/global/workloadIdentityPools/github-actions/providers/github"
       WIF_SERVICE_ACCOUNT: "techscreen-flag-sync@tech-screen-493720.iam.gserviceaccount.com"
@@ -143,12 +149,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        env: [dev, prod]
+        # prod temporarily excluded (owner decision 2026-07-06): the prod
+        # instance sleeps in cost-idle mode until real usage, and a sleeping
+        # instance fails the sync. Re-enable BOTH lines below (and wake prod)
+        # when prod goes always-on — by T49 pilot dry-run at the latest.
+        # Catch-up is automatic: the sync is a full-state upsert, so the first
+        # re-enabled run replays the current configs; no history is lost.
+        env: [dev]
         include:
           - env: dev
             cloud_sql_instance: "tech-screen-493720:europe-west1:techscreen-pg-dev"
-          - env: prod
-            cloud_sql_instance: "tech-screen-493720:europe-west1:techscreen-pg"
+          # - env: prod
+          #   cloud_sql_instance: "tech-screen-493720:europe-west1:techscreen-pg"
     env:
       WIF_PROVIDER: "projects/463244185014/locations/global/workloadIdentityPools/github-actions/providers/github"
       WIF_SERVICE_ACCOUNT: "techscreen-flag-sync@tech-screen-493720.iam.gserviceaccount.com"
