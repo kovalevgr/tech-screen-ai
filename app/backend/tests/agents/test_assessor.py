@@ -28,6 +28,7 @@ from pydantic import ValidationError
 from app.backend.agents import assessor
 from app.backend.agents.assessor import (
     PROMPT_VERSION,
+    AssessorEchoMismatch,
     AssessorOutput,
     AssessorOutputInvalid,
     AssessorTurnInput,
@@ -288,6 +289,28 @@ async def test_run_assessor_turn_request_uses_default_caps_and_contract_payload(
     assert payload["turn"] == inputs.turn
 
 
+def test_to_user_payload_typed_ids_win_over_conflicting_metadata() -> None:
+    """Caller-supplied turn_metadata ids must never override the typed ids
+    in the wire payload — trace/ledger attribution uses the typed ones."""
+    base = _make_inputs()
+    inputs = base.model_copy(
+        update={
+            "turn_metadata": {
+                "turn_id": "0f0f0f0f-0f0f-0f0f-0f0f-0f0f0f0f0f0f",
+                "session_id": "1e1e1e1e-1e1e-1e1e-1e1e-1e1e1e1e1e1e",
+                "asked_at": "2026-07-06T10:00:00Z",
+            }
+        }
+    )
+
+    payload = json.loads(inputs.to_user_payload())
+
+    assert payload["turn_metadata"]["turn_id"] == str(inputs.turn_id)
+    assert payload["turn_metadata"]["session_id"] == str(inputs.session_id)
+    # Non-conflicting caller metadata is preserved.
+    assert payload["turn_metadata"]["asked_at"] == "2026-07-06T10:00:00Z"
+
+
 # ---------------------------------------------------------------------------
 # Retry policy — schema misses
 # ---------------------------------------------------------------------------
@@ -377,6 +400,51 @@ async def test_run_assessor_turn_contract_violation_then_valid_retry_succeeds(
 
     assert output.assessments[0].confidence == pytest.approx(0.7)
     assert len(recorder.requests) == 2
+
+
+async def test_run_assessor_turn_echoed_id_mismatch_then_success_retries_once(
+    monkeypatch: pytest.MonkeyPatch,
+    sink: InMemoryTraceSink,
+    ledger: InMemoryCostLedger,
+    settings: Settings,
+) -> None:
+    """A hallucinated-but-well-formed echoed turn_id is a contract miss —
+    same retry-once path as a schema miss."""
+    inputs = _make_inputs()
+    hallucinated = _valid_parsed(inputs)
+    hallucinated["turn_id"] = str(uuid4())  # UUID-shaped, but not OUR turn
+    recorder = _CallModelRecorder([_ok_result(hallucinated), _ok_result(_valid_parsed(inputs))])
+    monkeypatch.setattr(assessor, "call_model", recorder)
+
+    output = await run_assessor_turn(inputs, sink=sink, ledger=ledger, settings=settings)
+
+    assert output.turn_id == inputs.turn_id
+    assert len(recorder.requests) == 2
+
+
+async def test_run_assessor_turn_echoed_id_mismatch_twice_raises_typed_error(
+    monkeypatch: pytest.MonkeyPatch,
+    sink: InMemoryTraceSink,
+    ledger: InMemoryCostLedger,
+    settings: Settings,
+) -> None:
+    inputs = _make_inputs()
+    wrong_session = str(uuid4())
+    hallucinated = _valid_parsed(inputs)
+    hallucinated["session_id"] = wrong_session
+    recorder = _CallModelRecorder([_ok_result(hallucinated), _ok_result(dict(hallucinated))])
+    monkeypatch.setattr(assessor, "call_model", recorder)
+
+    with pytest.raises(AssessorOutputInvalid) as excinfo:
+        await run_assessor_turn(inputs, sink=sink, ledger=ledger, settings=settings)
+
+    assert len(recorder.requests) == 2
+    cause = excinfo.value.__cause__
+    assert isinstance(cause, AssessorEchoMismatch)
+    # Diagnosable: names the mismatched field, expected vs got.
+    assert "session_id mismatch" in str(cause)
+    assert str(inputs.session_id) in str(cause)
+    assert wrong_session in str(cause)
 
 
 # ---------------------------------------------------------------------------

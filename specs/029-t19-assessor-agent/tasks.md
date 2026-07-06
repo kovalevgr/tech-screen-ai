@@ -29,3 +29,9 @@
 
 - [X] T012 `uv run pytest app/backend/tests` green (173 passed / 78 pre-existing skips); `ruff check` + `ruff format --check` clean; `mypy --strict app/backend` clean; `scripts/check-no-provider-sdk-imports.sh` exits 0
 - [X] T013 Spec Kit artefacts (this directory) committed with the feature branch
+
+## Phase 5: Reviewer gate fixes (PASS-WITH-FINDINGS, 2026-07-07)
+
+- [X] T014 [US1] `to_user_payload()`: spread caller `turn_metadata` FIRST so the typed `turn_id`/`session_id` always win in the wire payload; collision test added (conflicting caller ids → payload carries typed values, non-conflicting metadata preserved)
+- [X] T015 [US2] `_score_once`: enforce echoed-id EQUALITY (not just UUID shape) against the request's `turn_id`/`session_id`; mismatch raises `AssessorEchoMismatch` on the same retry-once path; tests: mismatch → retry → success (2 calls), mismatch ×2 → `AssessorOutputInvalid` (2 calls, cause names field with expected vs got)
+- [X] T016 spec.md Clarifications updated (echoed-id equality decision; confidence<0.4→needs_manual_review cross-field rule deliberately unenforced at this layer — T20 decides; vertex-integration.md ~127 divergence amended in the sibling T18 PR, this branch stays additive); all gates re-run green (176 passed / 78 skips)

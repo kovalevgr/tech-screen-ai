@@ -12,13 +12,15 @@ doorway :func:`app.backend.llm.call_model`. Responsibilities:
   exactly like ``system.md`` §3 INPUTS.
 - Apply the Assessor's per-agent schema-retry policy (T04 Clarifications
   2026-04-26 + ``docs/engineering/vertex-integration.md``): exactly one
-  fresh retry when the model output misses the contract — either a
-  wrapper-side :class:`~app.backend.llm.VertexSchemaError` or a payload
-  that passes the wrapper's structural check but violates the tighter
-  bounds encoded on :class:`AssessorOutput` (level enum, confidence
-  ceiling, span non-emptiness). A second miss raises
-  :class:`AssessorOutputInvalid` chaining the cause. Every other wrapper
-  error propagates untouched.
+  fresh retry when the model output misses the contract — a wrapper-side
+  :class:`~app.backend.llm.VertexSchemaError`, a payload that passes the
+  wrapper's structural check but violates the tighter bounds encoded on
+  :class:`AssessorOutput` (level enum, confidence ceiling, span
+  non-emptiness), or echoed ``turn_id`` / ``session_id`` that do not
+  EQUAL the request's ids (:class:`AssessorEchoMismatch` — a
+  hallucinated-but-well-formed UUID must never reach the append-only
+  audit trail). A second miss raises :class:`AssessorOutputInvalid`
+  chaining the cause. Every other wrapper error propagates untouched.
 
 Invariants honoured:
 
@@ -70,10 +72,32 @@ class AssessorOutputInvalid(Exception):
 
     The chained ``__cause__`` is the second miss — a
     :class:`~app.backend.llm.VertexSchemaError` (wrapper-side structural
-    miss) or a :class:`pydantic.ValidationError` (bounds violation caught
-    by :class:`AssessorOutput`). The message itself is PII-free
+    miss), a :class:`pydantic.ValidationError` (bounds violation caught
+    by :class:`AssessorOutput`), or an :class:`AssessorEchoMismatch`
+    (echoed ids diverge from the request). The message itself is PII-free
     (constitution §15): no candidate text, no raw payload.
     """
+
+
+class AssessorEchoMismatch(Exception):
+    """Model echoed ``turn_id`` / ``session_id`` that differ from the request.
+
+    ``system.md`` §3 instructs the model to echo the ``turn_metadata`` ids
+    for traceability. Pydantic only proves UUID *shape*; without an
+    equality check a hallucinated-but-well-formed UUID would flow
+    downstream into the append-only audit trail (§3). Treated as a
+    contract miss on the same retry-once path as a schema miss — this is
+    integrity enforcement, not a routing decision (§2). UUIDs are not PII;
+    the message names the mismatched field with expected vs got.
+    """
+
+
+_CONTRACT_MISS_ERRORS: Final[tuple[type[Exception], ...]] = (
+    VertexSchemaError,
+    ValidationError,
+    AssessorEchoMismatch,
+)
+"""The three contract-miss shapes that share the retry-once policy."""
 
 
 # ---------------------------------------------------------------------------
@@ -175,9 +199,13 @@ class AssessorTurnInput(BaseModel):
             "prior_turns": self.prior_turns,
             "competency_focus": self.competency_focus,
             "turn_metadata": {
+                # Caller metadata is spread FIRST so the typed ids always
+                # win: a conflicting caller-supplied "turn_id"/"session_id"
+                # must never skew the wire payload away from the ids used
+                # for trace / cost-ledger attribution.
+                **self.turn_metadata,
                 "turn_id": str(self.turn_id),
                 "session_id": str(self.session_id),
-                **self.turn_metadata,
             },
         }
         return json.dumps(payload, ensure_ascii=False)
@@ -269,7 +297,9 @@ async def run_assessor_turn(
 
     Raises:
         AssessorOutputInvalid: The model output missed the v0001 contract
-            twice (initial call + the single per-agent retry).
+            twice (initial call + the single per-agent retry). A miss is a
+            wrapper schema error, an output-model bounds violation, or an
+            echoed ``turn_id`` / ``session_id`` not equal to the request's.
         app.backend.llm.WrapperError: Any non-schema wrapper failure
             (timeout, upstream unavailable, budget, config, trace write)
             propagates untouched — no retry at this layer.
@@ -284,12 +314,26 @@ async def run_assessor_turn(
         # defaults — constitution §12 caps are never raised here.
     )
     try:
-        return await _score_once(request, sink=sink, ledger=ledger, settings=settings)
-    except (VertexSchemaError, ValidationError) as first_miss:
-        # Per-agent policy: exactly ONE fresh retry on a schema miss.
+        return await _score_once(
+            request,
+            expected_turn_id=inputs.turn_id,
+            expected_session_id=inputs.session_id,
+            sink=sink,
+            ledger=ledger,
+            settings=settings,
+        )
+    except _CONTRACT_MISS_ERRORS as first_miss:
+        # Per-agent policy: exactly ONE fresh retry on a contract miss.
         try:
-            return await _score_once(request, sink=sink, ledger=ledger, settings=settings)
-        except (VertexSchemaError, ValidationError) as second_miss:
+            return await _score_once(
+                request,
+                expected_turn_id=inputs.turn_id,
+                expected_session_id=inputs.session_id,
+                sink=sink,
+                ledger=ledger,
+                settings=settings,
+            )
+        except _CONTRACT_MISS_ERRORS as second_miss:
             raise AssessorOutputInvalid(
                 "assessor output failed the v0001 contract twice "
                 f"(first miss: {type(first_miss).__name__}, "
@@ -301,10 +345,26 @@ async def run_assessor_turn(
 async def _score_once(
     request: ModelCallRequest,
     *,
+    expected_turn_id: UUID,
+    expected_session_id: UUID,
     sink: TraceSink,
     ledger: CostLedger,
     settings: Settings,
 ) -> AssessorOutput:
-    """One ``call_model`` invocation + strict validation into the typed output."""
+    """One ``call_model`` invocation + strict validation into the typed output.
+
+    Beyond the Pydantic pass, enforces that the echoed ids EQUAL the
+    request's ids — UUID shape alone would let a hallucinated id reach
+    the audit trail. Raises :class:`AssessorEchoMismatch` on divergence.
+    """
     result = await call_model(request, sink=sink, ledger=ledger, settings=settings)
-    return AssessorOutput.model_validate(result.parsed)
+    output = AssessorOutput.model_validate(result.parsed)
+    if output.turn_id != expected_turn_id:
+        raise AssessorEchoMismatch(
+            f"echoed turn_id mismatch: expected {expected_turn_id}, got {output.turn_id}"
+        )
+    if output.session_id != expected_session_id:
+        raise AssessorEchoMismatch(
+            f"echoed session_id mismatch: expected {expected_session_id}, got {output.session_id}"
+        )
+    return output
