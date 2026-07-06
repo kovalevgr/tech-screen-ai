@@ -48,7 +48,7 @@ One new module, `app/backend/agents/interviewer.py`: a thin, typed, pure adapter
 | 17  | Specs precede implementation | This flow.                                                                                                                      | Pass   |
 | 18  | Multi-agent explicit         | `agent:`/`parallel:` declared above; fan-out with T19 was requested explicitly by the owner.                                    | Pass   |
 
-**Gate result**: PASS. One doc-drift item surfaced (not a violation): `docs/engineering/vertex-integration.md` § "JSON mode" still sketches "Interviewer: no retry"; the implementation plan's T18 acceptance (single retry) supersedes it — follow-up doc PR noted in spec Clarifications.
+**Gate result**: PASS. One doc-drift item surfaced (not a violation): `docs/engineering/vertex-integration.md` § "JSON mode" sketched "Interviewer: no retry"; the implementation plan's T18 acceptance (single retry) supersedes it. Resolved on this branch (Phase 3) per the reviewer gate's PASS-WITH-FINDINGS direction, rather than in a follow-up PR.
 
 ## Project Structure
 
@@ -65,11 +65,14 @@ specs/028-t18-interviewer-agent/
 
 ```text
 prompts/interviewer/v0001/schema.json          # commit 1 — T17 gap closure (contract)
-prompts/interviewer/v0001/notes.md             # commit 1 — dated addendum only
+prompts/interviewer/v0001/notes.md             # commit 1 — dated addendum; commit 3 adds the bounds-derivation clause
 app/backend/agents/__init__.py                 # new (backend-engineer)
 app/backend/agents/interviewer.py              # new (backend-engineer)
 app/backend/tests/agents/__init__.py           # new, empty
 app/backend/tests/agents/test_interviewer.py   # new (backend-engineer)
+docs/engineering/vertex-integration.md         # commit 3 — Interviewer retry line aligned (reviewer finding 1)
+docs/engineering/implementation-plan.md        # commit 3 — T17 stale schema sketch → schema.json as source of truth (finding 2)
+docs/engineering/coding-conventions.md         # commit 3 — backend layout gains agents/ line (finding 3)
 ```
 
 ## Phases
@@ -77,3 +80,4 @@ app/backend/tests/agents/test_interviewer.py   # new (backend-engineer)
 - **Phase 0**: contract gap closure (commit 1) — the §14 precondition for the T18/T19 parallel group.
 - **Phase 1**: wrapper module + typed models + retry policy.
 - **Phase 2**: unit suite (mock only at the `call_model` boundary) + full quality gates.
+- **Phase 3**: reviewer findings (PASS-WITH-FINDINGS, commit 3) — three doc-drift fixes, notes.md bounds clause, schema deepcopy, mixed-sequence + cache-independence tests.

@@ -28,3 +28,13 @@
 - [X] T011 [US1+US2] Acceptance matrix: happy path (1 invocation); schema miss → retry → success (2); schema miss ×2 → `InterviewerOutputInvalid` with `VertexSchemaError` cause (exactly 2); parsed-output violations (enum, >1200 chars, empty, extra property, `parsed=None`) → same retry-then-raise path; invalid-then-valid recovers; `VertexTimeoutError` / `SessionBudgetExceeded` propagate after exactly 1 invocation; input-model rejections (9 turns, unknown move)
 - [X] T012 Quality gates from worktree root: `pytest app/backend/tests` (175 passed, 78 skipped — DB suite skips without `DATABASE_URL`, unchanged from main), `ruff check app/backend` clean, `ruff format --check app/backend` clean, `mypy --strict app/backend` clean
 - [X] T013 Spec Kit artefacts (this directory) committed with the feature branch
+
+## Phase 3: Reviewer findings (PASS-WITH-FINDINGS, 2026-07-06) — commit 3
+
+- [X] T014 `docs/engineering/vertex-integration.md` § "JSON mode": Interviewer bullet rewritten to the implemented policy (single retry on schema miss / parsed-output validation failure, then typed `InterviewerOutputInvalid` to the orchestrator)
+- [X] T015 `docs/engineering/implementation-plan.md` T17 description: stale per-agent field-name sketch replaced — committed `prompts/<agent>/v0001/schema.json` files named as the source of truth (consistent with the existing Ownership note)
+- [X] T016 `docs/engineering/coding-conventions.md` backend layout: `agents/` line added (thin typed wrappers over `call_model`)
+- [X] T017 `prompts/interviewer/v0001/notes.md` addendum: clause added — the 1..1200-char bounds derive from guardrail §7 (~80 Ukrainian words), not §4; new normative content in schema.json, chosen conservatively
+- [X] T018 `interviewer.py`: `_load_output_schema` now returns `copy.deepcopy` of the `lru_cache`d file read — downstream mutation cannot poison the module cache; guarded by a new cache-independence test
+- [X] T019 Mixed-sequence test: `VertexSchemaError` then invalid parsed output → `InterviewerOutputInvalid`, exactly 2 `call_model` invocations, `__cause__` is the second (validation) failure
+- [X] T020 Spec artefacts updated for truthfulness (spec.md Clarifications + SC-003, plan.md gate note / source tree / phases, this phase) and all four quality gates re-run green

@@ -27,6 +27,7 @@ through its injected ``sink`` / ``ledger`` collaborators.
 
 from __future__ import annotations
 
+import copy
 import json
 from functools import lru_cache
 from pathlib import Path
@@ -142,13 +143,23 @@ def _load_system_prompt() -> str:
 
 
 @lru_cache(maxsize=1)
-def _load_output_schema() -> dict[str, Any]:
-    """Load the committed output contract (cached — immutable per version)."""
+def _read_output_schema() -> dict[str, Any]:
+    """One-time file read of the committed contract (immutable per version)."""
     schema_path = _PROMPTS_ROOT / "interviewer" / PROMPT_VERSION / "schema.json"
     loaded: Any = json.loads(schema_path.read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):
         raise TypeError(f"{schema_path}: expected a JSON object, got {type(loaded).__name__}")
     return loaded
+
+
+def _load_output_schema() -> dict[str, Any]:
+    """Return a fresh deep copy of the cached contract.
+
+    The dict flows into ``ModelCallRequest.json_schema`` with nested
+    objects shared by reference; a downstream mutation would otherwise
+    poison the module-level cache for every later call.
+    """
+    return copy.deepcopy(_read_output_schema())
 
 
 def _serialize_user_payload(inputs: InterviewerTurnInputs) -> str:

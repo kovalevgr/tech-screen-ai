@@ -126,7 +126,7 @@ Agent modules decide whether to retry on schema failure. Typically:
 
 - **Assessor:** retry up to once with temperature bumped to 0.1 on schema failure. If still failing, mark the assessment as `needs_manual_review` and enqueue.
 - **Planner:** retry up to twice; on repeated failure, fall back to the previous rubric version's default plan template.
-- **Interviewer:** no retry — partial or malformed output is truncated and surfaced with a recruiter escalation flag.
+- **Interviewer:** retry once on schema miss (or parsed-output validation failure); on the second failure the wrapper raises a typed `InterviewerOutputInvalid` surfaced to the orchestrator, which owns the escalation policy. See `app/backend/agents/interviewer.py` (T18).
 
 ---
 

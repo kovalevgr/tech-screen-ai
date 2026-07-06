@@ -160,6 +160,17 @@ def test_output_schema_loader_matches_committed_contract() -> None:
     assert _load_output_schema() == committed
 
 
+def test_output_schema_loader_returns_independent_copies() -> None:
+    """Callers get deep copies — a downstream mutation must not poison the cache."""
+    from app.backend.agents.interviewer import _load_output_schema
+
+    first = _load_output_schema()
+    first["properties"]["utterance"]["maxLength"] = 1  # simulated downstream mutation
+    second = _load_output_schema()
+    assert second["properties"]["utterance"]["maxLength"] == 1200
+    assert second is not first
+
+
 def test_prompt_version_matches_models_yaml_pin() -> None:
     """Module pin stays in lockstep with configs/models.yaml (§16, ADR-021)."""
     from app.backend.llm.models_config import MODELS_YAML_PATH, ModelsConfig
@@ -368,6 +379,33 @@ async def test_invalid_parsed_output_then_valid_recovers_on_retry(
 
     assert output.utterance == _VALID_PARSED["utterance"]
     assert len(fake.requests) == 2
+
+
+async def test_schema_miss_then_invalid_parsed_output_raises_with_validation_cause(
+    monkeypatch: pytest.MonkeyPatch,
+    in_memory_trace_sink: InMemoryTraceSink,
+    in_memory_cost_ledger: InMemoryCostLedger,
+    test_settings: Settings,
+) -> None:
+    """Mixed sequence: wrapper-level miss, then parsed-output violation.
+
+    Both failure classes share the one-retry budget; the typed exception
+    chains whichever failure came second (here: the ValidationError).
+    """
+    bad = {"utterance": "Дякую.", "internal_move_executed": "not_a_move"}
+    fake = _install(monkeypatch, [_schema_error(), _make_result(bad)])
+
+    with pytest.raises(InterviewerOutputInvalid) as excinfo:
+        await run_interviewer_turn(
+            _make_inputs(),
+            sink=in_memory_trace_sink,
+            ledger=in_memory_cost_ledger,
+            settings=test_settings,
+        )
+
+    assert len(fake.requests) == 2, "mixed failures share the single retry budget"
+    assert isinstance(excinfo.value.__cause__, ValidationError)
+    assert not isinstance(excinfo.value.__cause__, VertexSchemaError)
 
 
 # ---------------------------------------------------------------------------
