@@ -93,8 +93,12 @@ jobs:
           echo "SERVICE_NAME=${service_name}" >> "$GITHUB_ENV"
 
           split_json="$(gcloud run services describe "$service_name" --region "$REGION" --format=json)"
+          # sort_by(percent, revisionName) + last: on an exact traffic tie
+          # (e.g. a 50/50 mid-ramp split) the NEWEST revision wins as primary,
+          # so the auto-target is its predecessor — never two steps back.
+          # Revision names sort chronologically (zero-padded sequence numbers).
           primary="$(printf '%s' "$split_json" | jq -r \
-            '[.status.traffic[]] | max_by(.percent // 0) | .revisionName // empty')"
+            '[.status.traffic[]] | sort_by((.percent // 0), .revisionName) | last | .revisionName // empty')"
           before="$(printf '%s' "$split_json" | jq -r \
             '[.status.traffic[] | "\(.revisionName // "LATEST")=\(.percent // 0)%"] | join(", ")')"
           echo "TRAFFIC_BEFORE=${before}" >> "$GITHUB_ENV"

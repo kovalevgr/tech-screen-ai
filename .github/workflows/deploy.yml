@@ -64,9 +64,7 @@ defaults:
     shell: bash
 
 env:
-  GCP_PROJECT: "tech-screen-493720"
   REGION: "europe-west1"
-  AR_HOST: "europe-west1-docker.pkg.dev"
   AR_REPO: "europe-west1-docker.pkg.dev/tech-screen-493720/techscreen"
   WIF_PROVIDER: "projects/463244185014/locations/global/workloadIdentityPools/github-actions/providers/github"
   DEPLOYER_SA: "techscreen-deployer@tech-screen-493720.iam.gserviceaccount.com"

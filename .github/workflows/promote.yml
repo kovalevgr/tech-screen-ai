@@ -140,4 +140,6 @@ jobs:
             echo "| traffic after | ${TRAFFIC_AFTER:-n/a} |"
             echo ""
             echo "Observe per docs/engineering/deploy-playbook.md (error rate, p95, LLM cost) before the next step. Rollback at any point: \`gh workflow run rollback.yml -f env=${TARGET_ENV} -f service=${SVC}\`."
+            echo ""
+            echo "> Note: the target above is the LATEST READY revision, which is not necessarily the current primary — if this service was rolled back recently, promoting re-ramps the rolled-back-from candidate. Check *traffic before* against your expectation first (reviewer PR#20 N4)."
           } >> "$GITHUB_STEP_SUMMARY"

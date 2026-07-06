@@ -15,7 +15,7 @@
 
 ## Phase 2: Operator tooling (US5 supporting)
 
-- [X] T004 [US5] Write `scripts/cloud-sql-power.sh` — `wake|sleep|status` × `dev|prod`; thin `gcloud sql instances patch --activation-policy` wrapper + state report; operator-only (deployer SA cannot patch instances — D4/D10); shellcheck-clean
+- [X] T004 [US5] ~~Write~~ `scripts/cloud-sql-power.sh` — **amended post-review: shipped separately via PR #19** (this branch forked before that merge and re-authored it; integration kept main's superset version, reviewer PR#20 W1). Original intent: — `wake|sleep|status` × `dev|prod`; thin `gcloud sql instances patch --activation-policy` wrapper + state report; operator-only (deployer SA cannot patch instances — D4/D10); shellcheck-clean
 
 ## Phase 3: Deployer identity (author-only Terraform)
 

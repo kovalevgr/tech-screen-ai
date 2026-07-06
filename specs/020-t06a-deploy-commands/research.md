@@ -65,7 +65,7 @@ Role-by-role justification for `techscreen-deployer@` (all authored in `infra/te
 - **Rationale**: "previous serving revision" must survive the case where the latest *created* revision is a failed deploy (skipped — not Ready) and the case of a mid-ramp rollback (primary at 90 %, candidate at 10 % → target is the primary's predecessor **only if** the primary is the candidate; walking creation order from the primary handles both because the primary is whatever holds the most traffic). The explicit input is the escape hatch when the heuristic is wrong at 02:00.
 - **Concurrency**: all three workflows share group `cloud-run-<env>`; only rollback sets `cancel-in-progress: true` — rollback preempts, deploys/promotes queue.
 
-## D10. Cost-idle mode: repo had no tooling — `scripts/cloud-sql-power.sh` ships here **[repo-verified gap]**
+## D10. Cost-idle mode tooling **[amended post-review: the gap was already closed by PR #19, which merged after this branch forked — main's `cloud-sql-power.sh` (superset interface) was kept at integration; reviewer PR#20 W1]**
 
 - **Finding**: the live instances are kept stopped (`activationPolicy=NEVER`) to save cost, but the tree contains **no** `scripts/cloud-sql-power.sh`, and `cloud-setup.md` has **no cost-idle section** — the practice exists only operationally. The guard message this task must emit references that script by path.
 - **Decision**: ship the script in this PR (operator-only helper: `wake|sleep|status` × `dev|prod`, a thin `gcloud sql instances patch --activation-policy` wrapper) and document the rule in the deploy playbook. A one-line "steps that need the DB" table lives next to it.
