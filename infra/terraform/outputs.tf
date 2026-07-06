@@ -2,7 +2,7 @@
 # TechScreen — root outputs (T06)
 # -----------------------------------------------------------------------------
 # Consumed by operators (quickstart acceptance sweep) and future tasks
-# (T06a /deploy targets, T07 SSO wiring, sync-feature-flags.yml values).
+# (T06a /deploy targets, T07 SSO wiring, sync-configs.yml values).
 # =============================================================================
 
 output "prod_backend_url" {
@@ -36,6 +36,6 @@ output "dev_sql_connection_name" {
 }
 
 output "flag_sync_sa_email" {
-  description = "CI flag-sync service-account email (WIF-bound; used by sync-feature-flags.yml)."
+  description = "CI configs-as-code sync SA email (WIF-bound; used by sync-configs.yml, renamed from sync-feature-flags.yml in T16)."
   value       = google_service_account.flag_sync.email
 }

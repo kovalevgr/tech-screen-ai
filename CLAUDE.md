@@ -13,7 +13,7 @@ TechScreen is an internal AI-powered technical interview system for N-iX. It con
 ## The floor: read these before non-trivial work
 
 1. [`.specify/memory/constitution.md`](./.specify/memory/constitution.md) — **20 non-negotiable invariants.** If a change would violate any of these, stop and flag it.
-2. [`adr/`](./adr/) — 21 architectural decisions with context and consequences. Start at [`adr/README.md`](./adr/README.md) for the index.
+2. [`adr/`](./adr/) — 24 architectural decisions with context and consequences. Start at [`adr/README.md`](./adr/README.md) for the index.
 3. [`docs/specs/architecture.docx`](./docs/specs/architecture.docx) — system architecture diagram and data flow.
 4. [`docs/specs/data-model.docx`](./docs/specs/data-model.docx) — full schema with invariants.
 5. [`docs/specs/agents.docx`](./docs/specs/agents.docx) — Interviewer / Assessor / Planner contracts.

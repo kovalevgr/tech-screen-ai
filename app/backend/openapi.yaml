@@ -364,6 +364,13 @@ components:
       - type
       title: ValidationError
       type: object
+  securitySchemes:
+    IdentityPlatformBearer:
+      bearerFormat: JWT
+      description: 'Identity Platform ID token for staff SSO; verified claims contract:
+        docs/contracts/id-token-claims.json (T07, ADR-024).'
+      scheme: bearer
+      type: http
 info:
   title: TechScreen Backend
   version: 0.0.0
@@ -417,6 +424,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
+      security:
+      - IdentityPlatformBearer: []
       summary: List Position Templates
       tags:
       - position-templates
@@ -441,6 +450,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
+      security:
+      - IdentityPlatformBearer: []
       summary: Create Position Template
       tags:
       - position-templates
@@ -468,6 +479,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
+      security:
+      - IdentityPlatformBearer: []
       summary: Archive Position Template
       tags:
       - position-templates
@@ -494,6 +507,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
+      security:
+      - IdentityPlatformBearer: []
       summary: Get Position Template
       tags:
       - position-templates
@@ -526,6 +541,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
+      security:
+      - IdentityPlatformBearer: []
       summary: Update Position Template
       tags:
       - position-templates
@@ -539,6 +556,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/RubricSnapshot'
           description: Successful Response
+      security:
+      - IdentityPlatformBearer: []
       summary: Read Active Rubric
       tags:
       - rubric

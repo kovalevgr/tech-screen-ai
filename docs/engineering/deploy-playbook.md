@@ -174,7 +174,7 @@ scripts/cloud-sql-power.sh sleep  dev|prod
 | backend revision startup | **yes, once `DATABASE_URL` is wired** into the Cloud Run template (the deploy gate detects this and fails with the wake instruction) |
 | frontend anything | never |
 | operator-run migrations | always |
-| `sync-feature-flags.yml` | always |
+| `sync-configs.yml` (both jobs: flags + rubric) | always |
 
 Waking is deliberately human-only: the CI deployer identity holds `roles/cloudsql.viewer` (read state, cannot patch). Remember to `sleep` the instance when the session ends.
 
