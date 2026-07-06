@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from app.backend.api.position_templates import router as position_templates_router
 from app.backend.api.rubric import router as rubric_router
 from app.backend.logging import configure_logging
+from app.backend.services.auth import IdTokenVerifier, set_verifier
 from app.backend.services.feature_flags import FeatureFlagService, set_service
 from app.backend.settings import Settings
 
@@ -56,9 +57,22 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configured, also loads ``configs/feature-flags.yaml``, validates it
     against the committed JSON Schema, and starts the LISTEN/NOTIFY
     listener that keeps the in-process cache fresh (T05a — FR-003/SC-003).
+
+    T07: when ``AUTH_MODE=identity_platform``, installs the process-wide
+    :class:`IdTokenVerifier` behind the API auth seam (§9 dark launch —
+    with the default ``AUTH_MODE=disabled`` no verifier exists and every
+    authenticated endpoint answers 401, the pre-T07 posture).
     """
     settings = Settings()
     settings.assert_safe_for_environment()
+
+    verifier: IdTokenVerifier | None = None
+    if settings.auth_mode == "identity_platform":
+        verifier = IdTokenVerifier(
+            project_id=settings.gcp_project,
+            allowed_domain=settings.auth_allowed_domain,
+        )
+        set_verifier(verifier)
 
     flag_service: FeatureFlagService | None = None
     if settings.database_url:
@@ -74,6 +88,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         if flag_service is not None:
             await flag_service.stop()
             set_service(None)
+        if verifier is not None:
+            set_verifier(None)
 
 
 app = FastAPI(title="TechScreen Backend", version=_project_version(), lifespan=lifespan)
