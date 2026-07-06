@@ -80,7 +80,9 @@ Rules of the road:
 3. Terraform deliberately **ignores `settings.activation_policy`** (module lifecycle block) — sleeping/waking never shows up as plan drift; the declared shape stays `ALWAYS` for the day real usage starts and this section is retired.
 4. Nothing is lost while asleep: data, schema, users, PITR history, and secrets all persist.
 
-**Retire this mode** (flip both to `wake` permanently and delete this section) at T49 pilot dry-run at the latest — anything user-facing needs always-on databases.
+**Current posture (owner decision 2026-07-06):** `dev` stays **awake** for the active T06a/T07/T11 work phase; `prod` sleeps and is **temporarily excluded from the `sync-configs.yml` matrix** (commented out in both jobs) so config merges don't fail against a stopped instance. Re-enabling prod = wake it + uncomment the two matrix lines; the sync is a full-state upsert, so the first run replays current configs automatically.
+
+**Retire this mode** (flip both to `wake` permanently, restore the sync matrix, and delete this section) at T49 pilot dry-run at the latest — anything user-facing needs always-on databases.
 
 ---
 
