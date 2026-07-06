@@ -247,6 +247,9 @@ resource "google_cloud_run_v2_service" "backend" {
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
+      # The /deploy workflow names revisions explicitly (sha-run-attempt);
+      # Terraform must not null it back — deploys own revision naming (T06a).
+      template[0].revision,
       client,
       client_version,
       # API populates an empty service-level scaling block we do not manage
@@ -289,6 +292,9 @@ resource "google_cloud_run_v2_service" "frontend" {
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
+      # The /deploy workflow names revisions explicitly (sha-run-attempt);
+      # Terraform must not null it back — deploys own revision naming (T06a).
+      template[0].revision,
       client,
       client_version,
       # API populates an empty service-level scaling block we do not manage
