@@ -248,7 +248,6 @@ jobs:
             echo "NAME_SUFFIX=${suffix}"
             echo "SERVICE_NAME=techscreen-${SVC}${suffix}"
             echo "IMAGE=${AR_REPO}/${SVC}:${TARGET_SHA}-${TARGET_ENV}"
-            echo "REV_SUFFIX=${TARGET_SHA:0:7}-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
           } >> "$GITHUB_ENV"
 
       - name: Authenticate to GCP (Workload Identity Federation)
@@ -306,12 +305,16 @@ jobs:
         env:
           PORT: ${{ steps.cfg.outputs.port }}
         run: |
+          # NO --revision-suffix: an explicit revision name persists in the
+          # service template and later Terraform template updates try to
+          # reuse it with a different config -> API 409 (found live during
+          # the T07 AUTH_MODE flip). Auto-naming kills that class; the git
+          # sha travels in the image tag + job summary instead.
           gcloud run deploy "$SERVICE_NAME" \
             --image "$IMAGE" \
             --region "$REGION" \
             --port "$PORT" \
             --no-traffic \
-            --revision-suffix "$REV_SUFFIX" \
             --quiet
           rev="$(gcloud run services describe "$SERVICE_NAME" --region "$REGION" \
             --format='value(status.latestCreatedRevisionName)')"

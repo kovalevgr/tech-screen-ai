@@ -37,5 +37,5 @@ ops_email = "ikovalov@n-ix.com"
 # triggers (quickstart §5). Public run.app URLs — not credentials (ADR-022).
 # -----------------------------------------------------------------------------
 
-auth_before_create_uri  = ""
-auth_before_sign_in_uri = ""
+auth_before_create_uri  = "https://techscreen-auth-claims-before-created-i5ougvjndq-ew.a.run.app"
+auth_before_sign_in_uri = "https://techscreen-auth-claims-before-signed-in-i5ougvjndq-ew.a.run.app"

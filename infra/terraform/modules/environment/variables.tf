@@ -45,3 +45,36 @@ variable "operator_email" {
   description = "Human operator allowed to mint short-lived tokens for the backend SA (smoke tests; no JSON keys per constitution §6)."
   type        = string
 }
+
+variable "llm_backend" {
+  description = "LLM_BACKEND for the backend service: \"vertex\" (prod-required, FR-007 boot guard) or \"mock\" (dev-legal, free)."
+  type        = string
+
+  validation {
+    condition     = contains(["mock", "vertex"], var.llm_backend)
+    error_message = "LLM_BACKEND is \"mock\" or \"vertex\"."
+  }
+}
+
+variable "auth_mode" {
+  description = "AUTH_MODE for the backend service (T07 §9 seam): \"disabled\" (dark, default) or \"identity_platform\". Managed here so gcloud-side flips never fight Terraform."
+  type        = string
+  default     = "disabled"
+
+  validation {
+    condition     = contains(["disabled", "identity_platform"], var.auth_mode)
+    error_message = "AUTH_MODE is \"disabled\" or \"identity_platform\"."
+  }
+}
+
+variable "auth_allowed_domain" {
+  description = "Workspace hosted domain admitted by the backend verifier (AUTH_ALLOWED_DOMAIN)."
+  type        = string
+  default     = "n-ix.com"
+}
+
+variable "wire_runtime" {
+  description = "Wire env vars + DATABASE_URL secret + Cloud SQL connector into the backend template. Keep FALSE while the environment's SQL instance sleeps (cost-idle): the connector volume needs a RUNNABLE instance for new revisions to become ready. Flip together with waking the instance."
+  type        = bool
+  default     = false
+}

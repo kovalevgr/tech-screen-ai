@@ -15,6 +15,8 @@ module "env_prod" {
   source = "./modules/environment"
 
   env                = "prod"
+  llm_backend        = "vertex" # FR-007: prod refuses mock at boot
+  wire_runtime       = false    # prod sleeps (cost-idle) — flip together with waking it
   name_suffix        = ""
   secret_suffix      = ""
   project_id         = var.project_id
@@ -29,6 +31,9 @@ module "env_dev" {
   source = "./modules/environment"
 
   env                = "dev"
+  llm_backend        = "mock"              # dev-legal (settings guard), zero Vertex spend
+  wire_runtime       = true                # dev instance is awake for the active work phase
+  auth_mode          = "identity_platform" # T07 live on dev since 2026-07-06 (prod stays dark)
   name_suffix        = "-dev"
   secret_suffix      = "_DEV"
   project_id         = var.project_id
