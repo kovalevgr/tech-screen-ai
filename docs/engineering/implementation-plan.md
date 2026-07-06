@@ -324,6 +324,8 @@ Every sub-agent PR is gated by `reviewer` (`.claude/agents/reviewer.md`). A task
 
 ### T11 — Tier-1 checkpoint (smoke)
 
+> **✅ CLOSED 2026-07-06** — gate record + declared deviations in [`docs/engineering/tier1-checkpoint-2026-07.md`](./tier1-checkpoint-2026-07.md) (checkpoint PR merged by Ihor = the LGTM). Note: the §8 topology this tier shipped is dev+prod per ADR-023.
+
 - **agent:** `human` + `orchestrator`
 - **parallel:** false (gate)
 - **depends_on:** [T01a, T02, T03, T04, T05, T05a, T06, T06a, T07, T08, T09, T10]
