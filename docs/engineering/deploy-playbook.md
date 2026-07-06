@@ -258,6 +258,10 @@ The `deploys` audit table described in earlier versions of this playbook is **de
 
 ---
 
+## Terraform template changes require a re-deploy (live finding, 2026-07-06)
+
+Any `terraform apply` that touches a Cloud Run **template** (env vars, secret wiring, connector volumes) rolls a new revision built from the **config's placeholder image** — `ignore_changes[image]` suppresses the diff but the update request still carries the config value, so the service serves the hello page until the next `/deploy`. Rule: **after every template-touching apply, immediately run `/deploy <env> <service>` (+ `/promote 100` if traffic follows latest is not in effect).** Related: never name revisions explicitly in deploys — an explicit name stored in the template makes later Terraform updates fail with API 409 (that is why deploy.yml has no `--revision-suffix`).
+
 ## Document versioning
 
 - v2.0 — 2026-07-05 — T06a: descriptive → implemented. Exact workflow invocations (`deploy.yml`/`promote.yml`/`rollback.yml`), §10 gate mechanics (label check at deploy time; application operator-run), cost-idle wake rule + `scripts/cloud-sql-power.sh`, pinned-revision traffic semantics, preempting rollback, auditability via run history, honest not-yet-implemented table.

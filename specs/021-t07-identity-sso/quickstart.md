@@ -27,7 +27,9 @@ Expected new resources: 3 API services (`identitytoolkit`, `cloudfunctions`, `cl
 
 ## 3. Enable the Google provider (console — deliberately not Terraform)
 
-Console → **Identity Platform → Providers → Add a provider → Google** → Enable. Accept the **auto-provisioned** OAuth client (do not paste a client ID/secret — the whole point is that no secret exists for us to hold; research R3, constitution §5).
+Console → **Identity Platform → Providers → Add a provider → Google** → Enable.
+
+> **Amended 2026-07-06 (live finding):** the console does NOT auto-provision the OAuth client — it requires a **Web client ID + secret**. Create them first under **APIs & Services → Credentials → OAuth client ID** (Web application; JS origins = both frontend run.app URLs + http://localhost:3000; redirect URI = `https://tech-screen-493720.firebaseapp.com/__/auth/handler`; consent screen Internal must exist), then paste both into the provider form. The secret lives only in Google's console/GCIP config — never in Git or Terraform state (that §5 property survives; R3's "no pasting" claim was wrong).
 
 While here: **Settings → Authorized domains** should already show `localhost` + both frontend `run.app` hosts (Terraform-managed — do not hand-edit).
 
