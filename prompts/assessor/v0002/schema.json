@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://techscreen.nix.internal/schemas/assessor-output.v1.json",
+  "title": "AssessorOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "turn_id",
+    "session_id",
+    "competency_focus",
+    "assessments",
+    "red_flags",
+    "needs_manual_review"
+  ],
+  "properties": {
+    "turn_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUID of the candidate turn being assessed."
+    },
+    "session_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "competency_focus": {
+      "type": "string",
+      "description": "The rubric_node_id the orchestrator asked the Assessor to focus on."
+    },
+    "assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rubric_node_id",
+          "level",
+          "confidence",
+          "rationale_en",
+          "evidence_spans"
+        ],
+        "properties": {
+          "rubric_node_id": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer",
+            "enum": [1, 2, 3, 4]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0.99,
+            "description": "Assessor-reported confidence. 1.0 is forbidden; below 0.4 sets needs_manual_review."
+          },
+          "rationale_en": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600,
+            "description": "English, 1-3 sentences, referencing the matched level descriptor."
+          },
+          "evidence_spans": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Exact substring of the candidate answer."
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "red_flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "description_en"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "FACTUALLY_WRONG",
+              "CONTRADICTION",
+              "FABRICATED_TECHNOLOGY",
+              "LIKELY_CHEATING",
+              "RED_FLAG_OTHER"
+            ]
+          },
+          "rubric_node_id": {
+            "type": ["string", "null"]
+          },
+          "description_en": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "evidence_span": {
+            "type": ["string", "null"]
+          }
+        }
+      }
+    },
+    "needs_manual_review": {
+      "type": "boolean"
+    },
+    "manual_review_reason_en": {
+      "type": ["string", "null"],
+      "maxLength": 400
+    }
+  }
+}
