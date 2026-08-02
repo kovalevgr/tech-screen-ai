@@ -1,0 +1,23 @@
+# Orchestrator thresholds — source of truth (constitution §16, contract §8).
+#
+# Every routing threshold the deterministic state machine uses lives here and
+# ONLY here: never in a prompt, never decided by an LLM (constitution §2,
+# ADR-005). Changing a threshold is a config PR — no prompt change, no code
+# change, no migration.
+#
+# Loaded and validated at load time by app/backend/orchestrator/config.py
+# (frozen pydantic, unknown keys rejected). The body below is the contract §8
+# block verbatim; see docs/contracts/state-machine.md §5–§6 for what each
+# threshold gates.
+
+adjudication:
+  confidence_min: 0.6        # ANSWERED requires at least this
+  max_probes_per_competency: 2
+  min_probe_seconds: 60
+flags:
+  cheat_flags_to_review: 1
+  drift_to_review: 3
+timing:
+  candidate_timeout_minutes: 10
+  tick_seconds: 15
+state_schema_version: 1
