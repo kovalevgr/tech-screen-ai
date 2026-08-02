@@ -102,7 +102,8 @@ class ModelCallRequest(BaseModel):
     """Per-call wall-clock cap. Hard ceiling 30 s per constitution §12."""
 
     max_output_tokens: int = Field(default=4096, ge=1, le=4096)
-    """Hard ceiling 4096 per constitution §12."""
+    """Hard ceiling 4096 per constitution §12. The effective cap sent to the
+    backend is ``min(this, configs/models.yaml per-agent pin)`` (§16)."""
 
     model_override: str | None = None
     """Test/script-only escape hatch; production callers leave this ``None``."""
@@ -397,6 +398,12 @@ async def call_model(
     # Step 4 — choose backend (mock vs real per env).
     backend = _select_backend(agent=request.agent, settings=settings)
 
+    # Effective output-token cap: the per-agent pin from configs/models.yaml
+    # (constitution §16 — configs as code) can only LOWER the request's
+    # value; the request field keeps its own §12 hard ceiling of 4096 and
+    # callers may still ask for less than the agent pin.
+    effective_max_output_tokens = min(request.max_output_tokens, agent_cfg.max_output_tokens)
+
     # Step 5 — wrap the backend call in retry + wall-clock timeout.
     raw: RawBackendResult | None = None
     attempts = 0
@@ -408,7 +415,7 @@ async def call_model(
                 request=request,
                 resolved_model=resolved_model,
                 temperature=agent_cfg.temperature,
-                max_output_tokens=request.max_output_tokens,
+                max_output_tokens=effective_max_output_tokens,
             ),
             timeout=request.timeout_s,
         )

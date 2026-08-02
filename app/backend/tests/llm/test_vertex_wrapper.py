@@ -1001,6 +1001,104 @@ async def test_failed_call_does_not_increment_ledger(
 
 
 # ---------------------------------------------------------------------------
+# 030 — per-agent max_output_tokens pin from configs/models.yaml is enforced
+# ---------------------------------------------------------------------------
+
+
+class _RecordingBackend:
+    """Backend that records the kwargs it received and returns a canned result."""
+
+    def __init__(self, result: RawBackendResult) -> None:
+        self._result = result
+        self.received: dict[str, Any] = {}
+
+    async def generate(
+        self,
+        *,
+        system_prompt: str,
+        user_payload: str,
+        json_schema: dict[str, Any] | None,
+        model: str,
+        temperature: float,
+        max_output_tokens: int,
+        timeout_s: float,
+    ) -> RawBackendResult:
+        self.received = {
+            "system_prompt": system_prompt,
+            "user_payload": user_payload,
+            "json_schema": json_schema,
+            "model": model,
+            "temperature": temperature,
+            "max_output_tokens": max_output_tokens,
+            "timeout_s": timeout_s,
+        }
+        return self._result
+
+
+def _recording_backend() -> _RecordingBackend:
+    return _RecordingBackend(
+        RawBackendResult(
+            text='{"message_uk": "ok", "intent": "noop", "end_of_phase": false}',
+            input_tokens=5,
+            output_tokens=8,
+            model="gemini-2.5-flash",
+            model_version="gemini-2.5-flash-001",
+        )
+    )
+
+
+async def test_agent_pin_lowers_request_default_max_output_tokens(
+    in_memory_trace_sink: InMemoryTraceSink,
+    in_memory_cost_ledger: InMemoryCostLedger,
+    test_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Request default 4096 + interviewer pin 2048 → backend receives 2048.
+
+    Constitution §16 (configs as code): the per-agent
+    ``max_output_tokens`` pin in ``configs/models.yaml`` is live config,
+    not decoration — the effective cap is
+    ``min(request.max_output_tokens, agent pin)``.
+    """
+    backend = _recording_backend()
+    _force_backend(monkeypatch, backend)
+
+    request = _interviewer_request(max_output_tokens=4096)  # the request-level default
+    await call_model(
+        request,
+        sink=in_memory_trace_sink,
+        ledger=in_memory_cost_ledger,
+        settings=test_settings,
+    )
+    # configs/models.yaml pins interviewer at 2048.
+    assert backend.received["max_output_tokens"] == 2048
+
+
+async def test_explicit_request_below_agent_pin_wins(
+    in_memory_trace_sink: InMemoryTraceSink,
+    in_memory_cost_ledger: InMemoryCostLedger,
+    test_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explicit request 1024 below the interviewer pin 2048 → backend receives 1024.
+
+    The agent pin only LOWERS the effective cap; callers may always ask
+    for less.
+    """
+    backend = _recording_backend()
+    _force_backend(monkeypatch, backend)
+
+    request = _interviewer_request(max_output_tokens=1024)
+    await call_model(
+        request,
+        sink=in_memory_trace_sink,
+        ledger=in_memory_cost_ledger,
+        settings=test_settings,
+    )
+    assert backend.received["max_output_tokens"] == 1024
+
+
+# ---------------------------------------------------------------------------
 # Sanity: the patched module-level symbols above must actually exist
 # ---------------------------------------------------------------------------
 
