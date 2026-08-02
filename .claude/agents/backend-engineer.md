@@ -1,7 +1,7 @@
 ---
 name: backend-engineer
 description: FastAPI, SQLAlchemy, Alembic, Pydantic, Vertex adapter, orchestrator, domain code, backend tests. Invoke for any change under app/backend/** or alembic/**.
-model: sonnet
+model: opus
 tools:
   - Read
   - Write

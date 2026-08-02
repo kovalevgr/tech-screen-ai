@@ -1,7 +1,7 @@
 ---
 name: frontend-engineer
 description: Next.js App Router, shadcn/ui, Tailwind, design system, React Query, OpenAPI client, frontend tests. Invoke for any change under app/frontend/**.
-model: sonnet
+model: opus
 tools:
   - Read
   - Write
