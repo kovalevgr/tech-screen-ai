@@ -16,7 +16,9 @@ Listed alphabetically within sections.
 
 **Candidate.** The person being interviewed. Identified by a row in the `candidate` table. Authenticates via magic link — never holds an account (see ADR-016).
 
-**Competency.** A named skill area evaluated in an interview (e.g. "C# concurrency", "React state management", "system design"). A rubric node with `kind: competency`. Competencies have sub-competencies and are scored on a 1–5 level scale.
+**Competency.** A named skill area evaluated in an interview (e.g. "C# concurrency", "React state management", "system design"). A rubric node with `kind: competency`. Competencies have sub-competencies and are scored on the **competency proficiency scale**.
+
+**Competency proficiency scale (canonical).** The six-state N-iX competency-matrix scale for how well a candidate commands a competency (owner decision 2026-08-02): **0 = None** ("не володіє" — demonstrated absence of proficiency), **1 = Basic**, **2 = Competent**, **3 = Advanced**, **4 = Proficient**, **5 = Expert**. Rubric files store level descriptors for ranks 1–5 only (`docs/contracts/rubric.schema.json`, minimum 1 / maximum 5); 0 needs no descriptor and is **Assessor-output-only** (`prompts/assessor/v0003/schema.json`). Do not confuse this with the Interviewer's target-level guide (Entry / Specialist / Expert / Proficient, `prompts/interviewer/v0001/level-guide.md`), which is a DIFFERENT axis — the position's target seniority, not the candidate's proficiency. Name-collision warning: "Proficient" appears in both scales with different meanings (proficiency rank 4 vs the top position target level).
 
 **Correctness (Variant A / B / C).** The three approaches we considered for flagging factually wrong answers. The MVP uses Variant A (prompt the Assessor itself). See ADR-020.
 
@@ -30,7 +32,7 @@ Listed alphabetically within sections.
 
 **Interview session.** A single conducted interview. Corresponds to one `interview_session` row. Holds references to the frozen rubric snapshot, plan snapshot, and assigned reviewer.
 
-**Level (1–5).** The score a competency receives. 1 = "Superficial", 5 = "Expert". Levels are tied to anchors in the rubric and have behavioural descriptions per level per competency.
+**Level (0–5).** The score a competency receives, on the **competency proficiency scale** (see above): 0 = None, 1 = Basic … 5 = Expert. Levels 1–5 are tied to anchors in the rubric and have behavioural descriptions per level per competency; 0 has no rubric anchor and can only be emitted by the Assessor.
 
 **Magic link / magic token.** The candidate's authentication mechanism. A signed, single-use, short-lived token delivered by email, redeemed to enter the interview UI. See ADR-016.
 
