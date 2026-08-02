@@ -81,7 +81,7 @@ class LLMResult(BaseModel):
 The adapter is the only place that:
 
 1. Authenticates to Vertex (via Application Default Credentials, resolved from the runtime service account).
-2. Enforces the timeout (a hard upper bound; no caller can pass > 60s).
+2. Enforces the timeout (a hard upper bound; no caller can pass > 30s — `le=30` on `ModelCallRequest.timeout_s`, constitution §12).
 3. Enforces `max_output_tokens` (caller may request lower, never higher).
 4. Retries on transient errors (see "Retry policy" below).
 5. Computes per-call cost from token counts and model price table.
@@ -124,15 +124,15 @@ When `json_schema` is provided the adapter:
 
 Agent modules decide whether to retry on schema failure. Typically:
 
-- **Assessor:** retry up to once with temperature bumped to 0.1 on schema failure. If still failing, mark the assessment as `needs_manual_review` and enqueue.
+- **Assessor:** retry once on schema miss, parsed-output validation failure, or echoed-id equality mismatch (the response must echo the requested turn/session/competency ids) — with an identical fresh request; on the second failure the wrapper raises a typed `AssessorOutputInvalid` surfaced to the orchestrator, which owns the escalation policy (e.g. marking `needs_manual_review`). See `app/backend/agents/assessor.py` (T19).
 - **Planner:** retry up to twice; on repeated failure, fall back to the previous rubric version's default plan template.
-- **Interviewer:** no retry — partial or malformed output is truncated and surfaced with a recruiter escalation flag.
+- **Interviewer:** retry once on schema miss (or parsed-output validation failure); on the second failure the wrapper raises a typed `InterviewerOutputInvalid` surfaced to the orchestrator, which owns the escalation policy. See `app/backend/agents/interviewer.py` (T18).
 
 ---
 
 ## Cost and latency caps
 
-- **Timeout:** 30 seconds per call (constitution §12). The adapter will not accept `timeout_s > 60`.
+- **Timeout:** 30 seconds per call (constitution §12). The adapter will not accept `timeout_s > 30` (`le=30` on `ModelCallRequest`).
 - **Max output tokens:** 4096 per call. The adapter will not accept a higher value.
 - **Per-session cost ceiling:** $5 in production. The orchestrator checks session aggregate cost before every LLM call; above the ceiling, the session state transitions to `SESSION_HALTED_COST_CEILING`.
 - **Monthly budget alert:** $50, configured in GCP Billing. Alerts at 50%, 90%, 100%.

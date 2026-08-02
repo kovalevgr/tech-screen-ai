@@ -25,6 +25,7 @@ app/backend/
   services/       Business logic. Stateless functions or classes.
   repositories/   DB access. SQLAlchemy models + query functions. Nothing else.
   llm/            Vertex adapter, prompt assembly, response parsing.
+  agents/         Thin typed agent wrappers over call_model (Interviewer, Assessor, Planner).
   orchestrator/   The deterministic state machine (ADR-005).
   domain/         Pure-Python entities and value objects.
   config/         Pydantic settings loaded from env and configs/ YAML.
