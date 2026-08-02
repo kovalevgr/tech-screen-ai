@@ -376,3 +376,9 @@ class Settings(BaseSettings):
 | `Settings`                     | `BaseSettings`      | process    | FR-007, FR-019, ADR-022   |
 
 No persistent rows. No migration. No DB models. T05 will replace the in-memory `TraceSink` and `CostLedger` implementations with Postgres-backed ones, leaving every other surface in this document unchanged.
+
+---
+
+## Amendments
+
+- **2026-08-02**: error taxonomy superseded by `specs/030-schema-transport-real-vertex` — the real backend now raises the SDK-free `BackendError` hierarchy (see `app/backend/llm/_backend_protocol.py`) instead of `google.api_core.exceptions.*`. §7's "raises `google.api_core.exceptions.*`" invariant is historical.

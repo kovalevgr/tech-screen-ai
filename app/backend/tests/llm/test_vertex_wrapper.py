@@ -39,6 +39,7 @@ from app.backend.llm._backend_protocol import (
     BackendCallerError,
     BackendDeadlineExceededError,
     BackendTransientError,
+    BackendUpstreamError,
     RawBackendResult,
     VertexBackend,
 )
@@ -493,6 +494,42 @@ async def test_invalid_argument_not_retried(
     records = in_memory_trace_sink.records
     assert len(records) == 1
     assert records[0].outcome == "config_error"
+    assert records[0].attempts == 1
+
+
+# ---------------------------------------------------------------------------
+# 030 — BackendUpstreamError (unclassified upstream code) → no retry
+# ---------------------------------------------------------------------------
+
+
+async def test_upstream_error_not_retried_raises_upstream_unavailable(
+    in_memory_trace_sink: InMemoryTraceSink,
+    in_memory_cost_ledger: InMemoryCostLedger,
+    test_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``BackendUpstreamError`` (e.g. HTTP 404) → 1 attempt, upstream-unavailable.
+
+    Spec 030 US2 scenario 4 at the wrapper level: unclassified upstream
+    codes are NOT retried and surface as
+    ``VertexUpstreamUnavailableError`` (pre-030 catch-all semantics).
+    """
+    backend = _ScriptedBackend([BackendUpstreamError("vertex api error 404: not found")])
+    _force_backend(monkeypatch, backend)
+
+    request = _interviewer_request()
+    with pytest.raises(VertexUpstreamUnavailableError):
+        await call_model(
+            request,
+            sink=in_memory_trace_sink,
+            ledger=in_memory_cost_ledger,
+            settings=test_settings,
+        )
+    assert backend.calls == 1, "unclassified upstream errors must not be retried"
+
+    records = in_memory_trace_sink.records
+    assert len(records) == 1
+    assert records[0].outcome == "upstream_unavailable"
     assert records[0].attempts == 1
 
 

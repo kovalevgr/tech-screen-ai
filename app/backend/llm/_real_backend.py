@@ -63,8 +63,11 @@ exists so the taxonomy tests can construct SDK errors without tripping
 def classify_http_status(code: int) -> type[BackendError]:
     """Map an upstream HTTP status code to its transport classification.
 
-    Preserves the documented pre-030 semantics
-    (`docs/engineering/vertex-integration.md` § Retry policy):
+    Mapping per `docs/engineering/vertex-integration.md` § Retry policy.
+    NOTE: 030 deliberately WIDENS the transient set — pre-030 only
+    429/500/503 were retried and 501/502/505 got a single attempt via
+    the catch-all; blanket 5xx-except-504 resolves the old
+    docstring-vs-table contradiction in the docstring's favor.
 
     - 429 + 5xx (except 504) → :class:`BackendTransientError` (retried);
     - 504 → :class:`BackendDeadlineExceededError` (deadline already

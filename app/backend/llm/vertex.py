@@ -16,7 +16,7 @@ Every model token that leaves a TechScreen process MUST traverse
   per Clarifications 2026-04-26.
 - A 30-second wall-clock cap across all retries via
   :func:`asyncio.wait_for`.
-- Two-stage JSON-schema validation (SDK-side ``response_schema`` +
+- Two-stage JSON-schema validation (SDK-side ``response_json_schema`` +
   wrapper-side :class:`pydantic.TypeAdapter`); schema miss raises
   :class:`VertexSchemaError` immediately with the raw payload — wrapper
   does NOT retry (per-agent retry policies live in agent modules).

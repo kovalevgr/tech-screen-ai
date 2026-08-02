@@ -82,6 +82,11 @@ def test_prompt_schema_transports_verbatim_pre_network(schema_path: Path) -> Non
     # step; 0.8.0's `t_schema` rejection fired at this layer). The
     # converter only reads `.vertexai` off the api client, so a stub
     # namespace keeps the test fully offline.
+    #
+    # NOTE: `_GenerateContentParameters` / `_GenerateContentParameters_to_vertex`
+    # are SDK-private. AttributeError here ⇒ the SDK's private converter
+    # moved on an SDK bump; re-pin the conversion path — the schemas
+    # themselves are probably fine.
     params = genai_types._GenerateContentParameters(
         model="gemini-2.5-flash",
         contents="ping",

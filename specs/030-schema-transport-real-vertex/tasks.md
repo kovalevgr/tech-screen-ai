@@ -34,3 +34,12 @@
 - [X] T013 `docs/engineering/vertex-integration.md`: retry-policy table rewritten to the 2.x taxonomy (`BackendError` classification, SDK retry OFF); JSON-mode §1 rewritten to `response_json_schema` verbatim transport; adapter/caps sections mention the `min(request, pin)` rule
 - [X] T014 Quality gates: `uv run pytest app/backend/tests` green; `ruff check` + `ruff format --check` clean; `mypy --strict app/backend` clean; `scripts/check-no-provider-sdk-imports.sh` exits 0; transport proof passes for all three schemas
 - [X] T015 Spec Kit artefacts (this directory) committed with the feature branch
+
+## Phase 5: Reviewer gate fixes (PASS-WITH-FINDINGS, 2026-08-02)
+
+- [X] T016 `app/backend/llm/vertex.py` module docstring: stale "SDK-side ``response_schema``" corrected to ``response_json_schema``
+- [X] T017 502-widening honesty: spec.md Clarification "Semantics preserved" rewritten (pre-030 only 429/500/503 were retried; 030 deliberately widens to blanket 5xx-except-504, resolving the pre-030 docstring-vs-table contradiction in the docstring's favor); `classify_http_status` docstring no longer claims preservation; same one-liner added to the vertex-integration.md 030 note
+- [X] T018 [US2] `test_vertex_wrapper.py`: wrapper-level `BackendUpstreamError` test — scripted backend raises it → `VertexUpstreamUnavailableError`, exactly 1 backend call, trace `outcome="upstream_unavailable"` (spec US2 scenario 4 now covered at the wrapper layer, not just classification)
+- [X] T019 T04 contract amendment: dated notes appended to `specs/007-t04-vertex-client-wrapper/contracts/wrapper-contract.md` and `data-model.md` — error taxonomy superseded by this spec; `google.api_core` references are historical (no in-place rewrites)
+- [X] T020 Guardrail hardening: `scripts/check-no-provider-sdk-imports.sh` second check fails any `GenAiAPIError` occurrence outside `_real_backend.py` / `test_real_backend.py` (closes the re-export bypass); `test_no_provider_sdk_imports.py` still passes
+- [X] T021 `test_prompt_schema_transport.py`: comment above the SDK-private converter usage (AttributeError ⇒ converter moved on an SDK bump; re-pin the path — schemas themselves are probably fine); all gates re-run green

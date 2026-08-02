@@ -393,3 +393,9 @@ The pre-commit hook and the CI step both invoke the same script, exit non-zero, 
 ## Summary
 
 11 surfaces, all stable across the lifetime of the wrapper. T17–T21 build on them; T05 swaps the in-memory sink and ledger implementations for Postgres-backed ones without touching any other surface. Adding a new agent is a `configs/models.yaml` PR + (eventually) a `prompts/<agent>/<version>/` PR; adding a new model is a `pricing.yaml` PR. Neither requires a wrapper code change.
+
+---
+
+## Amendments
+
+- **2026-08-02**: error taxonomy superseded by `specs/030-schema-transport-real-vertex` — the real backend now raises the SDK-free `BackendError` hierarchy (see `app/backend/llm/_backend_protocol.py`) instead of `google.api_core.exceptions.*`; the google-genai 2.x bump also switched structured output from `response_schema` to verbatim `response_json_schema` transport. §3's `google.api_core` references are historical.
