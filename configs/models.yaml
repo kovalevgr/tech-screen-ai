@@ -16,7 +16,7 @@ interviewer:
 
 assessor:
   model: gemini-2.5-flash
-  prompt_version: "v0001"
+  prompt_version: "v0003"
   temperature: 0.1
   max_output_tokens: 2048
 
