@@ -5,9 +5,12 @@
 # Static guardrail enforcing spec FR-014 / constitution §12 / ADR-002:
 # only the canonical Vertex wrapper modules may import a model-provider SDK.
 #
-# Allowlist (the two underscore-prefixed leaves of `app/backend/llm/`):
-#   - app/backend/llm/_real_backend.py
-#   - app/backend/llm/_mock_backend.py
+# Allowlist:
+#   - app/backend/llm/_real_backend.py   (the SDK adapter)
+#   - app/backend/llm/_mock_backend.py   (forward-compat; imports nothing today)
+#   - app/backend/tests/llm/test_prompt_schema_transport.py
+#     (030 offline regression — pins the installed SDK's pre-network
+#     schema-transport behaviour, so it must import the SDK directly)
 #
 # Blocked imports:
 #   import|from  vertexai
@@ -27,6 +30,7 @@ PATTERN='^(import|from)[[:space:]]+(vertexai|google\.genai|google\.cloud\.aiplat
 ALLOWED_FILES=(
   "app/backend/llm/_real_backend.py"
   "app/backend/llm/_mock_backend.py"
+  "app/backend/tests/llm/test_prompt_schema_transport.py"
 )
 
 # ripgrep over backend Python only. -g excludes frontend; --no-heading +
