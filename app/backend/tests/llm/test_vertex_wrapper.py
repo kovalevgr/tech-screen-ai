@@ -22,7 +22,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from google.api_core import exceptions as gae
 from pydantic import ValidationError
 
 from app.backend.llm import (
@@ -36,7 +35,13 @@ from app.backend.llm import (
     VertexUpstreamUnavailableError,
     call_model,
 )
-from app.backend.llm._backend_protocol import RawBackendResult, VertexBackend
+from app.backend.llm._backend_protocol import (
+    BackendCallerError,
+    BackendDeadlineExceededError,
+    BackendTransientError,
+    RawBackendResult,
+    VertexBackend,
+)
 from app.backend.llm._mock_backend import MockVertexBackend
 from app.backend.llm.cost_ledger import CostLedger, InMemoryCostLedger
 from app.backend.llm.pricing import PricingTable
@@ -58,18 +63,6 @@ from app.backend.tests.llm._test_prompts import (
 )
 
 _FIXTURES_DIR: Path = Path(__file__).resolve().parents[1] / "fixtures" / "llm_responses"
-
-
-def _make_gae(exc_type: type[gae.GoogleAPIError], message: str) -> gae.GoogleAPIError:
-    """Typed shim around google-api-core untyped exception constructors.
-
-    ``google-api-core`` ships without ``py.typed`` so direct calls like
-    ``gae.ServiceUnavailable("msg")`` are flagged ``no-untyped-call``
-    under ``mypy --strict`` in some setups. Wrapping the construction in
-    a single typed helper confines any suppression to one location and
-    clarifies intent at every call site.
-    """
-    return exc_type(message)
 
 
 # ---------------------------------------------------------------------------
@@ -362,7 +355,7 @@ async def test_retry_on_transient_then_succeeds(
     )
     backend = _ScriptedBackend(
         [
-            _make_gae(gae.ServiceUnavailable, "upstream temporarily unavailable"),
+            BackendTransientError("upstream temporarily unavailable"),
             success,
         ]
     )
@@ -408,9 +401,9 @@ async def test_retry_budget_exhausted_raises_upstream_unavailable(
     """
     backend = _ScriptedBackend(
         [
-            _make_gae(gae.ServiceUnavailable, "attempt 1"),
-            _make_gae(gae.ServiceUnavailable, "attempt 2"),
-            _make_gae(gae.ServiceUnavailable, "attempt 3"),
+            BackendTransientError("attempt 1"),
+            BackendTransientError("attempt 2"),
+            BackendTransientError("attempt 3"),
         ]
     )
     _force_backend(monkeypatch, backend)
@@ -446,11 +439,11 @@ async def test_deadline_exceeded_not_retried(
     test_settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``DeadlineExceeded`` short-circuits the retry loop — attempts == 1.
+    """``BackendDeadlineExceededError`` short-circuits the retry loop — attempts == 1.
 
     Maps to FR-004 + Clarifications 2026-04-26.
     """
-    backend = _ScriptedBackend([_make_gae(gae.DeadlineExceeded, "vertex deadline")])
+    backend = _ScriptedBackend([BackendDeadlineExceededError("vertex deadline")])
     _force_backend(monkeypatch, backend)
 
     request = _interviewer_request()
@@ -461,7 +454,7 @@ async def test_deadline_exceeded_not_retried(
             ledger=in_memory_cost_ledger,
             settings=test_settings,
         )
-    assert backend.calls == 1, "DeadlineExceeded must not be retried"
+    assert backend.calls == 1, "deadline-exceeded classification must not be retried"
 
     records = in_memory_trace_sink.records
     assert len(records) == 1
@@ -480,11 +473,11 @@ async def test_invalid_argument_not_retried(
     test_settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``InvalidArgument`` re-classified as ``ModelCallConfigError``.
+    """``BackendCallerError`` re-classified as ``ModelCallConfigError``.
 
     Maps to FR-004.
     """
-    backend = _ScriptedBackend([_make_gae(gae.InvalidArgument, "bad payload")])
+    backend = _ScriptedBackend([BackendCallerError("bad payload")])
     _force_backend(monkeypatch, backend)
 
     request = _interviewer_request()
@@ -615,7 +608,7 @@ def _setup_timeout(
     settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> tuple[ModelCallRequest, type[BaseException] | None, TraceSink, CostLedger]:
-    backend = _ScriptedBackend([_make_gae(gae.DeadlineExceeded, "deadline")])
+    backend = _ScriptedBackend([BackendDeadlineExceededError("deadline")])
     _force_backend(monkeypatch, backend)
     return _interviewer_request(), VertexTimeoutError, sink, ledger
 
@@ -628,9 +621,9 @@ def _setup_upstream_unavailable(
 ) -> tuple[ModelCallRequest, type[BaseException] | None, TraceSink, CostLedger]:
     backend = _ScriptedBackend(
         [
-            _make_gae(gae.ServiceUnavailable, "a"),
-            _make_gae(gae.ServiceUnavailable, "b"),
-            _make_gae(gae.ServiceUnavailable, "c"),
+            BackendTransientError("a"),
+            BackendTransientError("b"),
+            BackendTransientError("c"),
         ]
     )
     _force_backend(monkeypatch, backend)

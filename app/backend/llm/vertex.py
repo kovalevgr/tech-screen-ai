@@ -10,8 +10,10 @@ Every model token that leaves a TechScreen process MUST traverse
   via Pydantic validation on :class:`ModelCallRequest` — rejected before
   any network I/O.
 - A uniform 3-attempt retry budget on transient upstream failures
-  (HTTP 5xx, HTTP 429, connection-level errors); ``DeadlineExceeded`` is
-  excluded from retry per Clarifications 2026-04-26.
+  (HTTP 5xx, HTTP 429, connection-level errors); the deadline-exceeded
+  equivalent (HTTP 504 / transport timeout, classified by the real
+  backend as ``BackendDeadlineExceededError``) is excluded from retry
+  per Clarifications 2026-04-26.
 - A 30-second wall-clock cap across all retries via
   :func:`asyncio.wait_for`.
 - Two-stage JSON-schema validation (SDK-side ``response_schema`` +
@@ -38,7 +40,6 @@ from typing import Any, Final
 from uuid import UUID, uuid4
 
 import structlog
-from google.api_core import exceptions as gae
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from tenacity import (
     AsyncRetrying,
@@ -48,7 +49,14 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
-from app.backend.llm._backend_protocol import RawBackendResult, VertexBackend
+from app.backend.llm._backend_protocol import (
+    BackendCallerError,
+    BackendDeadlineExceededError,
+    BackendError,
+    BackendTransientError,
+    RawBackendResult,
+    VertexBackend,
+)
 from app.backend.llm._mock_backend import MockVertexBackend, canonical_prompt_sha
 from app.backend.llm._real_backend import RealVertexBackend
 from app.backend.llm.cost_ledger import CostLedger
@@ -124,17 +132,22 @@ class ModelCallResult(BaseModel):
 # cap is enforced by `asyncio.wait_for(...)`. Changing backoff parameters
 # requires re-verifying the math vs the 30-s cap and FR-003.
 #
-# `DeadlineExceeded` is deliberately EXCLUDED from the retried set per
-# Clarifications 2026-04-26 — the timeout already fired, retrying just
-# burns the remaining wall-clock budget.
-# `InvalidArgument` and `PermissionDenied` are caller-side errors; they
-# are NOT retried and the wrapper translates them to `ModelCallConfigError`.
+# Backends signal transient upstream failures (HTTP 429 / 5xx-except-504,
+# connection-level transport errors) as `BackendTransientError` — the
+# real backend performs the SDK→classification translation in
+# `_real_backend.translate_transport_error` so this module stays free of
+# provider-SDK imports (guardrail: check-no-provider-sdk-imports.sh).
+#
+# `BackendDeadlineExceededError` (HTTP 504 / transport timeout) is
+# deliberately EXCLUDED from the retried set per Clarifications
+# 2026-04-26 — the timeout already fired, retrying just burns the
+# remaining wall-clock budget.
+# `BackendCallerError` (HTTP 400 / 403) is caller-side; it is NOT
+# retried and the wrapper translates it to `ModelCallConfigError`.
 # ---------------------------------------------------------------------------
 
 _RETRYABLE_EXCEPTIONS: Final[tuple[type[BaseException], ...]] = (
-    gae.ServiceUnavailable,
-    gae.InternalServerError,
-    gae.ResourceExhausted,
+    BackendTransientError,
     ConnectionError,
 )
 """Exception types for which the wrapper retries up to the 3-attempt budget."""
@@ -195,18 +208,20 @@ def _models_config() -> ModelsConfig:
 
 
 def _classify_provider_error(exc: BaseException) -> WrapperError:
-    """Translate a known google.api_core exception into a wrapper error.
+    """Translate a backend transport-classification error into a wrapper error.
 
     Raised after the retry loop has either returned the underlying
     exception (transient set exhausted) or surfaced a non-retried error.
+    The real backend has already collapsed every provider-SDK exception
+    into the SDK-free `BackendError` hierarchy (`_backend_protocol.py`).
     """
-    if isinstance(exc, gae.DeadlineExceeded):
+    if isinstance(exc, BackendDeadlineExceededError):
         return VertexTimeoutError(f"vertex deadline exceeded: {exc}")
     if isinstance(exc, _RETRYABLE_EXCEPTIONS):
         return VertexUpstreamUnavailableError(f"vertex upstream unavailable after retries: {exc}")
-    if isinstance(exc, gae.InvalidArgument | gae.PermissionDenied):
+    if isinstance(exc, BackendCallerError):
         return ModelCallConfigError(f"vertex caller-side error: {exc}")
-    if isinstance(exc, gae.GoogleAPIError):
+    if isinstance(exc, BackendError):
         return VertexUpstreamUnavailableError(f"vertex API error: {exc}")
     # Unknown exception type — surface as upstream unavailable so the caller
     # at least knows the call was attempted; the trace record carries the
@@ -534,10 +549,10 @@ async def _call_with_retries(
 ) -> tuple[RawBackendResult, int]:
     """Run the backend call inside the tenacity retry loop.
 
-    Returns ``(raw, attempts)`` on success. Translates known
-    :mod:`google.api_core.exceptions` into wrapper errors after the retry
-    budget has been exhausted (or for non-retried error types like
-    ``DeadlineExceeded``).
+    Returns ``(raw, attempts)`` on success. Translates the backend's
+    SDK-free `BackendError` classification into wrapper errors after the
+    retry budget has been exhausted (or for non-retried error types like
+    ``BackendDeadlineExceededError``).
     """
     attempt_count = 0
     last_exc: BaseException | None = None
@@ -556,10 +571,10 @@ async def _call_with_retries(
                         max_output_tokens=max_output_tokens,
                         timeout_s=float(request.timeout_s),
                     )
-                except gae.DeadlineExceeded as exc:
+                except BackendDeadlineExceededError as exc:
                     # NOT retried — convert immediately.
                     raise VertexTimeoutError(f"vertex deadline exceeded: {exc}") from exc
-                except (gae.InvalidArgument, gae.PermissionDenied) as exc:
+                except BackendCallerError as exc:
                     raise ModelCallConfigError(f"vertex caller-side error: {exc}") from exc
                 else:
                     return raw, attempt_count
@@ -581,7 +596,10 @@ async def _call_with_retries(
         # accurate trace record.
         wrapped.attempts = attempt_count  # type: ignore[attr-defined]
         raise
-    except gae.GoogleAPIError as exc:
+    except (BackendError, ConnectionError) as exc:
+        # Either the retry budget was exhausted (tenacity `reraise=True`
+        # re-raises the final transient error here) or the backend raised
+        # a non-retried `BackendUpstreamError`.
         wrapper_err = _classify_provider_error(exc)
         wrapper_err.attempts = attempt_count  # type: ignore[attr-defined]
         raise wrapper_err from exc

@@ -8,8 +8,16 @@ dependencies = [
   "uvicorn[standard]>=0.32,<0.36",
   "structlog>=24.4,<25",
   "pyyaml>=6.0,<7",
-  "google-genai>=0.5,<1",
-  "google-api-core>=2.20,<3",
+  # 030: bumped 0.x → 2.x for `response_json_schema` (raw JSON-Schema
+  # transport; exists since 1.22.0). 0.8.0's `response_schema` transformer
+  # rejected every committed prompt schema pre-network. The bump also
+  # removed google-api-core: 2.x raises `google.genai.errors.*` + httpx
+  # transport errors, so nothing imports `google.api_core` any more.
+  "google-genai>=2.16,<3",
+  # 030: `app/backend/llm/_real_backend.py` catches httpx transport
+  # exceptions directly (google-genai 2.x transport layer); already in
+  # the closure as a base dep of google-genai. Tests reuse it (TestClient).
+  "httpx>=0.28,<0.29",
   # T07: Identity Platform ID-token verification (google.auth.jwt against the
   # securetoken certs). Already in the closure as a base dep of google-genai;
   # declared because app/backend/services/auth.py imports it directly. Its
@@ -29,7 +37,6 @@ dev = [
   "ruff>=0.7,<1",
   "mypy>=1.13,<2",
   "pytest>=8.3,<9",
-  "httpx>=0.27,<0.29",
   "types-PyYAML>=6.0,<7",
   "pytest-asyncio>=0.23,<1",
   # T07: test-only RSA keypair generation for locally-minted ID tokens
@@ -62,12 +69,8 @@ mypy_path = "."
 # explicit `files` list as "must find these". Leaving it implicit lets the CLI
 # argument drive discovery so an empty `app/backend/` still exits 0.
 
-# google-genai 0.x ships without a `py.typed` marker; treat it as untyped
-# at the module boundary. The wrapper module (`app/backend/llm/_real_backend.py`)
-# is the only consumer and is itself fully typed at the public surface.
-[[tool.mypy.overrides]]
-module = ["google.genai", "google.genai.*"]
-ignore_missing_imports = true
+# google-genai 2.x ships `py.typed` — no override needed (the 0.x-era
+# `ignore_missing_imports` block was removed in 030).
 
 # jsonschema (4.x) and asyncpg both lack a `py.typed` marker. Treat them as
 # untyped at the module boundary — the FeatureFlagService (T05a) is itself
