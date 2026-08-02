@@ -25,13 +25,13 @@ One new module, `app/backend/agents/interviewer.py`: a thin, typed, pure adapter
 
 **Storage**: none. No DB access, no migrations. Tracing flows through the wrapper's injected sink (durable sink is T21).
 
-**Testing**: `uv run pytest app/backend/tests/agents` (18 tests, no DB, no network); full gates `pytest app/backend/tests` + `ruff check` + `ruff format --check` + `mypy --strict app/backend`.
+**Testing**: `uv run pytest app/backend/tests/agents` (no DB, no network); full gates `pytest app/backend/tests` + `ruff check` + `ruff format --check` + `mypy --strict app/backend`. (Test/line counts deliberately not pinned here — they drift with review rounds; the suite itself is the record.)
 
 **Project Type**: backend module + unit tests. Purely additive.
 
 **Constraints**: §2 (wrapper executes the orchestrator's move, never decides), §11 (English module/prompts, Ukrainian utterances stay inside payload/output data), §12 (default caps untouched; retry budget bounded at one), §15 (no logging in this module — `call_model` owns the single non-PII log event), §16 (prompt version pinned in code must match `configs/models.yaml`; asserted by a test), §17 (this spec flow), provider-SDK import ban (pre-commit hook).
 
-**Scale/Scope**: 1 contract file + notes addendum, 2 source files (~230 lines), 1 test module (~380 lines), 3 spec artefacts.
+**Scale/Scope**: 1 contract file + notes addendum, 2 source files, 1 test module, 3 spec artefacts.
 
 ## Constitution Check
 

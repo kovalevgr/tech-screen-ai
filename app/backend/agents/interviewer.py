@@ -23,6 +23,12 @@ Responsibilities:
 
 Pure: no DB access, no side effects beyond what ``call_model`` performs
 through its injected ``sink`` / ``ledger`` collaborators.
+
+Failure modes outside the retry policy: a missing or unreadable prompt
+artefact under ``prompts/interviewer/<PROMPT_VERSION>/`` (or the shared
+anchors file) raises :class:`FileNotFoundError` / :class:`OSError` from
+the loaders, deliberately unwrapped — it signals a broken deploy or
+incomplete image, not a model failure, and must fail loudly.
 """
 
 from __future__ import annotations
@@ -163,15 +169,22 @@ def _load_output_schema() -> dict[str, Any]:
 
 
 def _serialize_user_payload(inputs: InterviewerTurnInputs) -> str:
-    """Serialize the §3 inputs to a deterministic JSON string.
+    """Serialize the §3 inputs to a total, deterministic JSON string.
 
     ``session_id`` is excluded — it drives tracing/cost attribution, not
-    the model. ``sort_keys`` keeps the payload byte-stable for the mock
+    the model. Serialization is TOTAL over legal inputs: pydantic's json
+    mode canonicalises rich types nested in the permissive dict fields
+    (``datetime`` → ISO-8601, ``UUID``/``Decimal`` → string) and
+    ``fallback=str`` stringifies anything the serializer does not know,
+    so a legal T20-era payload can never escape as a raw ``TypeError`` /
+    ``PydanticSerializationError`` outside the documented exception
+    contract (``default=str`` is the same backstop at the ``json.dumps``
+    layer). ``sort_keys`` keeps the payload byte-stable for the mock
     backend's SHA-keyed fixtures; ``ensure_ascii=False`` keeps Ukrainian
     text readable in traces.
     """
-    payload = inputs.model_dump(mode="json", exclude={"session_id"})
-    return json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    payload = inputs.model_dump(mode="json", exclude={"session_id"}, fallback=str)
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
 
 
 def _validate_result(result: ModelCallResult) -> InterviewerOutput:
@@ -209,6 +222,10 @@ async def run_interviewer_turn(
         WrapperError: Any non-schema ``call_model`` failure
             (timeout, upstream, budget, config, trace-write) propagates
             untouched — no agent-side retry for those classes.
+        FileNotFoundError: A prompt artefact for ``PROMPT_VERSION``
+            (``system.md``, ``level-guide.md``, ``schema.json``, or the
+            shared anchors file) is missing. Deliberately unwrapped:
+            this is a broken-deploy signal, not a model failure.
     """
     request = ModelCallRequest(
         agent="interviewer",

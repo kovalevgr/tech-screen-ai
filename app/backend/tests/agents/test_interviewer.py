@@ -15,10 +15,11 @@ T18 acceptance (implementation-plan):
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -152,6 +153,34 @@ def test_system_prompt_assembly_contains_all_three_parts() -> None:
     ), "prompt parts out of order (system.md §5–6: appendices follow the body)"
 
 
+async def test_assembled_system_prompt_travels_on_model_call_request(
+    monkeypatch: pytest.MonkeyPatch,
+    in_memory_trace_sink: InMemoryTraceSink,
+    in_memory_cost_ledger: InMemoryCostLedger,
+    test_settings: Settings,
+) -> None:
+    """The full three-part assembled prompt is what call_model receives."""
+    from app.backend.agents.interviewer import _load_system_prompt
+
+    fake = _install(monkeypatch, [_make_result(_VALID_PARSED)])
+
+    await run_interviewer_turn(
+        _make_inputs(),
+        sink=in_memory_trace_sink,
+        ledger=in_memory_cost_ledger,
+        settings=test_settings,
+    )
+
+    sent = fake.requests[0].system_prompt
+    assert sent == _load_system_prompt(), "request must carry the assembled prompt verbatim"
+    system_marker = "# Interviewer — system prompt — v0001"
+    guide_marker = "# Interviewer — level prompting guide — v0001"
+    anchors_marker = "# Ukrainian Style Anchors"
+    assert sent.index(system_marker) < sent.index(guide_marker) < sent.index(anchors_marker), (
+        "all three parts must travel on the request, in prompt order"
+    )
+
+
 def test_output_schema_loader_matches_committed_contract() -> None:
     """The loaded json_schema is byte-equivalent to the committed schema.json."""
     from app.backend.agents.interviewer import _load_output_schema
@@ -204,6 +233,27 @@ async def test_run_interviewer_turn_happy_path_returns_parsed_output(
     assert output.utterance == _VALID_PARSED["utterance"]
     assert output.internal_move_executed == "ask_seed"
     assert len(fake.requests) == 1
+
+
+async def test_output_accepts_utterance_at_exactly_1200_chars(
+    monkeypatch: pytest.MonkeyPatch,
+    in_memory_trace_sink: InMemoryTraceSink,
+    in_memory_cost_ledger: InMemoryCostLedger,
+    test_settings: Settings,
+) -> None:
+    """The 1200-char backstop is inclusive — exactly 1200 chars validates."""
+    boundary = {"utterance": "а" * 1200, "internal_move_executed": "ask_seed"}
+    fake = _install(monkeypatch, [_make_result(boundary)])
+
+    output = await run_interviewer_turn(
+        _make_inputs(),
+        sink=in_memory_trace_sink,
+        ledger=in_memory_cost_ledger,
+        settings=test_settings,
+    )
+
+    assert len(output.utterance) == 1200
+    assert len(fake.requests) == 1, "a boundary-valid utterance must not trigger a retry"
 
 
 async def test_run_interviewer_turn_request_carries_contract_and_default_caps(
@@ -266,6 +316,51 @@ async def test_run_interviewer_turn_payload_serializes_inputs_without_session_id
         "text": "Індекси пришвидшують запити.",
     }
     assert str(inputs.session_id) not in fake.requests[0].user_payload
+
+
+async def test_payload_serialization_handles_rich_types_deterministically(
+    monkeypatch: pytest.MonkeyPatch,
+    in_memory_trace_sink: InMemoryTraceSink,
+    in_memory_cost_ledger: InMemoryCostLedger,
+    test_settings: Settings,
+) -> None:
+    """datetime/UUID/Decimal nested in the permissive dicts never raise.
+
+    A legal T20-era payload carries rich types inside
+    ``interview_plan_snapshot`` / ``move_context``; serialization must be
+    total (no raw TypeError) and byte-deterministic.
+    """
+    from app.backend.agents.interviewer import _serialize_user_payload
+
+    plan_id = UUID("00000000-0000-0000-0000-00000000beef")
+    inputs = _make_inputs(
+        interview_plan_snapshot={
+            "plan_id": plan_id,
+            "created_at": datetime(2026, 7, 1, 12, 30, tzinfo=UTC),
+        },
+        move_context={"seed_question_id": "db-01", "budget_left_usd": Decimal("1.50")},
+    )
+
+    first = _serialize_user_payload(inputs)
+    second = _serialize_user_payload(inputs)
+    assert first == second, "serialization must be byte-deterministic"
+
+    payload = json.loads(first)
+    assert payload["interview_plan_snapshot"]["plan_id"] == str(plan_id)
+    assert payload["interview_plan_snapshot"]["created_at"] == "2026-07-01T12:30:00Z"
+    assert payload["move_context"]["budget_left_usd"] == "1.50"
+
+    # End-to-end: the same inputs flow through run_interviewer_turn without
+    # any serialization error escaping the documented exception contract.
+    fake = _install(monkeypatch, [_make_result(_VALID_PARSED)])
+    output = await run_interviewer_turn(
+        inputs,
+        sink=in_memory_trace_sink,
+        ledger=in_memory_cost_ledger,
+        settings=test_settings,
+    )
+    assert output.internal_move_executed == "ask_seed"
+    assert fake.requests[0].user_payload == first
 
 
 # ---------------------------------------------------------------------------

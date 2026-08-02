@@ -43,3 +43,11 @@
 
 - [X] T021 `docs/engineering/vertex-integration.md` § "JSON mode": Assessor bullet rewritten to the shipped T19 policy — single retry with an identical fresh request (no temperature bump: `ModelCallRequest` has no temperature field; it comes from agent config), second failure → typed `AssessorOutputInvalid` to the orchestrator, which owns escalation (e.g. `needs_manual_review`, a §2 routing decision the wrapper must not make). Carried on this branch because it owns the file's edits; T19 stays purely additive
 - [X] T022 spec.md Clarifications + SC-003 updated (four doc amendments, not three); all four quality gates re-run green
+
+## Phase 5: Ultra-review findings — commit 5
+
+- [X] T023 Serialization hardening: `_serialize_user_payload` made total and deterministic — `model_dump(mode="json", fallback=str)` canonicalises rich types (datetime → ISO-8601, UUID/Decimal → string) and stringifies unknowns; `default=str` as the `json.dumps`-layer backstop; documented in the helper docstring
+- [X] T024 `FileNotFoundError` from missing/unreadable prompt artefacts documented (module docstring + entry-point Raises) — deliberately unwrapped, broken-deploy signal
+- [X] T025 New tests: rich-types serialization (datetime+UUID+Decimal nested in plan/move_context; no raw TypeError, byte-deterministic, end-to-end through the wrapper); prompt-transit (assembled three-part system prompt travels verbatim on `ModelCallRequest.system_prompt`); 1200-char inclusive boundary accepts
+- [X] T026 Doc accuracy: vertex-integration.md — both stale `timeout_s > 60` claims corrected to the enforced 30 (`le=30`), Assessor bullet gains the third T19 retry trigger (echoed-id equality mismatch); implementation-plan.md T17 file list — `few_shot.md` (exists for no agent) → `level-guide.md` (exists for both)
+- [X] T027 Spec artefacts: plan.md brittle test/line counts dropped; spec.md Clarification 1 "verbatim" claim scoped (1..1200 bounds are §7-derived additions, per notes.md) + new Clarification on the ok-trace seam for wrapper-rejected calls (T21 to record wrapper outcome); gates re-run green; branch pushed to PR #29
