@@ -107,6 +107,12 @@ class InterviewSession(UUIDPk, TimestampCreated, Base):
     transitional ``'{}'`` default so the placeholder/seed inserts (which predate
     real session creation, T28) keep working; every real session overwrites the
     default via ``services.rubric_snapshot.freeze_session_rubric``.
+
+    T20 adds ``session_state`` — the orchestrator's working state
+    (``docs/contracts/state-machine.md`` §9). NULL until the session starts.
+    Unlike the six append-only audit tables (§3), ``interview_session`` is
+    mutable working state: the column is rewritten in place after every
+    transition. The durable transition trail lives in ``turn_trace`` (T21).
     """
 
     __tablename__ = "interview_session"
@@ -120,6 +126,10 @@ class InterviewSession(UUIDPk, TimestampCreated, Base):
         JSONB,
         nullable=False,
         server_default=text("'{}'::jsonb"),
+    )
+    session_state: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB,
+        nullable=True,
     )
 
 
