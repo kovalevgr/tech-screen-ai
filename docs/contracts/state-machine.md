@@ -67,12 +67,13 @@ Per-competency loop: seed k (`ask_seed` for the very first, otherwise folded int
 
 Adjudication is computed **only** from completed `AssessorOutput`s for the CURRENT competency focus, plan `target_level`, and config thresholds. Verdicts:
 
-| Verdict | Deterministic condition (evaluated in this order) | Machine reaction |
+| Verdict | Deterministic condition | Machine reaction |
 |---|---|---|
 | **ANSWERED (2)** | max `level` over focus-node assessments ≥ `target_level` AND its `confidence` ≥ `confidence_min` | `acknowledge_and_transition` → next seed/competency |
 | **CLARIFY (1)** | not ANSWERED, AND (`probes_used` < `max_probes_per_competency`) AND competency time remaining > `min_probe_seconds` | `depth_probe` (branch from plan; probe counter +1) |
 | **NONE (0)** | not ANSWERED and probe budget/time exhausted, OR latest assessment `level == 0`, OR assessments empty ("not assessable") after ≥1 probe | record gap in coverage → `close_competency` → advance |
 
+- **Evaluation order (normative):** ANSWERED → level-0 short-circuit → budget/time exhaustion → not-assessable-after-probe (each of these → NONE) → CLARIFY as the residual verdict.
 - Thresholds live in `configs/orchestrator.yaml` (§8) — **never** in prompts, never decided by an LLM.
 - `level == 0` (None, evidence-backed) and `assessments == []` (not assessable) both adjudicate toward NONE but are stored distinctly in coverage (reviewer-visible difference; assessor contract v0003).
 - `needs_manual_review == true` or any red flag: recorded in coverage + session flags; does NOT change the move sequence (measurement, not routing) except `LIKELY_CHEATING` count ≥ `cheat_flags_to_review` → set `flagged_for_review` (session continues; candidate is never confronted).
@@ -83,10 +84,11 @@ Adjudication is computed **only** from completed `AssessorOutput`s for the CURRE
 2. **Interviewer failure** (`InterviewerOutputInvalid`, timeout, upstream): retry budget is the WRAPPER's (already spent). The machine emits `FlagTurnDegraded` + repeats the move once with the same context; second consecutive failure → `ABORTED(fatal_agent_error)` + `session_decision(reason=agent_failure)` row command.
 3. **Assessment failure**: coverage cell marked `assessment_failed`; adjudication treats it as "no assessment available" (policy 1). Never aborts the session — the interview is candidate-facing; scoring gaps become reviewer work.
 4. **Drift detection (T18 contract):** if `InterviewerOutput.internal_move_executed != last_issued_move`, increment `drift_count`, keep the machine's own accounting (the ISSUED move is authoritative for state); `drift_count ≥ drift_to_review` → `flagged_for_review`.
-5. **Timers**: all budgets evaluated on event arrival using event `now` (no internal clock). Competency over budget → force NONE path at next adjudication point. Session over `session_max_minutes` → jump to QA (if not yet) with `qa_minutes_min`, then CLOSE.
+5. **Timers**: all budgets evaluated on event arrival using event `now` (no internal clock). Competency budget reached → force NONE path at next adjudication point. Session `session_max_minutes` reached → jump to QA (if not yet) with `qa_minutes_min`, then CLOSE.
 6. **Candidate silence**: `TimerTick` with `now - last_candidate_activity > candidate_timeout_minutes` → `ABORTED(candidate_timeout)` (Tier-5 reliability layer may soften this; the hook exists now).
 7. **Event priority on one tick**: if a single `TimerTick` satisfies several conditions, candidate-timeout (§6.6) wins over session/competency/QA budgets — silence is the stronger signal.
 8. **Late assessments**: `AssessmentCompleted`/`AssessmentFailed` are accepted in ANY non-terminal phase while their `for_turn_id` is still in `pending_assessments` — coverage updates even after the machine has moved past the competency or into QA. Terminal states remain sinks (edge 20).
+9a. **Stale agent replies**: `InterviewerReplyReady` / `InterviewerFailed` whose `turn_id` does not match the outstanding command's id are untabulated events → no-op (no delivery, no drift accounting). Closes the race where edge 14 preempts an in-flight interviewer call.
 9. **Determinism of identifiers**: command `turn_id`s are derived `uuid5(session_id, structural-counter path)` — never `uuid4()` — so re-issuing after resume (edge 21) is idempotent by construction.
 
 ## 7. Plan shape consumed (input contract — Planner T24/T25 must satisfy)
@@ -133,6 +135,7 @@ Loader mirrors `models_config.py` (frozen pydantic, load-time validation, typed 
 
 - Forward-only migration: `interview_session.session_state JSONB NULL` (+ index nothing; single-row access by PK). `interview_session` is NOT in the §3 append-only set — in-place update of this working-state column is correct and intended; the audit trail lives in turn_trace/T21, not here.
 - After EVERY transition the shell persists `new_state.model_dump_json()` (carries `state_schema_version`). Write-after-transition, before issuing wrapper calls, so a crash resumes at the last consistent point.
+- `PersistState` commands are advisory markers; the shell persists after EVERY transition regardless of whether the tuple carries the marker.
 - Resume: rehydrate `SessionState` from JSONB → feed `Reconnected` → machine re-emits the pending command idempotently (commands carry deterministic `turn_id`s so the shell can dedupe).
 
 ## 10. Transition table (normative — every edge gets ≥1 test fixture)
@@ -152,9 +155,9 @@ Loader mirrors `models_config.py` (frozen pydantic, load-time validation, typed 
 | 11 | TECH at adjudication | — | CLARIFY | same competency, probes+1 | RunInterviewer(depth_probe, branch ctx) |
 | 12 | TECH at adjudication | — | NONE & competencies remain | next competency | ONE RunInterviewer(move=`close_competency`, move_context carries the NEXT competency's first seed), RecordGap |
 | 13 | TECH | — | last competency exits (any verdict) | QA | RunInterviewer(acknowledge_and_transition, qa ctx) |
-| 14 | TECH/any | TimerTick | session_max exceeded | QA (or CLOSE if already QA) | as #13 |
+| 14 | TECH/any | TimerTick | session_max reached | QA (or CLOSE if already QA) | as #13 (TECH→QA) / as #16 (QA→CLOSE) |
 | 15 | QA | CandidateTurnReceived | qa time remains | QA | RunInterviewer(acknowledge_and_transition, qa ctx) — no RunAssessor |
-| 16 | QA | TimerTick / turn | qa budget exhausted | CLOSE | EmitScriptedClosing, PersistState |
+| 16 | QA | TimerTick / turn | qa budget reached | CLOSE | EmitScriptedClosing, PersistState |
 | 17 | CLOSE | InterviewerReplyReady / immediate | — | COMPLETED | EndSession(completed), RecordDecision(completed) |
 | 18 | any non-terminal | TimerTick | candidate timeout | ABORTED(candidate_timeout) | RecordDecision(timeout), PersistState |
 | 19 | any non-terminal | OperatorAbort | — | ABORTED(operator_abort) | RecordDecision(operator), PersistState |
@@ -164,6 +167,8 @@ Loader mirrors `models_config.py` (frozen pydantic, load-time validation, typed 
 Adjudication (§5) is evaluated inside edge #7's move selection — it is not a separate event; fixtures must cover ANSWERED/CLARIFY/NONE × {assessment present, pending (policy `proceed_planned`), failed}. Move vocabulary is the Interviewer contract's: advances are ONE call (`acknowledge_and_transition` or `close_competency` with the next seed in `move_context`) — never two round-trips; a bare `ask_seed` occurs only for the very first seed after INTRO. "ScheduleNothing" in edge 3 means the command is simply absent from the tuple — there is no no-op Command variant.
 
 ## Amendments
+
+- **v1.2 (2026-08-03, reviewer gate):** adjudication evaluation-order parenthetical corrected to the normative order; edge 14 command cell split (TECH→QA as #13, QA→CLOSE as #16 — a literal "as #13" would burn a discarded LLM call); budget guards reworded to "reached" (inclusive); §6.9a stale-reply no-op rule added; §9 advisory-marker sentence added. Code was correct; the contract text now says so.
 
 - **v1.1 (2026-08-03):** folded accepted refinements from the discarded first implementation round: top-level `awaiting`/`last_issued_move`; CoverageCell best/latest split; multi-seed iteration rule; one-call advance moves with contract vocabulary; tick priority (§6.7); late-assessment acceptance (§6.8); uuid5 command ids (§6.9). Adjudicated by the contract owner; the discarded round's remaining deviations were rejected or made moot.
 
