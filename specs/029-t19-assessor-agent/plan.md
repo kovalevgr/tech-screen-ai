@@ -15,8 +15,8 @@ T19 ships the second of the two Tier-3 agent wrappers: a thin, typed, async adap
 Deliverables:
 
 1. **`app/backend/agents/__init__.py`** — deliberately re-exports nothing; byte-agreed with the T18 branch so the parallel tasks never conflict on this file (§14: the committed per-agent `schema.json` files are the contract that lets T18/T19 fan out).
-2. **`app/backend/agents/assessor.py`** — `PROMPT_VERSION = "v0001"`; module-cached prompt assembly (`system.md` + `level-guide.md`; `schema.json` as `json_schema`); frozen `AssessorTurnInput` mirroring system.md §3 INPUTS (permissive `dict[str, Any]` for structures T20/Tier-4 will type; typed ids win over caller `turn_metadata` in the wire payload); `AssessorOutput`/`AssessmentItem`/`RedFlagItem` mirroring `schema.json` exactly; `run_assessor_turn(...)` with the per-agent retry policy (one fresh retry on schema/validation miss or echoed-id mismatch → `AssessorOutputInvalid` chaining the cause; other wrapper errors untouched).
-3. **`app/backend/tests/agents/test_assessor.py`** — real prompt files, `call_model` monkeypatched at the module boundary; retry matrix (incl. echoed-id mismatch); error-propagation matrix; the T19 acceptance test proving the event loop stays free while scoring (ADR-007).
+2. **`app/backend/agents/assessor.py`** — `PROMPT_VERSION = "v0001"`; module-cached prompt assembly (`system.md` + `level-guide.md`; `schema.json` as `json_schema`); frozen `AssessorTurnInput` mirroring system.md §3 INPUTS (permissive `dict[str, Any]` for structures T20/Tier-4 will type; typed ids win over caller `turn_metadata` in the wire payload; serialization total via `default=str`); `AssessorOutput`/`AssessmentItem`/`RedFlagItem` mirroring `schema.json` exactly; `run_assessor_turn(...)` with the per-agent retry policy (one fresh retry on schema/validation miss or echoed `turn_id`/`session_id`/`competency_focus` mismatch → `AssessorOutputInvalid` chaining the cause; other wrapper errors untouched).
+3. **`app/backend/tests/agents/test_assessor.py`** — real prompt files, `call_model` monkeypatched at the module boundary; retry matrix (incl. echoed-field mismatches); error-propagation matrix; the T19 acceptance test proving the event loop stays free while scoring (implementation-plan.md § T19 async criterion).
 
 ## Technical Context
 
@@ -24,9 +24,9 @@ Deliverables:
 
 **Storage**: none — the wrapper is pure; tracing/cost flow through the injected `TraceSink` / `CostLedger` protocols exactly as T04 defined them.
 
-**Testing**: `uv run pytest app/backend/tests` (19 new tests, no DB, no network); `ruff check` + `ruff format --check` + `mypy --strict` on `app/backend`.
+**Testing**: `uv run pytest app/backend/tests` (24 new tests, no DB, no network); `ruff check` + `ruff format --check` + `mypy --strict` on `app/backend`.
 
-**Constraints honoured**: §2 (scores, never routes), §11 (English-only Assessor output enforced by the contract itself), §12 (wrapper default caps never raised), §15 (typed failure message carries no candidate text), ADR-007 (plain awaitable coroutine, no blocking I/O after first-call prompt cache fill), FR-014/ADR-002 (no provider SDK imports — `scripts/check-no-provider-sdk-imports.sh` clean).
+**Constraints honoured**: §2 (scores, never routes), §11 (English-only Assessor output enforced by the contract itself), §12 (wrapper default caps never raised), §15 (typed failure message carries no candidate text), implementation-plan.md § T19 async acceptance (plain awaitable coroutine, no blocking I/O after first-call prompt cache fill — NOT "ADR-007", which is pgvector; see spec Clarifications 2026-08-02), FR-014/ADR-002 (no provider SDK imports — `scripts/check-no-provider-sdk-imports.sh` clean).
 
 **Known stale doc**: implementation-plan.md T17's Assessor output one-liner (`concepts_covered/...`) predates the committed contract; per the T17 ownership note the per-agent `schema.json` wins (spec.md Clarifications).
 
@@ -59,7 +59,7 @@ specs/029-t19-assessor-agent/
 app/backend/agents/__init__.py             # new — empty public surface (shared line-for-line with T18 branch)
 app/backend/agents/assessor.py             # new — the wrapper
 app/backend/tests/agents/__init__.py       # new — empty (tests/services convention)
-app/backend/tests/agents/test_assessor.py  # new — 19 tests
+app/backend/tests/agents/test_assessor.py  # new — 24 tests
 ```
 
 ## Phases

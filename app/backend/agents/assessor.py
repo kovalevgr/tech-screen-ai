@@ -16,11 +16,12 @@ doorway :func:`app.backend.llm.call_model`. Responsibilities:
   :class:`~app.backend.llm.VertexSchemaError`, a payload that passes the
   wrapper's structural check but violates the tighter bounds encoded on
   :class:`AssessorOutput` (level enum, confidence ceiling, span
-  non-emptiness), or echoed ``turn_id`` / ``session_id`` that do not
-  EQUAL the request's ids (:class:`AssessorEchoMismatch` — a
-  hallucinated-but-well-formed UUID must never reach the append-only
-  audit trail). A second miss raises :class:`AssessorOutputInvalid`
-  chaining the cause. Every other wrapper error propagates untouched.
+  non-emptiness), or echoed ``turn_id`` / ``session_id`` /
+  ``competency_focus`` that do not EQUAL the request's values
+  (:class:`AssessorEchoMismatch` — a hallucinated-but-well-formed echo
+  must never reach the append-only audit trail). A second miss raises
+  :class:`AssessorOutputInvalid` chaining the cause. Every other wrapper
+  error propagates untouched.
 
 Invariants honoured:
 
@@ -28,10 +29,12 @@ Invariants honoured:
   branches on model output; the orchestrator consumes the typed result.
 - Constitution §12 — wrapper default caps (30 s timeout, 4096 output
   tokens) are left untouched; this module never raises them.
-- ADR-007 (voice-readiness) — :func:`run_assessor_turn` is a plain
-  awaitable coroutine with no blocking I/O on the event loop: prompt files
-  are read once (first call) and cached at module level, because prompt
-  files are immutable per version.
+- T19 async acceptance (``docs/engineering/implementation-plan.md`` § T19:
+  the call must not block the Interviewer's next turn) —
+  :func:`run_assessor_turn` is a plain awaitable coroutine with no
+  blocking I/O on the event loop: prompt files are read once (first
+  call) and cached at module level, because prompt files are immutable
+  per version.
 - Constitution §15 — :class:`AssessorOutputInvalid` messages carry no
   candidate text; payload detail lives only on the chained cause.
 
@@ -80,15 +83,18 @@ class AssessorOutputInvalid(Exception):
 
 
 class AssessorEchoMismatch(Exception):
-    """Model echoed ``turn_id`` / ``session_id`` that differ from the request.
+    """Model echoed ``turn_id`` / ``session_id`` / ``competency_focus``
+    that differ from the request.
 
     ``system.md`` §3 instructs the model to echo the ``turn_metadata`` ids
-    for traceability. Pydantic only proves UUID *shape*; without an
-    equality check a hallucinated-but-well-formed UUID would flow
-    downstream into the append-only audit trail (§3). Treated as a
-    contract miss on the same retry-once path as a schema miss — this is
-    integrity enforcement, not a routing decision (§2). UUIDs are not PII;
-    the message names the mismatched field with expected vs got.
+    (and the output contract echoes ``competency_focus`` — "the
+    rubric_node_id the orchestrator asked the Assessor to focus on").
+    Pydantic only proves *shape*; without an equality check a
+    hallucinated-but-well-formed echo would flow downstream into the
+    append-only audit trail (§3). Treated as a contract miss on the same
+    retry-once path as a schema miss — this is integrity enforcement, not
+    a routing decision (§2). UUIDs and rubric node ids are not PII; the
+    message names the mismatched field with expected vs got.
     """
 
 
@@ -188,6 +194,14 @@ class AssessorTurnInput(BaseModel):
     def to_user_payload(self) -> str:
         """Serialise to the JSON ``user_payload`` shape of ``system.md`` §3.
 
+        Serialization is TOTAL and deterministic: the permissive dict
+        fields legally carry non-JSON-native scalars in T20-era inputs
+        (``datetime``, ``UUID``, ``Decimal``, ...), so ``default=str``
+        maps every such value to its stable ``str()`` form instead of
+        leaking a raw ``TypeError`` outside the typed contract. The
+        fallback never touches JSON-native values, so ordinary payloads
+        are byte-identical to before.
+
         Returns:
             A JSON object string with exactly the five §3 input keys;
             ``turn_metadata`` re-nests the typed ids. ``ensure_ascii=False``
@@ -208,7 +222,7 @@ class AssessorTurnInput(BaseModel):
                 "session_id": str(self.session_id),
             },
         }
-        return json.dumps(payload, ensure_ascii=False)
+        return json.dumps(payload, ensure_ascii=False, default=str)
 
 
 # ---------------------------------------------------------------------------
@@ -283,8 +297,9 @@ async def run_assessor_turn(
     """Score one candidate turn via the Assessor agent.
 
     Plain awaitable coroutine — no blocking I/O on the event loop
-    (ADR-007 voice-readiness): the Interviewer may produce turn N+1 while
-    this call is still scoring turn N.
+    (T19 async acceptance, ``implementation-plan.md`` § T19): the
+    Interviewer may produce turn N+1 while this call is still scoring
+    turn N.
 
     Args:
         inputs: Typed turn inputs mirroring ``system.md`` §3.
@@ -299,7 +314,8 @@ async def run_assessor_turn(
         AssessorOutputInvalid: The model output missed the v0001 contract
             twice (initial call + the single per-agent retry). A miss is a
             wrapper schema error, an output-model bounds violation, or an
-            echoed ``turn_id`` / ``session_id`` not equal to the request's.
+            echoed ``turn_id`` / ``session_id`` / ``competency_focus``
+            not equal to the request's.
         app.backend.llm.WrapperError: Any non-schema wrapper failure
             (timeout, upstream unavailable, budget, config, trace write)
             propagates untouched — no retry at this layer.
@@ -318,6 +334,7 @@ async def run_assessor_turn(
             request,
             expected_turn_id=inputs.turn_id,
             expected_session_id=inputs.session_id,
+            expected_competency_focus=inputs.competency_focus,
             sink=sink,
             ledger=ledger,
             settings=settings,
@@ -329,6 +346,7 @@ async def run_assessor_turn(
                 request,
                 expected_turn_id=inputs.turn_id,
                 expected_session_id=inputs.session_id,
+                expected_competency_focus=inputs.competency_focus,
                 sink=sink,
                 ledger=ledger,
                 settings=settings,
@@ -347,15 +365,17 @@ async def _score_once(
     *,
     expected_turn_id: UUID,
     expected_session_id: UUID,
+    expected_competency_focus: str,
     sink: TraceSink,
     ledger: CostLedger,
     settings: Settings,
 ) -> AssessorOutput:
     """One ``call_model`` invocation + strict validation into the typed output.
 
-    Beyond the Pydantic pass, enforces that the echoed ids EQUAL the
-    request's ids — UUID shape alone would let a hallucinated id reach
-    the audit trail. Raises :class:`AssessorEchoMismatch` on divergence.
+    Beyond the Pydantic pass, enforces that the echoed ``turn_id`` /
+    ``session_id`` / ``competency_focus`` EQUAL the request's values —
+    shape alone would let a hallucinated echo reach the audit trail.
+    Raises :class:`AssessorEchoMismatch` on divergence.
     """
     result = await call_model(request, sink=sink, ledger=ledger, settings=settings)
     output = AssessorOutput.model_validate(result.parsed)
@@ -366,5 +386,10 @@ async def _score_once(
     if output.session_id != expected_session_id:
         raise AssessorEchoMismatch(
             f"echoed session_id mismatch: expected {expected_session_id}, got {output.session_id}"
+        )
+    if output.competency_focus != expected_competency_focus:
+        raise AssessorEchoMismatch(
+            f"echoed competency_focus mismatch: expected {expected_competency_focus!r}, "
+            f"got {output.competency_focus!r}"
         )
     return output

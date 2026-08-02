@@ -6,7 +6,8 @@ files and ``schema.json`` are the REAL committed artefacts from
 ``prompts/assessor/v0001/``.
 
 Constitution §15: every payload string here is synthetic non-PII content.
-The T19 acceptance criterion (async, non-blocking scoring — ADR-007) is
+The T19 acceptance criterion (async, non-blocking scoring per
+``implementation-plan.md`` § T19) is
 covered by ``test_run_assessor_turn_does_not_block_event_loop_while_scoring``:
 a stand-in "Interviewer produces turn N+1" coroutine completes while the
 Assessor task is still pending. T18 code is deliberately NOT imported —
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -47,6 +49,7 @@ from app.backend.llm import (
     WrapperError,
 )
 from app.backend.llm.cost_ledger import InMemoryCostLedger
+from app.backend.llm.models_config import MODELS_YAML_PATH, ModelsConfig
 from app.backend.llm.trace import InMemoryTraceSink
 from app.backend.settings import Settings
 
@@ -187,8 +190,14 @@ def ledger() -> InMemoryCostLedger:
 
 
 @pytest.fixture
-def settings() -> Settings:
-    return Settings()
+def settings(test_settings: Settings) -> Settings:
+    """Alias of the shared conftest ``test_settings`` fixture.
+
+    A bare ``Settings()`` here would re-introduce ``.env`` / shell-env
+    sensitivity — the shared fixture pins every field explicitly (mock
+    backend, dev env, $5 budget, committed fixtures dir).
+    """
+    return test_settings
 
 
 # ---------------------------------------------------------------------------
@@ -196,8 +205,12 @@ def settings() -> Settings:
 # ---------------------------------------------------------------------------
 
 
-def test_prompt_version_pinned_to_v0001() -> None:
-    assert PROMPT_VERSION == "v0001"
+def test_prompt_version_matches_models_yaml_pin() -> None:
+    """Lockstep guard: the module constant must equal the assessor
+    ``prompt_version`` pinned in ``configs/models.yaml`` — the registry the
+    wrapper resolves at call time. A one-sided bump fails here."""
+    models_config = ModelsConfig.from_yaml(MODELS_YAML_PATH)
+    assert PROMPT_VERSION == models_config.for_agent("assessor").prompt_version
 
 
 def test_system_prompt_assembled_from_real_files_contains_expected_parts() -> None:
@@ -309,6 +322,75 @@ def test_to_user_payload_typed_ids_win_over_conflicting_metadata() -> None:
     assert payload["turn_metadata"]["session_id"] == str(inputs.session_id)
     # Non-conflicting caller metadata is preserved.
     assert payload["turn_metadata"]["asked_at"] == "2026-07-06T10:00:00Z"
+
+
+def test_to_user_payload_serializes_non_json_scalars_deterministically() -> None:
+    """T20-era inputs legally hold datetime/UUID/Decimal inside the
+    permissive dicts; serialization must be total (``default=str``), not a
+    raw TypeError escaping the typed contract."""
+    asked_at = datetime(2026, 7, 6, 10, 0, 0, tzinfo=UTC)
+    node_uuid = uuid4()
+    weight = Decimal("0.75")
+    base = _make_inputs()
+    inputs = base.model_copy(
+        update={
+            "rubric_snapshot_subset": [{"id": "python.async", "node_uuid": node_uuid}],
+            "turn": {"candidate_answer": "Відповідь.", "weight": weight},
+            "turn_metadata": {"asked_at": asked_at},
+        }
+    )
+
+    payload = json.loads(inputs.to_user_payload())
+
+    # Non-JSON-native scalars land as their stable str() forms.
+    assert payload["rubric_snapshot_subset"][0]["node_uuid"] == str(node_uuid)
+    assert payload["turn"]["weight"] == str(weight)
+    assert payload["turn_metadata"]["asked_at"] == str(asked_at)
+    # ...and the fallback never disturbs the typed-id precedence.
+    assert payload["turn_metadata"]["turn_id"] == str(inputs.turn_id)
+    # Deterministic: repeat serialization is byte-identical.
+    assert inputs.to_user_payload() == inputs.to_user_payload()
+
+
+async def test_run_assessor_turn_empty_assessments_is_valid_output(
+    monkeypatch: pytest.MonkeyPatch,
+    sink: InMemoryTraceSink,
+    ledger: InMemoryCostLedger,
+    settings: Settings,
+) -> None:
+    """``assessments: []`` is an explicitly legal output (system.md §4 —
+    the terse "Не знаю" path). No retry, no error."""
+    inputs = _make_inputs()
+    empty = _valid_parsed(inputs)
+    empty["assessments"] = []
+    recorder = _CallModelRecorder([_ok_result(empty)])
+    monkeypatch.setattr(assessor, "call_model", recorder)
+
+    output = await run_assessor_turn(inputs, sink=sink, ledger=ledger, settings=settings)
+
+    assert output.assessments == []
+    assert output.needs_manual_review is False
+    assert len(recorder.requests) == 1
+
+
+async def test_run_assessor_turn_confidence_at_ceiling_boundary_validates(
+    monkeypatch: pytest.MonkeyPatch,
+    sink: InMemoryTraceSink,
+    ledger: InMemoryCostLedger,
+    settings: Settings,
+) -> None:
+    """confidence == 0.99 is the inclusive schema maximum — it must pass
+    (only 1.0 is forbidden)."""
+    inputs = _make_inputs()
+    at_ceiling = _valid_parsed(inputs)
+    at_ceiling["assessments"][0]["confidence"] = 0.99
+    recorder = _CallModelRecorder([_ok_result(at_ceiling)])
+    monkeypatch.setattr(assessor, "call_model", recorder)
+
+    output = await run_assessor_turn(inputs, sink=sink, ledger=ledger, settings=settings)
+
+    assert output.assessments[0].confidence == pytest.approx(0.99)
+    assert len(recorder.requests) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -447,6 +529,50 @@ async def test_run_assessor_turn_echoed_id_mismatch_twice_raises_typed_error(
     assert wrong_session in str(cause)
 
 
+async def test_run_assessor_turn_competency_focus_mismatch_then_success_retries_once(
+    monkeypatch: pytest.MonkeyPatch,
+    sink: InMemoryTraceSink,
+    ledger: InMemoryCostLedger,
+    settings: Settings,
+) -> None:
+    """A hallucinated competency_focus echo has the same audit-trail
+    exposure as a hallucinated id — same contract-miss retry-once path."""
+    inputs = _make_inputs()
+    hallucinated = _valid_parsed(inputs)
+    hallucinated["competency_focus"] = "python.gc"  # well-formed, but not the asked focus
+    recorder = _CallModelRecorder([_ok_result(hallucinated), _ok_result(_valid_parsed(inputs))])
+    monkeypatch.setattr(assessor, "call_model", recorder)
+
+    output = await run_assessor_turn(inputs, sink=sink, ledger=ledger, settings=settings)
+
+    assert output.competency_focus == inputs.competency_focus
+    assert len(recorder.requests) == 2
+
+
+async def test_run_assessor_turn_competency_focus_mismatch_twice_raises_typed_error(
+    monkeypatch: pytest.MonkeyPatch,
+    sink: InMemoryTraceSink,
+    ledger: InMemoryCostLedger,
+    settings: Settings,
+) -> None:
+    inputs = _make_inputs()
+    hallucinated = _valid_parsed(inputs)
+    hallucinated["competency_focus"] = "python.gc"
+    recorder = _CallModelRecorder([_ok_result(hallucinated), _ok_result(dict(hallucinated))])
+    monkeypatch.setattr(assessor, "call_model", recorder)
+
+    with pytest.raises(AssessorOutputInvalid) as excinfo:
+        await run_assessor_turn(inputs, sink=sink, ledger=ledger, settings=settings)
+
+    assert len(recorder.requests) == 2
+    cause = excinfo.value.__cause__
+    assert isinstance(cause, AssessorEchoMismatch)
+    # Diagnosable: names the mismatched field, expected vs got.
+    assert "competency_focus mismatch" in str(cause)
+    assert inputs.competency_focus in str(cause)
+    assert "python.gc" in str(cause)
+
+
 # ---------------------------------------------------------------------------
 # Non-schema wrapper errors — propagate untouched, no retry
 # ---------------------------------------------------------------------------
@@ -482,7 +608,7 @@ async def test_run_assessor_turn_non_schema_wrapper_error_propagates_without_ret
 
 
 # ---------------------------------------------------------------------------
-# T19 acceptance — async, non-blocking scoring (ADR-007 voice-readiness)
+# T19 acceptance — async, non-blocking scoring (implementation-plan.md § T19)
 # ---------------------------------------------------------------------------
 
 

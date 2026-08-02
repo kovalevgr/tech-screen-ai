@@ -35,3 +35,12 @@
 - [X] T014 [US1] `to_user_payload()`: spread caller `turn_metadata` FIRST so the typed `turn_id`/`session_id` always win in the wire payload; collision test added (conflicting caller ids → payload carries typed values, non-conflicting metadata preserved)
 - [X] T015 [US2] `_score_once`: enforce echoed-id EQUALITY (not just UUID shape) against the request's `turn_id`/`session_id`; mismatch raises `AssessorEchoMismatch` on the same retry-once path; tests: mismatch → retry → success (2 calls), mismatch ×2 → `AssessorOutputInvalid` (2 calls, cause names field with expected vs got)
 - [X] T016 spec.md Clarifications updated (echoed-id equality decision; confidence<0.4→needs_manual_review cross-field rule deliberately unenforced at this layer — T20 decides; vertex-integration.md ~127 divergence amended in the sibling T18 PR, this branch stays additive); all gates re-run green (176 passed / 78 skips)
+
+## Phase 6: Ultra-review fixes (multi-agent review, 2026-08-02)
+
+- [X] T017 [US1] `to_user_payload()` serialization made total and deterministic (`json.dumps(..., default=str)` — datetime/UUID/Decimal in the permissive dicts serialize as `str()` forms, no raw `TypeError`); serialization test with all three scalar types nested in rubric/turn/metadata payloads
+- [X] T018 [US2] Echo-equality check extended to `competency_focus` (same `AssessorEchoMismatch` contract-miss retry-once path via `_CONTRACT_MISS_ERRORS`); tests: mismatch → retry → success (2 calls); mismatch ×2 → `AssessorOutputInvalid` (2 calls, cause names field with expected vs got)
+- [X] T019 Lockstep test replaces the tautology: `PROMPT_VERSION` asserted equal to the assessor `prompt_version` pinned in `configs/models.yaml` (via the real `ModelsConfig` loader)
+- [X] T020 [US1] Empty-assessments happy-path test (`assessments: []` is legal — the "Не знаю" path); confidence-0.99 boundary test (inclusive maximum validates)
+- [X] T021 Local bare `Settings()` fixture replaced by delegation to the shared conftest `test_settings` fixture (env-independent, fields pinned explicitly)
+- [X] T022 spec.md Clarifications session 2026-08-02 added (serialization totality; competency echo; system.md §8-vs-§4 prompt tension deferred to prompt v0002; wrapper-rejection-after-ok-trace seam → T21 input; ADR-007 citation corrected to implementation-plan.md § T19 across all branch files); plan.md/tasks.md counts and citations updated; all gates green (24 module tests / 181 suite)

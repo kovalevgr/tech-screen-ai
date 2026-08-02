@@ -20,6 +20,14 @@
 - Q: Who enforces the cross-field rule "confidence < 0.4 sets `needs_manual_review`" (schema.json prose + system.md §4)? → A: **Nobody at this layer — deliberately.** `schema.json` cannot express the cross-field constraint and the wrapper does not add it; the output reaches T20 unenforced and the orchestrator must decide how to treat a low-confidence assessment without the flag. Recorded here so T20 picks it up as an explicit input.
 - Q: `docs/engineering/vertex-integration.md` (~line 127) says the Assessor retries "with temperature bumped" and on repeated failure "marks the assessment as needs_manual_review and enqueues" — neither is possible at wrapper level (no temperature override on `ModelCallRequest`; synthesising an assessment would be flow control, §2). → A: The doc line is being amended in the sibling T18 PR, which already owns edits to that file; this branch stays purely additive and does not touch `docs/engineering/**`.
 
+### Session 2026-08-02 (ultra-review — multi-agent)
+
+- Q: Is `to_user_payload()` serialization total? A legal T20-era input can hold `datetime` / `UUID` / `Decimal` inside the permissive dicts. → A: **Yes, now — `json.dumps(..., default=str)`.** Non-JSON-native scalars fall back to their stable `str()` forms instead of leaking a raw `TypeError` outside the typed contract; JSON-native values are untouched, so ordinary payloads are byte-identical. Deterministic (repeat serialization is byte-identical).
+- Q: The echo-equality check covers `turn_id`/`session_id` — what about `competency_focus`? → A: **Extended.** `competency_focus` is a pure echo per the output contract ("the rubric_node_id the orchestrator asked the Assessor to focus on"); a hallucinated focus id has the same audit-trail exposure as a hallucinated UUID. Same `AssessorEchoMismatch` contract-miss retry-once path.
+- Q: system.md §8 item 1 forbids Ukrainian/Russian text "in any field", but §4 requires `evidence_spans` to be exact substrings of the (typically Ukrainian) candidate answer — the two prompt rules contradict. → A: **Known prompt tension, deferred to a prompt-v0002 task** (prompt-engineer owns `prompts/**`; this branch does not touch it). The wrapper follows the machine contract: spans are validated as non-empty strings regardless of language, and the tests use Ukrainian evidence spans deliberately.
+- Q: When the wrapper rejects a *successful* call (bounds violation or echo mismatch after `call_model` returned ok), what does the audit trail show? → A: **A known seam.** The `call_model` trace records `outcome=ok`; the wrapper-level rejection leaves no wrapper-side audit artifact of its own. T21's `turn_trace` MUST record the wrapper outcome (accepted / retried / rejected-with-cause) so the trail distinguishes "model call ok" from "assessment accepted". Recorded here as an explicit T21 input.
+- Q: The spec cited "ADR-007 (voice-readiness)" — ADR-007 is actually pgvector-in-same-database; no ADR covers voice-readiness. → A: Citation corrected everywhere on this branch: the async requirement's source is `implementation-plan.md` § T19 ("Async — call does not block the Interviewer's next turn").
+
 ## User Scenarios & Testing *(mandatory)*
 
 The "users" are the orchestrator (T20) that needs a typed, non-blocking scoring call per candidate turn, and the reviewers whose audit trail depends on the Assessor's output conforming to the committed contract.
@@ -35,19 +43,20 @@ The orchestrator hands the wrapper the rubric subset, the turn, prior context, a
 
 ### User Story 2 — Contract misses are retried once, then surfaced typed (Priority: P1)
 
-A malformed model output (wrapper `VertexSchemaError`, bounds violations like `confidence: 1.0`, `level: 5`, empty `evidence_spans`, or echoed `turn_id`/`session_id` not equal to the request's — Clarifications 2026-07-07) triggers exactly one fresh retry; a second miss raises `AssessorOutputInvalid` with the cause chained. Non-schema wrapper errors (timeout, upstream, budget, trace-write) propagate untouched with no retry.
+A malformed model output (wrapper `VertexSchemaError`, bounds violations like `confidence: 1.0`, `level: 5`, empty `evidence_spans`, or echoed `turn_id`/`session_id`/`competency_focus` not equal to the request's — Clarifications 2026-07-07 / 2026-08-02) triggers exactly one fresh retry; a second miss raises `AssessorOutputInvalid` with the cause chained. Non-schema wrapper errors (timeout, upstream, budget, trace-write) propagate untouched with no retry.
 
 **Acceptance Scenarios**:
 
 1. Schema miss → retry → success: result returned, exactly 2 `call_model` invocations.
 2. Schema miss → retry → second miss: `AssessorOutputInvalid`, exactly 2 invocations, `__cause__` is the second miss.
-3. Bounds-violating payloads (confidence 1.0 / level 5 / empty spans) follow the same retry-then-raise path with a `ValidationError` cause.
-4. Echoed-id mismatch (hallucinated-but-valid UUID) → one retry → success; mismatch ×2 → `AssessorOutputInvalid`, exactly 2 invocations, cause an `AssessorEchoMismatch` naming the field with expected vs got.
+3. Bounds-violating payloads (confidence 1.0 / level 5 / empty spans) follow the same retry-then-raise path with a `ValidationError` cause. Boundary: confidence exactly 0.99 validates.
+4. Echoed-field mismatch (hallucinated-but-valid UUID, or a `competency_focus` other than the asked one) → one retry → success; mismatch ×2 → `AssessorOutputInvalid`, exactly 2 invocations, cause an `AssessorEchoMismatch` naming the field with expected vs got.
 5. `VertexTimeoutError` (and peers) propagate after exactly 1 invocation.
+6. `assessments: []` is a legal output (the "Не знаю" path, system.md §4): accepted with no retry.
 
 ### User Story 3 — Scoring never blocks the interview (Priority: P1, T19 acceptance)
 
-Per ADR-007 (voice-readiness) the Assessor call is a plain awaitable coroutine with no blocking I/O: the Interviewer can produce turn N+1 while the Assessor is still scoring turn N.
+Per the T19 async acceptance criterion (`implementation-plan.md` § T19: "Async — call does not block the Interviewer's next turn") the Assessor call is a plain awaitable coroutine with no blocking I/O: the Interviewer can produce turn N+1 while the Assessor is still scoring turn N. (An earlier draft cited "ADR-007 (voice-readiness)" — wrong; ADR-007 is pgvector. See Clarifications 2026-08-02.)
 
 **Acceptance Scenarios**:
 
@@ -68,8 +77,9 @@ Per ADR-007 (voice-readiness) the Assessor call is a plain awaitable coroutine w
 - **FR-002**: A frozen Pydantic input model MUST mirror `system.md` §3 INPUTS (`rubric_snapshot_subset`, `turn`, `prior_turns`, `competency_focus`, `turn_metadata`) with typed `session_id: UUID` / `turn_id: UUID`; structures that do not exist in code yet stay permissive `dict[str, Any]` with a refining-owner comment (T20 / Tier-4).
 - **FR-003**: Typed output models MUST mirror `prompts/assessor/v0001/schema.json` exactly: level ∈ {1,2,3,4}, confidence ∈ [0, 0.99], `rationale_en` ≤ 600 chars, `evidence_spans` non-empty, five-value red-flag enum, `needs_manual_review`, `manual_review_reason_en` ≤ 400 chars, `additionalProperties: false` → `extra="forbid"`.
 - **FR-004**: System prompt assembly MUST load `system.md` + `level-guide.md` from the `prompts/` tree (`Path(__file__).resolve().parents[3] / "prompts"` — valid in-repo and in the Docker image), pinned via module constant `PROMPT_VERSION = "v0001"`, cached at module level.
-- **FR-005**: Retry policy: exactly one fresh retry on a contract miss — `VertexSchemaError`, output-model `ValidationError`, or `AssessorEchoMismatch` (echoed `turn_id`/`session_id` ≠ request ids); second miss raises module-level `AssessorOutputInvalid` chaining the cause; all other wrapper errors propagate untouched.
+- **FR-005**: Retry policy: exactly one fresh retry on a contract miss — `VertexSchemaError`, output-model `ValidationError`, or `AssessorEchoMismatch` (echoed `turn_id`/`session_id`/`competency_focus` ≠ request values); second miss raises module-level `AssessorOutputInvalid` chaining the cause; all other wrapper errors propagate untouched.
 - **FR-008**: `to_user_payload()` MUST give the typed `turn_id`/`session_id` precedence over any caller-supplied `turn_metadata` keys of the same name (caller metadata spread first), so the wire payload can never diverge from trace/ledger attribution.
+- **FR-009**: `to_user_payload()` serialization MUST be total and deterministic: non-JSON-native scalars (`datetime`, `UUID`, `Decimal`, ...) inside the permissive dict fields serialize via `default=str`; no raw `TypeError` may escape the typed contract.
 - **FR-006**: The module MUST be pure (no DB, no side effects beyond `call_model`'s injected sink/ledger), import no provider SDK (only `app.backend.llm`), and import nothing from `app.backend.agents.interviewer` (sibling branch).
 - **FR-007**: `app/backend/agents/__init__.py` re-exports nothing (byte-agreed with the T18 branch so parallel tasks never touch the same line).
 
