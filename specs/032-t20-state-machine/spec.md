@@ -32,6 +32,26 @@ The deterministic Python core that runs an interview session: phases INTRO → T
 6. **§3 scope**: `interview_session.session_state` is mutable working state, not one of the six append-only audit tables; in-place update is correct. The transition audit trail is T21's (`turn_trace` + transition records).
 7. **Rubric-snapshot cross-check** of plan `node_id`s is deferred to the session-start service (T22) — the machine validates shape, not referential integrity against the snapshot.
 
+### Implementation notes (recorded during build, not design changes)
+
+Added by `backend-engineer` while executing plan.md phases 3–5. Each is the simplest reading consistent with contract v1.1; none reopens a decided item.
+
+8. **Command tuples are literal.** The §10 command column is implemented verbatim — including where the table omits `PersistState` (edges 2, 15, 17, 20 and edge 14's "as #13" tuple). §9's blanket "persist after EVERY transition" remains the shell's obligation (Clarification 4), so no durability is lost by following the table exactly. Edges 10–13 inherit `PersistState` from edge 7, inside which they are evaluated.
+9. **Edge 14 in QA.** "QA (or CLOSE if already QA)" is implemented as: TECH + session_max → QA with edge 13's single `acknowledge_and_transition`; QA + session_max → CLOSE with edge 16's `EmitScriptedClosing, PersistState` (an `acknowledge_and_transition` into Q&A is meaningless when the destination is CLOSE).
+10. **Plan location.** §1 fixes the signature `transition(state, event, config)` and §3 fixes `SessionStarted`'s payload as `now` only, so the raw plan is frozen onto `SessionState.plan_input` at session creation and validated into `SessionState.plan` by edge 1. Both are retained: the raw copy is what makes edge 2 (plan invalid) representable and lets the shell show exactly what was rejected.
+11. **Plan minimum + forward compatibility.** `PlanSnapshot` requires ≥ 1 competency (§7 states no minimum; a plan with nothing to assess is a configuration error). Unknown extra keys are tolerated so a richer future Planner payload cannot break a running session.
+12. **`ReissuePendingCommand` carries the command.** Edge 21 names it as a command and §9 says the machine "re-emits the pending command", so it is a real `Command` variant wrapping the outstanding `RunInterviewer` / `DeliverUtterance` / `EmitScriptedOpening` / `EmitScriptedClosing`. With nothing outstanding the tuple is just `PersistState`.
+13. **`assessment_focus` map.** §4 lists `pending_assessments` as bare turn ids, but `AssessmentFailed` carries no assessor output — so `TechState.assessment_focus` (`turn_id → node_id`) records which coverage cell a late failure belongs to (§6.3 + §6.8). Entries are dropped together with the pending id; §4's field keeps its stated shape.
+14. **`level_zero` gap marker.** §4 names three `CoverageCell` markers; NONE reached via §5's level-0 short-circuit gets a fourth `RecordGap` marker value so a reviewer sees *why* the competency closed. The cell itself stays distinct exactly as §5 requires (level 0 recorded vs `gap_not_assessable`).
+15. **Boundary operators.** §6.6's candidate timeout is strict (`>` — the operator the contract writes). Session / Q&A / competency budgets count as exhausted on *reaching* the limit (`>=`). §5's `confidence >= confidence_min` and `level >= target_level` are inclusive as written; CLARIFY's time guard is `remaining > min_probe_seconds`, also as written.
+16. **Abort reason on edge 19.** `OperatorAbort.reason` is typed as the full §2 abort set and copied onto the state, so §11's `ABORTED(cost_ceiling)` hook is reachable (T21 raises the event). `RecordDecision(operator)` is unchanged; the default reason is `operator_abort`.
+17. **Phase-agnostic §6 policies.** Edges 4/5/6 are tabulated for TECH, but §6.2 (failure ladder) and §6.4 (drift) are written phase-agnostically, so they also apply in QA — the only other phase that issues a `RunInterviewer`. INTRO and CLOSE are unaffected (CLOSE exits via edge 17).
+18. **Untabulated `(phase, event)` pairs are no-ops** — same state, no commands. The machine never guesses at an edge the contract does not define.
+19. **Scripted opening and closing both exist** (`prompts/shared/candidate-facing/opening.md`, `closing.md`). The core references them by path constant (`OPENING_SCRIPT_PATH`, `CLOSING_SCRIPT_PATH`) and never reads the files; delivery is T22/T29's. No candidate-facing prose was authored here.
+20. **`confidence_min` is capped at 0.99** by the config loader — the assessor v0003 confidence ceiling. A higher threshold would make ANSWERED unreachable, which must fail at load, not mid-interview.
+21. **Migration name** follows plan.md's `000?_add_session_state_column.py` → `alembic/versions/0006_add_session_state_column.py` (revision id `0006_add_session_state_column`).
+22. **SC-3 was verified live.** Docker was available in the implementing agent's sandbox, so `upgrade → downgrade → upgrade` ran against a real `pgvector/pgvector:pg17` Postgres and the full suite (440 tests) passed with `DATABASE_URL` set, in addition to the offline `--sql` render in both directions.
+
 ## Success criteria
 
 - **SC-1** All 21 contract edges have passing named tests (`test_edge_NN_*`); adjudication matrix complete incl. boundary `confidence == confidence_min` (passes) and probe-budget exhaustion.
