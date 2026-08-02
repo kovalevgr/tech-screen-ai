@@ -1,6 +1,7 @@
 ---
 name: infra-engineer
 description: Terraform, Docker, Cloud Run, GCP IAM, GitHub Actions, observability wiring. Invoke for any change under infra/**, .github/workflows/**, Dockerfile*, or docker-compose*.yml.
+model: sonnet
 tools:
   - Read
   - Write
