@@ -44,7 +44,7 @@ _SCHEMA_PATHS: list[Path] = sorted((_REPO_ROOT / "prompts").glob("*/v*/schema.js
 
 
 def _case_id(path: Path) -> str:
-    """`prompts/assessor/v0001/schema.json` → `assessor-v0001`."""
+    """`prompts/assessor/v0003/schema.json` → `assessor-v0003`."""
     return f"{path.parent.parent.name}-{path.parent.name}"
 
 

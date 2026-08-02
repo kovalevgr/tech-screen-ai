@@ -207,14 +207,18 @@ def settings(test_settings: Settings) -> Settings:
 
 
 def test_prompt_version_matches_models_yaml_pin() -> None:
-    """Lockstep guard: the module constant must equal the assessor
-    ``prompt_version`` pinned in ``configs/models.yaml`` — the registry the
-    wrapper resolves at call time. Both sides are pinned to the literal
-    active version (v0003, the 0–5 scale contract) so a one-sided bump —
-    or a silent regression of either side — fails here."""
+    """Three-way lockstep guard: the module constant, the assessor
+    ``prompt_version`` pinned in ``configs/models.yaml`` (the registry the
+    wrapper resolves at call time), and ``prompts/assessor/active.txt``
+    (the human/tooling pointer to the live version) must all agree. All
+    three are pinned to the literal active version (v0003, the 0–5 scale
+    contract) so a one-sided bump — or a silent regression of any side —
+    fails here."""
     models_config = ModelsConfig.from_yaml(MODELS_YAML_PATH)
     assert PROMPT_VERSION == "v0003"
     assert models_config.for_agent("assessor").prompt_version == "v0003"
+    active_txt_path = _PROMPT_DIR.parent / "active.txt"
+    assert active_txt_path.read_text(encoding="utf-8").strip() == PROMPT_VERSION
 
 
 def test_system_prompt_assembled_from_real_files_contains_expected_parts() -> None:

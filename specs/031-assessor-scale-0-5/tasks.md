@@ -31,3 +31,12 @@
 - [X] T013 `docs/engineering/glossary.md`: "Competency proficiency scale (canonical)" entry (0=None…5=Expert; rubric files 1–5 only; 0 assessor-output-only; interviewer target-level axis is a DIFFERENT axis; "Proficient" name-collision warning); stale "Level (1–5)" entry aligned. No .docx touched
 - [X] T014 Quality gates: `uv run pytest app/backend/tests` green; `ruff check app/backend` + `ruff format --check app/backend` clean; `mypy --strict app/backend` clean; `scripts/check-no-provider-sdk-imports.sh` exits 0
 - [X] T015 Spec Kit artifacts (this directory) committed with the feature branch; spec.md § Handoff to T20 records the owner's dialogue-decision table requirement (deterministic "answered / clarify / none" from level+confidence vs plan target, thresholds in config — NOT implemented here)
+
+## Phase 5: Fix-round — reviewer findings (2026-08-03)
+
+- [X] T016 [US2] `prompts/assessor/v0003/system.md` guardrail 3: append repeated-refusal sentence — «Не знаю» / refusals, however many times repeated, without a substantive attempt remain "not assessable" (empty `assessments` array), never level 0
+- [X] T017 [US2] `prompts/assessor/v0003/level-guide.md` Level 0 NOT-list: "a single «Не знаю»" tightened to "«Не знаю» / refusals, however many times repeated, without a substantive attempt"; meta-rules 6–7 re-read for consistency with the new wording (meta-rule 6 de-scoped from "once")
+- [X] T018 `prompts/assessor/v0003/notes.md`: "What changed" section gains a line recording the pre-merge tightening (reviewer finding, 2026-08-03)
+- [X] T019 `app/backend/tests/llm/test_prompt_schema_transport.py`: stale docstring example (`assessor/v0001` → `assessor-v0001`) updated to cite v0003
+- [X] T020 [US3] `app/backend/tests/agents/test_assessor.py`: `test_prompt_version_matches_models_yaml_pin` extended to a three-way lockstep — also asserts `prompts/assessor/active.txt` content equals `PROMPT_VERSION`
+- [X] T021 Quality gates re-run after the fix-round: `uv run pytest app/backend/tests`; `ruff check app/backend` + `ruff format --check app/backend`; `mypy --strict app/backend`; `scripts/check-no-provider-sdk-imports.sh`

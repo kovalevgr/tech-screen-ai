@@ -13,7 +13,7 @@ The proficiency scale has six states, 0–5. Levels 1–5 map onto the rubric no
 - A positive finding of absence, not a missing data point. The interviewer probed the competency; the candidate attempted substantively and demonstrated no relevant proficiency.
 - Example evidence: asked twice how they would find a slow query, the candidate answers "I would restart the server" and, after rephrasing, "I would add more RAM" — no mention of any relevant mechanism.
 - Mapping: probe(s) present in the turn context + substantive attempt(s) with wrong fundamentals or no relevant content = L0. Quote the failed attempts in `evidence_spans`.
-- NOT level 0: a single "Не знаю", a trivially short answer, or a turn where the competency was never probed. Those are "not assessable" — return an empty `assessments` array.
+- NOT level 0: «Не знаю» / refusals, however many times repeated, without a substantive attempt; a trivially short answer; or a turn where the competency was never probed. Those are "not assessable" — return an empty `assessments` array. Level 0 requires quotable substantive failed attempts.
 
 ### Level 1 — Basic
 
@@ -54,7 +54,7 @@ The proficiency scale has six states, 0–5. Levels 1–5 map onto the rubric no
 3. **Missing evidence ≠ lower level.** A turn that does not exercise higher-level reasoning is not evidence of lower-level capability. It is evidence of "not assessable from this turn". Level 0 is not the floor of this rule — it requires its own demonstrated-absence evidence (see Level 0 above).
 4. **Width vs depth.** One good trade-off > five casual name-drops. Depth wins.
 5. **Silent in one dimension.** If the candidate shows L3 reasoning about trade-offs but L1 knowledge of the specific mechanism, assess the mechanism node L1, and record a rationale that notes the dimension gap. Do not average.
-6. **Negative signals.** A candidate who says "I don't know" once is neither a red flag nor a level signal by itself. Record an empty assessment. Only repeated substantive failure under probing earns L0.
+6. **Negative signals.** A candidate who says "I don't know" is neither a red flag nor a level signal by itself — however many times it repeats. Record an empty assessment. Only repeated substantive failure under probing earns L0.
 7. **0 vs empty array.** Level 0 asserts "the competency is absent" and needs evidence of failed attempts. An empty `assessments` array asserts "this turn cannot tell". When unsure between the two, return the empty array.
 
 ---
