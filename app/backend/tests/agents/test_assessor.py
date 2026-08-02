@@ -2,8 +2,8 @@
 
 ``call_model`` is monkeypatched at the assessor module boundary (the only
 sanctioned mock seam per coding-conventions — the LLM boundary); prompt
-files and ``schema.json`` are the REAL committed artefacts from
-``prompts/assessor/v0001/``.
+files and ``schema.json`` are the REAL committed artefacts from the pinned
+``prompts/assessor/<PROMPT_VERSION>/`` folder.
 
 Constitution §15: every payload string here is synthetic non-PII content.
 The T19 acceptance criterion (async, non-blocking scoring per
@@ -87,6 +87,7 @@ def _make_inputs() -> AssessorTurnInput:
                     "L2": "Explains cooperative scheduling with an example.",
                     "L3": "Reasons about blocking hazards and mitigation.",
                     "L4": "Questions whether async is the right tool at all.",
+                    "L5": "Reasons about loop internals; anticipates scheduler failure modes.",
                 },
             }
         ],
@@ -99,7 +100,7 @@ def _make_inputs() -> AssessorTurnInput:
 
 
 def _valid_parsed(inputs: AssessorTurnInput) -> dict[str, Any]:
-    """A payload conforming to prompts/assessor/v0001/schema.json."""
+    """A payload conforming to the pinned prompts/assessor schema.json."""
     return {
         "turn_id": str(inputs.turn_id),
         "session_id": str(inputs.session_id),
@@ -208,9 +209,12 @@ def settings(test_settings: Settings) -> Settings:
 def test_prompt_version_matches_models_yaml_pin() -> None:
     """Lockstep guard: the module constant must equal the assessor
     ``prompt_version`` pinned in ``configs/models.yaml`` — the registry the
-    wrapper resolves at call time. A one-sided bump fails here."""
+    wrapper resolves at call time. Both sides are pinned to the literal
+    active version (v0003, the 0–5 scale contract) so a one-sided bump —
+    or a silent regression of either side — fails here."""
     models_config = ModelsConfig.from_yaml(MODELS_YAML_PATH)
-    assert PROMPT_VERSION == models_config.for_agent("assessor").prompt_version
+    assert PROMPT_VERSION == "v0003"
+    assert models_config.for_agent("assessor").prompt_version == "v0003"
 
 
 def test_system_prompt_assembled_from_real_files_contains_expected_parts() -> None:
@@ -393,6 +397,70 @@ async def test_run_assessor_turn_confidence_at_ceiling_boundary_validates(
     assert len(recorder.requests) == 1
 
 
+async def test_run_assessor_turn_level_zero_none_is_valid_output(
+    monkeypatch: pytest.MonkeyPatch,
+    sink: InMemoryTraceSink,
+    ledger: InMemoryCostLedger,
+    settings: Settings,
+) -> None:
+    """Level 0 (None — «не володіє») is a VALID six-state-scale output
+    (owner decision 2026-08-02): demonstrated absence after the
+    interviewer's probes is a real finding, not a contract miss. Under the
+    v0001/v0002 enum [1..4] the model was forced to inflate this to an
+    unearned Basic. No retry, no error."""
+    inputs = _make_inputs()
+    none_level = _valid_parsed(inputs)
+    none_level["assessments"][0].update(
+        {
+            "level": 0,
+            "confidence": 0.8,
+            "rationale_en": (
+                "After two probes on the event loop the candidate offered only "
+                "restarting the worker; no relevant mechanism named — level 0 (None)."
+            ),
+            "evidence_spans": ["я б просто перезапустив воркер"],
+        }
+    )
+    recorder = _CallModelRecorder([_ok_result(none_level)])
+    monkeypatch.setattr(assessor, "call_model", recorder)
+
+    output = await run_assessor_turn(inputs, sink=sink, ledger=ledger, settings=settings)
+
+    assert output.assessments[0].level == 0
+    assert output.needs_manual_review is False
+    assert len(recorder.requests) == 1
+
+
+async def test_run_assessor_turn_level_five_expert_is_valid_output(
+    monkeypatch: pytest.MonkeyPatch,
+    sink: InMemoryTraceSink,
+    ledger: InMemoryCostLedger,
+    settings: Settings,
+) -> None:
+    """Level 5 (Expert) is a VALID output — the v0001/v0002 enum capped at
+    4 and structured output silently deflated Expert answers to Proficient.
+    5 is the new top of the enum; no retry, no error."""
+    inputs = _make_inputs()
+    expert = _valid_parsed(inputs)
+    expert["assessments"][0].update(
+        {
+            "level": 5,
+            "confidence": 0.9,
+            "rationale_en": (
+                "Candidate reasons about loop internals and anticipates a "
+                "scheduler-level failure mode unprompted; matches the L5 descriptor."
+            ),
+        }
+    )
+    recorder = _CallModelRecorder([_ok_result(expert)])
+    monkeypatch.setattr(assessor, "call_model", recorder)
+
+    output = await run_assessor_turn(inputs, sink=sink, ledger=ledger, settings=settings)
+
+    assert output.assessments[0].level == 5
+    assert len(recorder.requests) == 1
+
+
 # ---------------------------------------------------------------------------
 # Retry policy — schema misses
 # ---------------------------------------------------------------------------
@@ -437,7 +505,8 @@ async def test_run_assessor_turn_schema_miss_twice_raises_typed_error(
     ("field_mutation", "expected_fragment"),
     [
         pytest.param({"confidence": 1.0}, "confidence", id="confidence-1.0-forbidden"),
-        pytest.param({"level": 5}, "level", id="level-5-out-of-enum"),
+        pytest.param({"level": 6}, "level", id="level-6-out-of-enum"),
+        pytest.param({"level": -1}, "level", id="level-minus-1-out-of-enum"),
         pytest.param({"evidence_spans": []}, "evidence_spans", id="empty-evidence-spans"),
     ],
 )

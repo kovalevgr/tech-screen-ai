@@ -58,7 +58,7 @@ from app.backend.llm.cost_ledger import CostLedger
 from app.backend.llm.trace import TraceSink
 from app.backend.settings import Settings
 
-PROMPT_VERSION: Final[str] = "v0001"
+PROMPT_VERSION: Final[str] = "v0003"
 """Pinned prompt version — bumped only together with a new prompts/ tree."""
 
 _AGENT_NAME: Final[str] = "assessor"
@@ -71,7 +71,7 @@ _PROMPT_DIR: Final[Path] = _PROMPTS_ROOT / _AGENT_NAME / PROMPT_VERSION
 
 
 class AssessorOutputInvalid(Exception):
-    """Assessor output missed the v0001 contract twice (initial call + one retry).
+    """Assessor output missed the pinned contract twice (initial call + one retry).
 
     The chained ``__cause__`` is the second miss — a
     :class:`~app.backend.llm.VertexSchemaError` (wrapper-side structural
@@ -113,7 +113,7 @@ _CONTRACT_MISS_ERRORS: Final[tuple[type[Exception], ...]] = (
 
 @lru_cache(maxsize=1)
 def load_system_prompt() -> str:
-    """Assemble the runtime system prompt for ``prompts/assessor/v0001``.
+    """Assemble the runtime system prompt for the pinned ``prompts/assessor`` version.
 
     ``system.md`` §5 ("LEVEL PROMPTING GUIDE") defers to ``level-guide.md``,
     so the guide is appended after the main prompt. ``notes.md`` is a
@@ -142,14 +142,14 @@ def load_output_schema() -> dict[str, Any]:
     mutation; only the file read is cached (no I/O after first call).
 
     Returns:
-        The parsed ``prompts/assessor/v0001/schema.json`` contract.
+        The parsed ``prompts/assessor/<PROMPT_VERSION>/schema.json`` contract.
     """
     schema: dict[str, Any] = json.loads(_output_schema_text())
     return schema
 
 
 # ---------------------------------------------------------------------------
-# Input model — mirrors prompts/assessor/v0001/system.md §3 INPUTS
+# Input model — mirrors the pinned prompts/assessor system.md §3 INPUTS
 # ---------------------------------------------------------------------------
 
 
@@ -174,7 +174,7 @@ class AssessorTurnInput(BaseModel):
     """Rubric node id the orchestrator wants this call to focus on."""
 
     rubric_snapshot_subset: list[dict[str, Any]]
-    """Rubric nodes relevant to the turn (id, label, L1–L4 descriptors,
+    """Rubric nodes relevant to the turn (id, label, L1–L5 descriptors,
     definition). Permissive ``dict`` payloads — the typed rubric-node model
     does not exist in code yet; T20 / Tier-4 refines this."""
 
@@ -226,7 +226,7 @@ class AssessorTurnInput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Output models — mirror prompts/assessor/v0001/schema.json exactly
+# Output models — mirror the pinned prompts/assessor schema.json exactly
 # ---------------------------------------------------------------------------
 
 RedFlagType = Literal[
@@ -245,7 +245,11 @@ class AssessmentItem(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     rubric_node_id: str
-    level: Literal[1, 2, 3, 4]
+    level: Literal[0, 1, 2, 3, 4, 5]
+    """Six-state competency-proficiency scale (owner decision 2026-08-02):
+    0=None ("не володіє" — demonstrated absence; assessor-output-only, rubric
+    files carry no rank-0 descriptor), 1=Basic, 2=Competent, 3=Advanced,
+    4=Proficient, 5=Expert. Mirrors the ``schema.json`` ``level`` enum."""
     confidence: float = Field(ge=0, le=0.99)
     rationale_en: str = Field(min_length=1, max_length=600)
     evidence_spans: list[Annotated[str, Field(min_length=1)]] = Field(min_length=1)
@@ -311,7 +315,7 @@ async def run_assessor_turn(
         The validated :class:`AssessorOutput` for the turn.
 
     Raises:
-        AssessorOutputInvalid: The model output missed the v0001 contract
+        AssessorOutputInvalid: The model output missed the pinned contract
             twice (initial call + the single per-agent retry). A miss is a
             wrapper schema error, an output-model bounds violation, or an
             echoed ``turn_id`` / ``session_id`` / ``competency_focus``
@@ -353,7 +357,7 @@ async def run_assessor_turn(
             )
         except _CONTRACT_MISS_ERRORS as second_miss:
             raise AssessorOutputInvalid(
-                "assessor output failed the v0001 contract twice "
+                f"assessor output failed the {PROMPT_VERSION} contract twice "
                 f"(first miss: {type(first_miss).__name__}, "
                 f"second miss: {type(second_miss).__name__}); "
                 "payload detail is on the chained cause"
