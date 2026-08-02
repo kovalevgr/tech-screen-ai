@@ -620,6 +620,26 @@ def _ignore(state: SessionState) -> TransitionResult:
     return TransitionResult(new_state=state, commands=())
 
 
+def _answers_pending_command(state: SessionState, turn_id: UUID) -> bool:
+    """Whether an agent reply belongs to the OUTSTANDING command (§6.9a).
+
+    A `TimerTick` can preempt an in-flight interviewer call (edge 14 moves the
+    session to Q&A and issues a fresh move), and the wrapper's reply for the
+    abandoned turn may still land afterwards. Such a reply is an untabulated
+    event: delivering it would speak a superseded utterance to the candidate,
+    and counting it would corrupt the drift (§6.4) and failure-ladder (§6.2)
+    accounting for a turn nobody is waiting on.
+
+    Args:
+        state: The current session state.
+        turn_id: The ``turn_id`` carried by the reply/failure event.
+
+    Returns:
+        ``True`` when a command is outstanding and the ids match.
+    """
+    return state.pending_command is not None and state.pending_command.turn_id == turn_id
+
+
 # ---------------------------------------------------------------------------
 # Adjudication — the owner's 2/1/0 table (§5)
 # ---------------------------------------------------------------------------
@@ -1203,6 +1223,9 @@ def _on_interviewer_reply(
     state: SessionState, event: InterviewerReplyReady, config: OrchestratorConfig
 ) -> TransitionResult:
     """Edge 4 (and edge 17 in CLOSE): deliver the utterance, note any drift."""
+    if not _answers_pending_command(state, event.turn_id):
+        # §6.9a — a reply for a superseded turn is untabulated.
+        return _ignore(state)
     if state.phase is Phase.CLOSE:
         return _complete(state)
     if state.phase not in (Phase.TECH, Phase.QA) or state.awaiting != "interviewer":
@@ -1233,6 +1256,9 @@ def _on_interviewer_reply(
 
 def _on_interviewer_failed(state: SessionState, event: InterviewerFailed) -> TransitionResult:
     """Edges 5/6: repeat the move once, then abort on a second consecutive miss."""
+    if not _answers_pending_command(state, event.turn_id):
+        # §6.9a — a failure for a superseded turn never advances the ladder.
+        return _ignore(state)
     if state.phase not in (Phase.TECH, Phase.QA) or state.awaiting != "interviewer":
         return _ignore(state)
     pending = state.pending_command

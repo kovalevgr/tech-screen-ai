@@ -44,17 +44,17 @@ from ._builders import (
     NODE_B,
     SESSION_ID,
     T0,
-    LevelTriple,
     at,
     competency,
     complete_assessment,
     created_state,
-    deliver_reply,
     drive_to_intro,
+    drive_to_qa,
     drive_to_tech,
     interviewer_output,
     make_plan,
     pending_interviewer,
+    tech_with_coverage,
     turn_uuid,
 )
 
@@ -315,33 +315,10 @@ def test_edge_09_assessment_failed_marks_the_cell(config: OrchestratorConfig) ->
 # ---------------------------------------------------------------------------
 
 
-def _tech_with_coverage(
-    config: OrchestratorConfig,
-    *,
-    levels: tuple[LevelTriple, ...],
-    plan: dict[str, Any] | None = None,
-) -> SessionState:
-    """Drive TECH to "one probe spent, one assessment completed, awaiting answer"."""
-    probing = transition(
-        drive_to_tech(config, plan),
-        CandidateTurnReceived(turn_id=turn_uuid(1), text="Перша відповідь", now=at(minutes=1)),
-        config,
-    ).new_state
-    scored = complete_assessment(
-        probing,
-        config,
-        turn_id=turn_uuid(1),
-        competency_focus=NODE_A,
-        levels=levels,
-        now=at(minutes=1, seconds=10),
-    )
-    return deliver_reply(scored, config, now=at(minutes=1, seconds=20))
-
-
 def test_edge_10_answered_advances_to_the_next_competency_in_one_call(
     config: OrchestratorConfig,
 ) -> None:
-    ready = _tech_with_coverage(config, levels=((NODE_A, 4, 0.8),))
+    ready = tech_with_coverage(config, levels=((NODE_A, 4, 0.8),))
 
     result = transition(
         ready,
@@ -379,7 +356,7 @@ def test_edge_11_clarify_issues_a_depth_probe_and_spends_budget(
 def test_edge_12_none_records_a_gap_and_closes_the_competency(
     config: OrchestratorConfig,
 ) -> None:
-    ready = _tech_with_coverage(config, levels=((NODE_A, 0, 0.9),))
+    ready = tech_with_coverage(config, levels=((NODE_A, 0, 0.9),))
 
     result = transition(
         ready,
@@ -406,7 +383,7 @@ def test_edge_12_none_records_a_gap_and_closes_the_competency(
 
 def test_edge_13_last_competency_exit_enters_qa(config: OrchestratorConfig) -> None:
     single = make_plan(competencies=[competency(NODE_A)])
-    ready = _tech_with_coverage(config, levels=((NODE_A, 4, 0.8),), plan=single)
+    ready = tech_with_coverage(config, levels=((NODE_A, 4, 0.8),), plan=single)
 
     result = transition(
         ready,
@@ -454,22 +431,10 @@ def test_edge_14_session_max_exceeded_in_qa_goes_to_close(config: OrchestratorCo
 # ---------------------------------------------------------------------------
 
 
-def _drive_to_qa(config: OrchestratorConfig, *, qa_minutes: int = 5) -> SessionState:
-    """Reach QA ``awaiting`` the candidate via the tabulated edges 13 + 4."""
-    single = make_plan(competencies=[competency(NODE_A)], qa_minutes=qa_minutes)
-    ready = _tech_with_coverage(config, levels=((NODE_A, 4, 0.8),), plan=single)
-    in_qa = transition(
-        ready,
-        CandidateTurnReceived(turn_id=turn_uuid(2), text="Друга відповідь", now=at(minutes=2)),
-        config,
-    ).new_state
-    return deliver_reply(in_qa, config, now=at(minutes=2, seconds=10))
-
-
 def test_edge_15_qa_turn_answers_without_scheduling_an_assessor(
     config: OrchestratorConfig,
 ) -> None:
-    in_qa = _drive_to_qa(config)
+    in_qa = drive_to_qa(config)
 
     result = transition(
         in_qa,
@@ -484,7 +449,7 @@ def test_edge_15_qa_turn_answers_without_scheduling_an_assessor(
 
 
 def test_edge_16_qa_budget_exhausted_enters_close(config: OrchestratorConfig) -> None:
-    in_qa = _drive_to_qa(config, qa_minutes=1)
+    in_qa = drive_to_qa(config, qa_minutes=1)
 
     result = transition(in_qa, TimerTick(now=at(minutes=4)), config)
 
@@ -495,7 +460,7 @@ def test_edge_16_qa_budget_exhausted_enters_close(config: OrchestratorConfig) ->
 def test_edge_16_qa_budget_exhausted_on_a_candidate_turn_enters_close(
     config: OrchestratorConfig,
 ) -> None:
-    in_qa = _drive_to_qa(config, qa_minutes=1)
+    in_qa = drive_to_qa(config, qa_minutes=1)
 
     result = transition(
         in_qa,
@@ -509,7 +474,7 @@ def test_edge_16_qa_budget_exhausted_on_a_candidate_turn_enters_close(
 
 def test_edge_17_close_completes_the_session(config: OrchestratorConfig) -> None:
     in_close = transition(
-        _drive_to_qa(config, qa_minutes=1), TimerTick(now=at(minutes=4)), config
+        drive_to_qa(config, qa_minutes=1), TimerTick(now=at(minutes=4)), config
     ).new_state
     closing = in_close.pending_command
     assert closing is not None
@@ -534,7 +499,7 @@ def test_edge_17_close_completes_on_the_next_tick_without_a_model_call(
 ) -> None:
     """The table's "``InterviewerReplyReady`` / immediate" alternative."""
     in_close = transition(
-        _drive_to_qa(config, qa_minutes=1), TimerTick(now=at(minutes=4)), config
+        drive_to_qa(config, qa_minutes=1), TimerTick(now=at(minutes=4)), config
     ).new_state
 
     result = transition(in_close, TimerTick(now=at(minutes=4, seconds=30)), config)

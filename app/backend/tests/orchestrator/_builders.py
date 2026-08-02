@@ -228,3 +228,38 @@ def complete_assessment(
         ),
         config,
     ).new_state
+
+
+def tech_with_coverage(
+    config: OrchestratorConfig,
+    *,
+    levels: tuple[LevelTriple, ...],
+    plan: dict[str, Any] | None = None,
+) -> SessionState:
+    """Drive TECH to "one probe spent, one assessment completed, awaiting answer"."""
+    probing = transition(
+        drive_to_tech(config, plan),
+        CandidateTurnReceived(turn_id=turn_uuid(1), text="Перша відповідь", now=at(minutes=1)),
+        config,
+    ).new_state
+    scored = complete_assessment(
+        probing,
+        config,
+        turn_id=turn_uuid(1),
+        competency_focus=NODE_A,
+        levels=levels,
+        now=at(minutes=1, seconds=10),
+    )
+    return deliver_reply(scored, config, now=at(minutes=1, seconds=20))
+
+
+def drive_to_qa(config: OrchestratorConfig, *, qa_minutes: int = 5) -> SessionState:
+    """Reach QA ``awaiting`` the candidate via the tabulated edges 13 + 4."""
+    single = make_plan(competencies=[competency(NODE_A)], qa_minutes=qa_minutes)
+    ready = tech_with_coverage(config, levels=((NODE_A, 4, 0.8),), plan=single)
+    in_qa = transition(
+        ready,
+        CandidateTurnReceived(turn_id=turn_uuid(2), text="Друга відповідь", now=at(minutes=2)),
+        config,
+    ).new_state
+    return deliver_reply(in_qa, config, now=at(minutes=2, seconds=10))

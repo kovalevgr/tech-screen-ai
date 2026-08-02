@@ -97,7 +97,7 @@ class PlanSnapshot(BaseModel):
     competencies: tuple[PlannedCompetency, ...] = Field(min_length=1)
     """At least one competency — a plan with nothing to assess is a
     configuration error, not an interview (implementation note, spec
-    Clarification 9)."""
+    Clarification 11)."""
 
     qa_minutes: int = Field(ge=0)
     session_max_minutes: int = Field(ge=1)

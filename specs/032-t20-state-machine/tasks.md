@@ -32,3 +32,11 @@
 ## Phase 6 — wrap-up
 
 - [x] T016 Verify diff additivity per SC-5; report edge→test mapping; do NOT push until told
+
+## Phase 7 — reviewer-gate fix round (PASS-WITH-FINDINGS, contract v1.2)
+
+- [x] T017 (finding 1) Stale-reply no-op guard per §6.9a in `_on_interviewer_reply` / `_on_interviewer_failed`; `test_stale_replies.py` covers the preempted-probe race, the failure ladder, the edge-15 QA path and CLOSE
+- [x] T018 (finding 5) Purity guards: attribute-form randomness scan, `import uuid` ban, `ast.Match` subjects + case guards, `description_en` / `manual_review_reason_en` added to the prose set
+- [x] T019 (nit 6) `plan.py` Clarification citation 9 → 11
+- [x] T020 (nit 8) Re-measure the DB suite and record the actual counts + why the reviewer's 464 and the original 440 differ (scope, not outcome)
+- [x] T021 Gates green without and with `DATABASE_URL`; push the branch
