@@ -32,9 +32,10 @@ class ModelCallConfigError(WrapperError):
 class VertexTimeoutError(WrapperError):
     """30-second wall-clock budget exceeded across all retries.
 
-    Trace `outcome` = "timeout". Per Clarifications 2026-04-26 the underlying
-    `google.api_core.exceptions.DeadlineExceeded` is excluded from retry —
-    the timeout already fired, repeating it only burns the 30-s budget.
+    Trace `outcome` = "timeout". Per Clarifications 2026-04-26 the
+    deadline-exceeded classification (`BackendDeadlineExceededError`:
+    HTTP 504 or a transport timeout) is excluded from retry — the timeout
+    already fired, repeating it only burns the 30-s budget.
     """
 
 
@@ -43,8 +44,9 @@ class VertexUpstreamUnavailableError(WrapperError):
 
     Trace `outcome` = "upstream_unavailable". Raised after the uniform
     3-attempt budget (1 initial + 2 retries) has been exhausted on the
-    set: HTTP 5xx (`ServiceUnavailable`, `InternalServerError`),
-    HTTP 429 (`ResourceExhausted`), and connection-level errors.
+    transient set (`BackendTransientError`: HTTP 429, HTTP 5xx except
+    504, connection-level transport errors), or immediately for any
+    unclassified upstream failure (`BackendUpstreamError`).
     """
 
 

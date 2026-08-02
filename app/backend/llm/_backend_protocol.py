@@ -7,8 +7,17 @@ This keeps the runtime cost at zero (Protocol is a `mypy --strict`
 artefact only) and lets a future test backend or a T05 DB-backed sink
 implementation slot in without touching the wrapper.
 
-See `specs/007-t04-vertex-client-wrapper/data-model.md` §7 and
-`contracts/wrapper-contract.md` §2.
+This module also defines the **transport-classification errors**
+(:class:`BackendError` and its children). They are the SDK-free contract
+between a backend and the wrapper's retry loop: the real backend
+translates every provider-SDK exception (``google.genai.errors.*``,
+``httpx.*``) into one of these before it escapes ``generate()``, so
+``vertex.py`` never has to import a provider SDK to classify failures
+(guardrail: ``scripts/check-no-provider-sdk-imports.sh``).
+
+See `specs/007-t04-vertex-client-wrapper/data-model.md` §7,
+`contracts/wrapper-contract.md` §2, and
+`specs/030-schema-transport-real-vertex/plan.md` (taxonomy rework).
 """
 
 from __future__ import annotations
@@ -16,6 +25,50 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class BackendError(Exception):
+    """Base for transport-level classification errors raised by backends.
+
+    Never surfaced to wrapper callers — ``vertex.py`` translates every
+    :class:`BackendError` into the public typed hierarchy in
+    ``errors.py`` (`VertexTimeoutError`, `ModelCallConfigError`,
+    `VertexUpstreamUnavailableError`).
+    """
+
+
+class BackendTransientError(BackendError):
+    """Transient upstream failure — retryable under the 3-attempt budget.
+
+    Real backend raises this for HTTP 429 and HTTP 5xx (except 504) and
+    for connection-level transport failures (refused / reset / broken
+    stream).
+    """
+
+
+class BackendDeadlineExceededError(BackendError):
+    """Upstream/transport deadline fired — NOT retried.
+
+    Equivalent of the legacy ``google.api_core.exceptions.DeadlineExceeded``
+    (HTTP 504) per Clarifications 2026-04-26: the timeout already burned
+    wall clock; retrying only eats the remaining 30-s budget.
+    """
+
+
+class BackendCallerError(BackendError):
+    """Caller-side rejection (HTTP 400 / 403) — NOT retried.
+
+    The wrapper translates this to :class:`ModelCallConfigError`.
+    """
+
+
+class BackendUpstreamError(BackendError):
+    """Any other upstream API failure (401, 404, 408, …) — NOT retried.
+
+    The wrapper translates this to :class:`VertexUpstreamUnavailableError`,
+    preserving the pre-030 catch-all semantics for unclassified provider
+    errors.
+    """
 
 
 class RawBackendResult(BaseModel):
@@ -61,8 +114,10 @@ class VertexBackend(Protocol):
     ) -> RawBackendResult:
         """Issue a single backend call and return the raw envelope.
 
-        Implementations MUST raise the wrapper's typed errors (or, for the
-        real backend, ``google.api_core.exceptions.*`` which the wrapper
-        translates) — never a bare ``Exception``.
+        Implementations MUST raise either the wrapper's typed errors or a
+        :class:`BackendError` subclass (the real backend translates every
+        provider-SDK exception into one before it escapes). Anything else
+        is classified as upstream-unavailable by the wrapper's defensive
+        catch-all.
         """
         ...

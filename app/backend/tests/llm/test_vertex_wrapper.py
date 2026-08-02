@@ -22,7 +22,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from google.api_core import exceptions as gae
 from pydantic import ValidationError
 
 from app.backend.llm import (
@@ -36,7 +35,14 @@ from app.backend.llm import (
     VertexUpstreamUnavailableError,
     call_model,
 )
-from app.backend.llm._backend_protocol import RawBackendResult, VertexBackend
+from app.backend.llm._backend_protocol import (
+    BackendCallerError,
+    BackendDeadlineExceededError,
+    BackendTransientError,
+    BackendUpstreamError,
+    RawBackendResult,
+    VertexBackend,
+)
 from app.backend.llm._mock_backend import MockVertexBackend
 from app.backend.llm.cost_ledger import CostLedger, InMemoryCostLedger
 from app.backend.llm.pricing import PricingTable
@@ -58,18 +64,6 @@ from app.backend.tests.llm._test_prompts import (
 )
 
 _FIXTURES_DIR: Path = Path(__file__).resolve().parents[1] / "fixtures" / "llm_responses"
-
-
-def _make_gae(exc_type: type[gae.GoogleAPIError], message: str) -> gae.GoogleAPIError:
-    """Typed shim around google-api-core untyped exception constructors.
-
-    ``google-api-core`` ships without ``py.typed`` so direct calls like
-    ``gae.ServiceUnavailable("msg")`` are flagged ``no-untyped-call``
-    under ``mypy --strict`` in some setups. Wrapping the construction in
-    a single typed helper confines any suppression to one location and
-    clarifies intent at every call site.
-    """
-    return exc_type(message)
 
 
 # ---------------------------------------------------------------------------
@@ -362,7 +356,7 @@ async def test_retry_on_transient_then_succeeds(
     )
     backend = _ScriptedBackend(
         [
-            _make_gae(gae.ServiceUnavailable, "upstream temporarily unavailable"),
+            BackendTransientError("upstream temporarily unavailable"),
             success,
         ]
     )
@@ -408,9 +402,9 @@ async def test_retry_budget_exhausted_raises_upstream_unavailable(
     """
     backend = _ScriptedBackend(
         [
-            _make_gae(gae.ServiceUnavailable, "attempt 1"),
-            _make_gae(gae.ServiceUnavailable, "attempt 2"),
-            _make_gae(gae.ServiceUnavailable, "attempt 3"),
+            BackendTransientError("attempt 1"),
+            BackendTransientError("attempt 2"),
+            BackendTransientError("attempt 3"),
         ]
     )
     _force_backend(monkeypatch, backend)
@@ -446,11 +440,11 @@ async def test_deadline_exceeded_not_retried(
     test_settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``DeadlineExceeded`` short-circuits the retry loop — attempts == 1.
+    """``BackendDeadlineExceededError`` short-circuits the retry loop — attempts == 1.
 
     Maps to FR-004 + Clarifications 2026-04-26.
     """
-    backend = _ScriptedBackend([_make_gae(gae.DeadlineExceeded, "vertex deadline")])
+    backend = _ScriptedBackend([BackendDeadlineExceededError("vertex deadline")])
     _force_backend(monkeypatch, backend)
 
     request = _interviewer_request()
@@ -461,7 +455,7 @@ async def test_deadline_exceeded_not_retried(
             ledger=in_memory_cost_ledger,
             settings=test_settings,
         )
-    assert backend.calls == 1, "DeadlineExceeded must not be retried"
+    assert backend.calls == 1, "deadline-exceeded classification must not be retried"
 
     records = in_memory_trace_sink.records
     assert len(records) == 1
@@ -480,11 +474,11 @@ async def test_invalid_argument_not_retried(
     test_settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``InvalidArgument`` re-classified as ``ModelCallConfigError``.
+    """``BackendCallerError`` re-classified as ``ModelCallConfigError``.
 
     Maps to FR-004.
     """
-    backend = _ScriptedBackend([_make_gae(gae.InvalidArgument, "bad payload")])
+    backend = _ScriptedBackend([BackendCallerError("bad payload")])
     _force_backend(monkeypatch, backend)
 
     request = _interviewer_request()
@@ -500,6 +494,42 @@ async def test_invalid_argument_not_retried(
     records = in_memory_trace_sink.records
     assert len(records) == 1
     assert records[0].outcome == "config_error"
+    assert records[0].attempts == 1
+
+
+# ---------------------------------------------------------------------------
+# 030 — BackendUpstreamError (unclassified upstream code) → no retry
+# ---------------------------------------------------------------------------
+
+
+async def test_upstream_error_not_retried_raises_upstream_unavailable(
+    in_memory_trace_sink: InMemoryTraceSink,
+    in_memory_cost_ledger: InMemoryCostLedger,
+    test_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``BackendUpstreamError`` (e.g. HTTP 404) → 1 attempt, upstream-unavailable.
+
+    Spec 030 US2 scenario 4 at the wrapper level: unclassified upstream
+    codes are NOT retried and surface as
+    ``VertexUpstreamUnavailableError`` (pre-030 catch-all semantics).
+    """
+    backend = _ScriptedBackend([BackendUpstreamError("vertex api error 404: not found")])
+    _force_backend(monkeypatch, backend)
+
+    request = _interviewer_request()
+    with pytest.raises(VertexUpstreamUnavailableError):
+        await call_model(
+            request,
+            sink=in_memory_trace_sink,
+            ledger=in_memory_cost_ledger,
+            settings=test_settings,
+        )
+    assert backend.calls == 1, "unclassified upstream errors must not be retried"
+
+    records = in_memory_trace_sink.records
+    assert len(records) == 1
+    assert records[0].outcome == "upstream_unavailable"
     assert records[0].attempts == 1
 
 
@@ -615,7 +645,7 @@ def _setup_timeout(
     settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> tuple[ModelCallRequest, type[BaseException] | None, TraceSink, CostLedger]:
-    backend = _ScriptedBackend([_make_gae(gae.DeadlineExceeded, "deadline")])
+    backend = _ScriptedBackend([BackendDeadlineExceededError("deadline")])
     _force_backend(monkeypatch, backend)
     return _interviewer_request(), VertexTimeoutError, sink, ledger
 
@@ -628,9 +658,9 @@ def _setup_upstream_unavailable(
 ) -> tuple[ModelCallRequest, type[BaseException] | None, TraceSink, CostLedger]:
     backend = _ScriptedBackend(
         [
-            _make_gae(gae.ServiceUnavailable, "a"),
-            _make_gae(gae.ServiceUnavailable, "b"),
-            _make_gae(gae.ServiceUnavailable, "c"),
+            BackendTransientError("a"),
+            BackendTransientError("b"),
+            BackendTransientError("c"),
         ]
     )
     _force_backend(monkeypatch, backend)
@@ -1005,6 +1035,104 @@ async def test_failed_call_does_not_increment_ledger(
     assert records[0].cost_usd > Decimal("0"), (
         "trace must record the cost Vertex billed, even on a failed call"
     )
+
+
+# ---------------------------------------------------------------------------
+# 030 — per-agent max_output_tokens pin from configs/models.yaml is enforced
+# ---------------------------------------------------------------------------
+
+
+class _RecordingBackend:
+    """Backend that records the kwargs it received and returns a canned result."""
+
+    def __init__(self, result: RawBackendResult) -> None:
+        self._result = result
+        self.received: dict[str, Any] = {}
+
+    async def generate(
+        self,
+        *,
+        system_prompt: str,
+        user_payload: str,
+        json_schema: dict[str, Any] | None,
+        model: str,
+        temperature: float,
+        max_output_tokens: int,
+        timeout_s: float,
+    ) -> RawBackendResult:
+        self.received = {
+            "system_prompt": system_prompt,
+            "user_payload": user_payload,
+            "json_schema": json_schema,
+            "model": model,
+            "temperature": temperature,
+            "max_output_tokens": max_output_tokens,
+            "timeout_s": timeout_s,
+        }
+        return self._result
+
+
+def _recording_backend() -> _RecordingBackend:
+    return _RecordingBackend(
+        RawBackendResult(
+            text='{"message_uk": "ok", "intent": "noop", "end_of_phase": false}',
+            input_tokens=5,
+            output_tokens=8,
+            model="gemini-2.5-flash",
+            model_version="gemini-2.5-flash-001",
+        )
+    )
+
+
+async def test_agent_pin_lowers_request_default_max_output_tokens(
+    in_memory_trace_sink: InMemoryTraceSink,
+    in_memory_cost_ledger: InMemoryCostLedger,
+    test_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Request default 4096 + interviewer pin 2048 → backend receives 2048.
+
+    Constitution §16 (configs as code): the per-agent
+    ``max_output_tokens`` pin in ``configs/models.yaml`` is live config,
+    not decoration — the effective cap is
+    ``min(request.max_output_tokens, agent pin)``.
+    """
+    backend = _recording_backend()
+    _force_backend(monkeypatch, backend)
+
+    request = _interviewer_request(max_output_tokens=4096)  # the request-level default
+    await call_model(
+        request,
+        sink=in_memory_trace_sink,
+        ledger=in_memory_cost_ledger,
+        settings=test_settings,
+    )
+    # configs/models.yaml pins interviewer at 2048.
+    assert backend.received["max_output_tokens"] == 2048
+
+
+async def test_explicit_request_below_agent_pin_wins(
+    in_memory_trace_sink: InMemoryTraceSink,
+    in_memory_cost_ledger: InMemoryCostLedger,
+    test_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explicit request 1024 below the interviewer pin 2048 → backend receives 1024.
+
+    The agent pin only LOWERS the effective cap; callers may always ask
+    for less.
+    """
+    backend = _recording_backend()
+    _force_backend(monkeypatch, backend)
+
+    request = _interviewer_request(max_output_tokens=1024)
+    await call_model(
+        request,
+        sink=in_memory_trace_sink,
+        ledger=in_memory_cost_ledger,
+        settings=test_settings,
+    )
+    assert backend.received["max_output_tokens"] == 1024
 
 
 # ---------------------------------------------------------------------------
