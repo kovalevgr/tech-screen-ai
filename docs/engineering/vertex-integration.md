@@ -82,7 +82,7 @@ The adapter is the only place that:
 
 1. Authenticates to Vertex (via Application Default Credentials, resolved from the runtime service account).
 2. Enforces the timeout (a hard upper bound; no caller can pass > 30s — `le=30` on `ModelCallRequest.timeout_s`, constitution §12).
-3. Enforces `max_output_tokens` (caller may request lower, never higher).
+3. Enforces `max_output_tokens`: the effective cap sent to the backend is `min(request.max_output_tokens, configs/models.yaml per-agent pin)` — the caller may request lower, never higher, and the agent pin can only lower it further (constitution §16).
 4. Retries on transient errors (see "Retry policy" below).
 5. Computes per-call cost from token counts and model price table.
 6. Persists `turn_trace` before returning — even on failure (the row records the error).
@@ -98,15 +98,16 @@ The adapter does **not** own:
 
 ## Retry policy
 
-> **Note:** Reconciled per `specs/007-t04-vertex-client-wrapper/spec.md` Clarifications 2026-04-26 to a single uniform 3-attempt budget across every retryable error class. The earlier per-error-type table conflicted with the wrapper's actual `tenacity.AsyncRetrying` configuration.
+> **Note:** Reconciled per `specs/007-t04-vertex-client-wrapper/spec.md` Clarifications 2026-04-26 to a single uniform 3-attempt budget across every retryable error class. Reworked in 030 (`specs/030-schema-transport-real-vertex/`): the pinned `google-genai` 2.x raises `google.genai.errors.APIError` (`ClientError` 4xx / `ServerError` 5xx, classified by `.code` — 429 arrives as a *ClientError*) plus raw `httpx` transport exceptions; `google.api_core` is gone from the closure. `_real_backend.py` translates every SDK exception into the SDK-free `BackendError` hierarchy (`_backend_protocol.py`) so `vertex.py` never imports a provider SDK. The SDK's own opt-in retry layer stays OFF (`HttpOptions.retry_options` never set) — the wrapper owns the budget.
 
 The adapter applies a uniform **3-attempt total** budget (1 initial + 2 retries) with exponential backoff and jitter:
 
-| Error class                                                                                                                                                                          | Attempts | Notes                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------- |
-| `google.api_core.exceptions.ServiceUnavailable`<br>`google.api_core.exceptions.InternalServerError`<br>`google.api_core.exceptions.ResourceExhausted`<br>Connection errors (refused, reset, HTTP-layer timeouts) | 3        | Exponential backoff with jitter; total wall clock still bounded by the 30-s `asyncio.wait_for` cap (constitution §12). |
-| `google.api_core.exceptions.DeadlineExceeded`                                                                                                                                        | 1        | **No retry** — the timeout already fired; repeating it only burns the remaining 30-s budget.                          |
-| `google.api_core.exceptions.InvalidArgument`<br>`google.api_core.exceptions.PermissionDenied`                                                                                        | 1        | **No retry** — request is malformed or auth is broken; re-raised as `ModelCallConfigError`.                           |
+| Upstream condition                                                                                              | Backend classification          | Attempts | Notes                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| HTTP 429 (quota) · HTTP 5xx except 504 · connection-level `httpx.TransportError` (refused, reset, broken stream) | `BackendTransientError`         | 3        | Exponential backoff with jitter; total wall clock still bounded by the 30-s `asyncio.wait_for` cap (constitution §12).   |
+| HTTP 504 · `httpx.TimeoutException`                                                                              | `BackendDeadlineExceededError`  | 1        | **No retry** — the timeout already fired; repeating it only burns the remaining 30-s budget. Raised as `VertexTimeoutError`. |
+| HTTP 400 (invalid argument) · HTTP 403 (permission denied)                                                       | `BackendCallerError`            | 1        | **No retry** — request is malformed or auth is broken; re-raised as `ModelCallConfigError`.                             |
+| Any other `APIError` code (401, 404, 408, …)                                                                     | `BackendUpstreamError`          | 1        | **No retry** — surfaced as `VertexUpstreamUnavailableError` (pre-030 catch-all semantics preserved).                    |
 
 Schema validation failures are **never** retried by the adapter — the wrapper raises `VertexSchemaError` immediately with `raw_payload` attached. Per-agent retry / fallback / escalation policies live in the agent modules (Assessor, Planner, Interviewer in T18–T21) and are described under "JSON mode" below.
 
@@ -118,7 +119,7 @@ Total time across retries is still bounded by `timeout_s` on the call (default 3
 
 When `json_schema` is provided the adapter:
 
-1. Uses Vertex's native JSON output mode (`response_mime_type = "application/json"` + `response_schema`).
+1. Uses Vertex's native JSON output mode: `response_mime_type = "application/json"` + `response_json_schema` (google-genai ≥ 1.22; we pin 2.x). The committed `prompts/<agent>/<version>/schema.json` document is transported to the API **verbatim** — no client-side translation. The legacy `response_schema` field is forbidden: its `t_schema` translator rejects standard JSON-Schema keywords (`$schema`, `$id`, `additionalProperties`, `"type": [..., "null"]` unions, `const`) before any network I/O, which is exactly the 030 blocker. The offline regression `app/backend/tests/llm/test_prompt_schema_transport.py` pins the verbatim-transport behaviour for every committed and future prompt schema.
 2. Validates the result against the schema using `pydantic.TypeAdapter`.
 3. On validation failure, raises `VertexSchemaError` with the raw text attached for debugging — the adapter itself does not retry on schema failures.
 
@@ -133,7 +134,7 @@ Agent modules decide whether to retry on schema failure. Typically:
 ## Cost and latency caps
 
 - **Timeout:** 30 seconds per call (constitution §12). The adapter will not accept `timeout_s > 30` (`le=30` on `ModelCallRequest`).
-- **Max output tokens:** 4096 per call. The adapter will not accept a higher value.
+- **Max output tokens:** 4096 hard ceiling per call; the per-agent `max_output_tokens` pin in `configs/models.yaml` lowers the effective cap (`min(request, pin)`). The adapter will not accept a higher request value.
 - **Per-session cost ceiling:** $5 in production. The orchestrator checks session aggregate cost before every LLM call; above the ceiling, the session state transitions to `SESSION_HALTED_COST_CEILING`.
 - **Monthly budget alert:** $50, configured in GCP Billing. Alerts at 50%, 90%, 100%.
 
