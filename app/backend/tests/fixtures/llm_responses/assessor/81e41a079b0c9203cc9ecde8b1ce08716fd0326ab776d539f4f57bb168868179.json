@@ -1,0 +1,7 @@
+{
+  "text": "{\"turn_id\": \"fbb8f6ea-af93-522a-b96b-d93abf00ab47\", \"session_id\": \"23232323-2323-5323-8323-232323232323\", \"competency_focus\": \"db.transactions\", \"assessments\": [{\"rubric_node_id\": \"db.transactions\", \"level\": 2, \"confidence\": 0.45, \"rationale_en\": \"Gestures at durability, not isolation; no REPEATABLE READ content.\", \"evidence_spans\": [\"щоб дані не губились під час запису\"]}], \"red_flags\": [], \"needs_manual_review\": false, \"manual_review_reason_en\": null}",
+  "input_tokens": 900,
+  "output_tokens": 180,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}

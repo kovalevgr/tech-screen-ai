@@ -1,0 +1,7 @@
+{
+  "text": "{\"turn_id\": \"c7e1c050-1464-5684-b43e-5d5bb3194bd6\", \"session_id\": \"23232323-2323-5323-8323-232323232323\", \"competency_focus\": \"db.transactions\", \"assessments\": [{\"rubric_node_id\": \"db.transactions\", \"level\": 0, \"confidence\": 0.8, \"rationale_en\": \"Substantive failure after probing: admits not understanding isolation levels at all.\", \"evidence_spans\": [\"не розумію, що таке рівні ізоляції взагалі\"]}], \"red_flags\": [], \"needs_manual_review\": false, \"manual_review_reason_en\": null}",
+  "input_tokens": 900,
+  "output_tokens": 180,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}
