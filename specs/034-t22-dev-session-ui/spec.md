@@ -22,6 +22,19 @@ Internal `/dev/session` page so the team can drive a full mock interview end-to-
 2. Minimal styling with existing Tailwind primitives; no design-system components required; page carries a visible "DEV ONLY" banner.
 3. No candidate PII concerns: dev sessions use synthetic plans/answers typed by the team.
 
+### Implementation notes (frontend stream, recorded during implementation)
+
+Open details resolved to the simplest option consistent with the contract. No design decision was reopened.
+
+4. **Poll condition.** FR-034-4 names two live conditions (`awaiting == "interviewer"`, assessments pending). `SessionView` carries no pending-assessment field — the assessor runs as a background task and only shows up as coverage / cost movement — so the observable proxy for both is "phase is not terminal". `sessionPollInterval()` returns 4 s while the phase is non-terminal and `false` on `COMPLETED` / `ABORTED`; the traces query uses the same cadence while the panel is open.
+5. **Transport.** The hand-typed client mirrors `src/api/client.ts`: same `NEXT_PUBLIC_API_BASE_URL` base (relative when unset), `credentials: "include"` cookie plumbing (the frontend has no bearer-token layer today), `globalThis.fetch` resolved per call, failures thrown as the existing `ApiError` so status branching (404 / 409 / 422) matches the rest of the app. Contract paths are used verbatim, including their `/api` prefix.
+6. **Copy.** Page chrome is English — this is an internal debug console, not a candidate surface; the Ukrainian on screen is what the machine produced (transcript) or what the demo plan carries. The candidate-facing i18n files are untouched.
+7. **Styling.** Plain HTML elements plus token-backed Tailwind utilities; no `components/ui/*` primitive is imported, per the T22 design-gate exclusion. The page still satisfies the repo's visual-discipline hooks: no raw hex, no arbitrary bracket values, no `dark:`, no shadows, no decorative animation.
+8. **`utterance` vs transcript.** The thread renders `SessionView.transcript` as the single source of truth; the `utterance` field of the last `POST /turns` response is echoed verbatim under the composer, including its meaningful `null` ("the session ended on this turn"), rather than being dropped as redundant.
+9. **404 screen.** The contract returns 404 both for a disabled flag and for an unknown session, and the response cannot distinguish them, so the notice names both causes and points at `enable_live_orchestrator`.
+10. **Traces panel.** Collapsed by default means no request at all: the traces query is disabled until the panel is opened; afterwards it is invalidated on every posted turn and polled on the same cadence while the session is live. Each row shows `outcome` and `wrapper_outcome` as two separately labelled chips, since `outcome=ok` + `wrapper_outcome=rejected` is a real combination.
+11. **Plan input.** The textarea checks JSON syntax client-side only (obvious typo, no round trip); semantic validation stays with the machine and its 422 `PlanInvalid` is surfaced as-is.
+
 ## Success criteria
 
 - SC-1 jest green; eslint/tsc green; no design-gate checks demanded.
