@@ -1,0 +1,15 @@
+# LLM runtime limits — source of truth (constitution §16, configs as code).
+#
+# The per-session cost ceiling of constitution §12. Enforcement is
+# dark-launched (§9): the shell's pre-call guard only RAISES
+# `SessionBudgetExceeded` — and therefore only aborts the session with
+# `ABORTED(cost_ceiling)` — while the `enforce_session_cost_ceiling` feature
+# flag is on. With the flag off (the default) the guard logs a structured
+# warning and the session continues.
+#
+# Loaded and validated at load time by app/backend/llm/limits_config.py
+# (frozen pydantic, unknown keys rejected). Changing the ceiling is a config
+# PR — no code change, no migration. The value is read as a string and parsed
+# to Decimal: money is never a float in this codebase.
+
+session_cost_ceiling_usd: "5.00"

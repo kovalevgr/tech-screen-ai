@@ -113,6 +113,12 @@ class InterviewSession(UUIDPk, TimestampCreated, Base):
     Unlike the six append-only audit tables (§3), ``interview_session`` is
     mutable working state: the column is rewritten in place after every
     transition. The durable transition trail lives in ``turn_trace`` (T21).
+
+    T21 adds ``dev_transcript`` — the chronological chat log the dev-session
+    API renders (``docs/contracts/dev-session-api.yaml`` ``SessionView``). The
+    pure state machine owns no transcript (its ``SessionState`` forbids extra
+    keys), so the shell accumulates one from the commands it executes and
+    persists it here, beside ``session_state`` and under the same §3 carve-out.
     """
 
     __tablename__ = "interview_session"
@@ -128,6 +134,10 @@ class InterviewSession(UUIDPk, TimestampCreated, Base):
         server_default=text("'{}'::jsonb"),
     )
     session_state: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
+    dev_transcript: Mapped[list[dict[str, Any]] | None] = mapped_column(
         JSONB,
         nullable=True,
     )

@@ -39,3 +39,25 @@ flags:
     default_value: null
     description: "Gates the /position-templates CRUD API (T13). Off by default (§9 dark-launch); flip the DB row to expose the endpoints."
     state: active
+
+  # T21 — gates ENFORCEMENT of the per-session cost ceiling (constitution §12).
+  # Off by default: the pre-call guard logs a structured warning and the session
+  # continues. On: the guard raises SessionBudgetExceeded, the shell aborts the
+  # session with ABORTED(cost_ceiling) and appends a session_decision row.
+  - name: enforce_session_cost_ceiling
+    owner: "@andrii"
+    default: false
+    default_value: null
+    description: "Enforces the per-session USD ceiling from configs/llm-limits.yaml (T21, §12). Off by default (§9 dark-launch) — the guard warns instead of aborting."
+    state: active
+
+  # T22 — gates the dev-only session API over the T20 orchestrator. Off by
+  # default: /api/dev/sessions* answers 404-as-if-absent. This is the §9
+  # exposure point the orchestrator itself deliberately lacked (spec 032
+  # Clarification 5).
+  - name: enable_live_orchestrator
+    owner: "@andrii"
+    default: false
+    default_value: null
+    description: "Gates the dev-only session API over the live orchestrator (T22). Off by default (§9 dark-launch); routes return 404 until the DB row is flipped."
+    state: active

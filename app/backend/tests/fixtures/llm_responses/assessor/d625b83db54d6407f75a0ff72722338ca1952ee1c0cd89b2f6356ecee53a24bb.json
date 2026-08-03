@@ -1,0 +1,7 @@
+{
+  "text": "{\"turn_id\": \"73ed5978-baa3-5fbd-b245-38ca8217fbb2\", \"session_id\": \"33333333-3333-5333-8333-333333333333\", \"competency_focus\": \"py.async\", \"assessments\": [{\"rubric_node_id\": \"py.async\", \"level\": 1, \"confidence\": 0.7, \"rationale_en\": \"Surface-level answer without depth.\", \"evidence_spans\": [\"event loop\"]}], \"red_flags\": [], \"needs_manual_review\": false}",
+  "input_tokens": 400,
+  "output_tokens": 60,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}

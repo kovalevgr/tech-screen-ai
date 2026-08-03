@@ -24,7 +24,9 @@ Every model token that leaves a TechScreen process MUST traverse
   before every backend call.
 - Synchronous trace-record write before returning (constitution §1 —
   auditability is non-negotiable). Sink failure raises
-  :class:`TraceWriteError`.
+  :class:`TraceWriteError`. Since T21 the record carries the raw
+  ``response_text`` and the ``parsed`` object as well as the metadata, so
+  a durable sink can write the full audit row from the record alone.
 - One ``llm_call`` structlog event per terminal state, carrying only
   trace-id + non-PII metadata (constitution §15). Zero prompt text, zero
   output text, zero candidate identity.
@@ -246,7 +248,15 @@ def _build_trace_record(
     raw: RawBackendResult | None,
     cost_usd: Decimal,
     error_message: str | None,
+    parsed: dict[str, Any] | None = None,
 ) -> TraceRecord:
+    """Build the one trace record this invocation writes.
+
+    ``response_text`` is taken from the backend result whenever there is one —
+    so a schema miss records the payload that missed, not just the message
+    about it — and is ``None`` for every failure that never reached the model
+    (T21 seam extension, see :mod:`app.backend.llm.trace`).
+    """
     return TraceRecord(
         id=uuid4(),
         created_at=datetime.now(UTC),
@@ -262,6 +272,8 @@ def _build_trace_record(
         output_tokens=raw.output_tokens if raw is not None else 0,
         cost_usd=cost_usd,
         error_message=error_message,
+        response_text=raw.text if raw is not None else None,
+        parsed=parsed,
     )
 
 
@@ -519,6 +531,7 @@ async def call_model(
         raw=raw,
         cost_usd=cost_usd,
         error_message=None,
+        parsed=parsed,
     )
 
     # Step 9 — sync trace write BEFORE returning. Sink failure halts.

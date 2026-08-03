@@ -15,9 +15,20 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
+from typing import Any
 
-from sqlalchemy import TIMESTAMP, ForeignKey, Numeric, SmallInteger, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import (
+    TIMESTAMP,
+    ForeignKey,
+    Integer,
+    Numeric,
+    SmallInteger,
+    Text,
+    func,
+    text,
+)
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.backend.db.base import Base
@@ -25,13 +36,21 @@ from app.backend.db.models._mixins import TimestampCreated, UUIDPk
 
 
 class TurnTrace(UUIDPk, TimestampCreated, Base):
-    """One row per LLM call.
+    """One row per LLM call — the durable audit trail (T21).
 
-    DEFERRED to T21: the rich columns reserved by T04's ``TraceRecord`` shape
-    (``agent``, ``model``, ``model_version``, ``outcome``, ``attempts``,
-    ``latency_ms``, ``cost_usd NUMERIC``, ``prompt_sha``) are intentionally NOT
-    added here. T05 creates the table + the §3 guard; T21 adds those columns via
-    a forward-only migration (constitution §10). This comment is T21's anchor.
+    Shape is the committed contract ``docs/contracts/turn-trace.schema.json``:
+    T04's ``TraceRecord`` fields, the full payloads, and the orchestrator
+    context. T05 created the table + the §3 guard; ``0007`` added the columns
+    below via a forward-only migration (constitution §10).
+
+    The non-nullable text columns carry a transitional ``''`` server default so
+    the pre-T21 placeholder rows stayed valid through the additive migration;
+    :class:`app.backend.llm.persistent_trace.PostgresTraceSink` always writes
+    them explicitly.
+
+    ``user_payload`` DOES carry candidate answers — this table is the §1 audit
+    trail. Access is role-gated at the API layer, and constitution §15 keeps the
+    payload out of logs, metrics and exports.
     """
 
     __tablename__ = "turn_trace"
@@ -41,6 +60,33 @@ class TurnTrace(UUIDPk, TimestampCreated, Base):
         ForeignKey("interview_session.id"),
         nullable=True,
     )
+
+    # --- orchestrator context (NULL for non-session calls) ------------------
+    turn_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    transition: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+    # --- T04 TraceRecord mirror ---------------------------------------------
+    agent: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    prompt_version: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    model: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    model_version: Mapped[str | None] = mapped_column(Text, nullable=True)
+    outcome: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    wrapper_outcome: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempts: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="1")
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    cost_usd: Mapped[Decimal] = mapped_column(
+        Numeric(12, 6), nullable=False, server_default=text("0")
+    )
+    prompt_sha: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # --- full payloads -------------------------------------------------------
+    system_prompt: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    user_payload: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    response_text: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    parsed: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
 
 class Assessment(UUIDPk, TimestampCreated, Base):
@@ -128,7 +174,15 @@ class AuditLog(UUIDPk, Base):
 
 
 class SessionDecision(UUIDPk, TimestampCreated, Base):
-    """The final hiring decision artefact (enum/justification deferred to T37)."""
+    """The final hiring decision artefact (enum/justification deferred to T37).
+
+    T21 widened this table for SYSTEM decisions: the orchestrator's
+    ``RecordDecision`` commands (``plan_invalid``, ``agent_failure``,
+    ``timeout``, ``operator``, ``completed``) and the cost-ceiling breach
+    (``cost_ceiling``) have no human actor, so ``decided_by`` became nullable
+    and ``reason`` records which decision was taken. Still append-only (§3):
+    a superseding decision is a new row.
+    """
 
     __tablename__ = "session_decision"
 
@@ -137,8 +191,9 @@ class SessionDecision(UUIDPk, TimestampCreated, Base):
         ForeignKey("interview_session.id"),
         nullable=False,
     )
-    decided_by: Mapped[uuid.UUID] = mapped_column(
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("user.id"),
-        nullable=False,
+        nullable=True,
     )
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)

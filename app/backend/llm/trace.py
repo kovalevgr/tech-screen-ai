@@ -10,13 +10,20 @@ constitution forbids.
 T04 ships the in-memory implementation only. T05 will add the durable
 Postgres-backed implementation; both implement :class:`TraceSink`
 structurally and require no caller-side change.
+
+T21 amendment (contract owner, 2026-08-03): :class:`TraceRecord` gained
+``response_text`` and ``parsed``. A sink is handed a record and nothing else,
+so the durable row shape in ``docs/contracts/turn-trace.schema.json`` — which
+wants the model's answer, not just metadata about it — can only be satisfied
+from here. Both fields default to ``None``, so every pre-T21 caller and test is
+unaffected.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -84,6 +91,27 @@ class TraceRecord(BaseModel):
     """``Decimal("0")`` on ``outcome in {"config_error", "budget_exceeded"}``."""
     error_message: str | None = None
     """Short PII-free summary on failure; ``None`` on ``outcome == "ok"``."""
+
+    response_text: str | None = None
+    """Raw model text exactly as the backend returned it, before parsing.
+
+    Added by T21 (contract owner adjudication 2026-08-03) so the durable sink
+    can satisfy the ``response_text`` column of
+    ``docs/contracts/turn-trace.schema.json``: a sink is handed a
+    :class:`TraceRecord` and nothing else, so anything the audit row needs has
+    to travel here. ``None`` when the call failed before any backend response.
+
+    **PII (§15).** This field and :attr:`parsed` are the only two on this model
+    that can carry candidate-derived content. They belong in the audit trail
+    (§1) and NOWHERE else: never log a whole ``TraceRecord``, never export one.
+    :func:`app.backend.llm.vertex._emit_log` names its fields explicitly for
+    exactly this reason.
+    """
+
+    parsed: dict[str, Any] | None = None
+    """Schema-validated parsed output when ``outcome == "ok"`` and the request
+    carried a ``json_schema``; ``None`` otherwise. See :attr:`response_text`
+    for the §15 note."""
 
 
 class TraceSink(Protocol):

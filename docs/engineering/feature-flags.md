@@ -56,6 +56,11 @@ consistent on every commit.
 | name | owner | default | description |
 | ---- | ----- | ------- | ----------- |
 | position_template_crud_enabled | @andrii | false | Gates the `/position-templates` CRUD API (T13). Off by default (§9 dark-launch); flip the DB row to expose the endpoints. |
+| enforce_session_cost_ceiling | @andrii | false | Enforces the per-session USD ceiling from `configs/llm-limits.yaml` (T21, §12). Off by default (§9 dark-launch) — the guard warns instead of aborting. |
+| enable_live_orchestrator | @andrii | false | Gates the dev-only session API over the live orchestrator (T22). Off by default (§9 dark-launch); routes return 404 until the DB row is flipped. |
+
+> **`enforce_session_cost_ceiling` — what "off" actually means.** `call_model` has carried an unconditional per-session budget backstop since T04 (`settings.llm_budget_per_session_usd`, default `5.00`), and it fires at the same threshold as this flag's shell-level ceiling. Flag OFF therefore means "status-quo T04 backstop degradation past $5" — the session's next model call raises `SessionBudgetExceeded` from inside the wrapper and the turn degrades — not unlimited continuation; flag ON aborts the session cleanly with `ABORTED(cost_ceiling)` and a `session_decision` row BEFORE the backstop is reached.
+> Separating the two thresholds (backstop = 2× the `configs/llm-limits.yaml` ceiling) and removing the settings-vs-configs duplication of `5.00` are deferred to pilot prep (T49); see `specs/033-t21-durable-trace-shell/spec.md` note 21.
 
 ## Sunset flags
 

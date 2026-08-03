@@ -8,6 +8,7 @@ task builds on.
 from __future__ import annotations
 
 import subprocess
+import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Generator
 from contextlib import asynccontextmanager
 from decimal import Decimal
@@ -17,11 +18,11 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import structlog
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from structlog.typing import EventDict, WrappedLogger
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
-    from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
     from app.backend.llm._mock_backend import MockVertexBackend
     from app.backend.llm.cost_ledger import InMemoryCostLedger
@@ -43,6 +44,25 @@ def client() -> TestClient:
     from app.backend.main import app
 
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _reconfigurable_structlog() -> None:
+    """Keep structlog's lazy proxies re-configurable for the whole suite.
+
+    ``configure_logging`` sets ``cache_logger_on_first_use=True`` — right in
+    production, poisonous in a test suite. The first log call through a
+    module-level ``structlog.get_logger()`` proxy freezes that proxy against
+    the processor chain in force at that moment, so a LATER test's
+    ``capture_logs()`` (or :func:`captured_logs`) sees nothing from that
+    module. Which test logs first then decides whether an unrelated log
+    assertion passes.
+
+    Disabling the cache costs a dict lookup per log call and makes every log
+    assertion independent of collection order. Autouse and first, so no proxy
+    is ever frozen.
+    """
+    structlog.configure(cache_logger_on_first_use=False)
 
 
 @pytest.fixture
@@ -263,6 +283,52 @@ async def db_conn(db_engine: AsyncEngine) -> AsyncGenerator[AsyncConnection, Non
     """
     async with db_engine.connect() as conn:
         yield conn
+
+
+async def session_ids(engine: AsyncEngine) -> set[uuid.UUID]:
+    """Every ``interview_session`` id currently in the database."""
+    async with engine.connect() as conn:
+        rows = (await conn.execute(text("SELECT id FROM interview_session"))).scalars()
+        return set(rows)
+
+
+async def purge_session(engine: AsyncEngine, session_id: uuid.UUID) -> None:
+    """Delete one session and its audit rows.
+
+    The audit deletes run as ``techscreen_migrator`` — the role the §3 trigger
+    exempts, and the only sanctioned way to remove an append-only row. Tests
+    that write real trace rows (the durable sink commits on its own connection
+    by design) use this so the database is left exactly as they found it.
+    """
+    async with engine.begin() as conn:
+        await conn.execute(text('SET ROLE "techscreen_migrator"'))
+        for table in ("turn_trace", "session_decision"):
+            await conn.execute(
+                text(f"DELETE FROM {table} WHERE interview_session_id = :s"), {"s": session_id}
+            )
+        await conn.execute(text("RESET ROLE"))
+        await conn.execute(text("DELETE FROM interview_session WHERE id = :s"), {"s": session_id})
+
+
+async def purge_sessions_created_after(engine: AsyncEngine, before: set[uuid.UUID]) -> None:
+    """Drop every session that appeared since ``before`` was taken.
+
+    Snapshot-diff rather than id tracking: a request that failed after creating
+    its session (an invalid plan answers 422 with no id in the body) still has
+    to be cleaned up.
+    """
+    for session_id in await session_ids(engine) - before:
+        await purge_session(engine, session_id)
+
+
+@pytest.fixture
+async def clean_sessions(db_engine: AsyncEngine) -> AsyncIterator[None]:
+    """Leave ``interview_session`` and its audit rows as the test found them."""
+    before = await session_ids(db_engine)
+    try:
+        yield
+    finally:
+        await purge_sessions_created_after(db_engine, before)
 
 
 @asynccontextmanager
