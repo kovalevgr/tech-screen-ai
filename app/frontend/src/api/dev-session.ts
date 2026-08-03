@@ -367,7 +367,14 @@ export function usePostDevTurn(sessionId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (text: string) => postDevTurn(sessionId as string, text),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
+      // A poll GET issued before this turn can still be in flight; letting it
+      // land after the write would briefly revert the view to the pre-turn
+      // state. Cancel it first, then adopt the post-transition view the
+      // machine just returned.
+      await queryClient.cancelQueries({
+        queryKey: devSessionKeys.detail(result.session.session_id),
+      });
       queryClient.setQueryData(
         devSessionKeys.detail(result.session.session_id),
         result.session

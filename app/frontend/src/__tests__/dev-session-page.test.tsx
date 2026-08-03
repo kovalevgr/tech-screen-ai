@@ -153,6 +153,32 @@ describe("DevSessionPage — turn gating (awaiting)", () => {
     );
   });
 
+  it("disables the input when a live session awaits nobody", async () => {
+    const user = userEvent.setup();
+    // Non-terminal phase with `awaiting: null` — the machine is mid-transition
+    // and owes nothing to either side yet.
+    server.use(
+      ...devSessionHandlers({
+        initial: sessionViewFixture({ phase: "TECH", awaiting: null }),
+      })
+    );
+    renderWithClient(<DevSessionPage />);
+
+    await createSession(user);
+
+    expect(screen.getByTestId("header-awaiting")).toHaveTextContent("null");
+    expect(screen.getByLabelText("Candidate turn")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send turn" })).toBeDisabled();
+    expect(screen.getByTestId("turn-hint")).toHaveTextContent(
+      "Not awaiting a candidate turn."
+    );
+    // Still live, so the poll keeps running.
+    expect(screen.getByTestId("poll-status")).toHaveTextContent(
+      "Polling every 4s."
+    );
+    expect(screen.queryByTestId("terminal-banner")).not.toBeInTheDocument();
+  });
+
   it("posts the typed turn and renders the machine's answer", async () => {
     const user = userEvent.setup();
     let posted = "";
