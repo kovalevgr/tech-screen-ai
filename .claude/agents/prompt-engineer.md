@@ -1,7 +1,7 @@
 ---
 name: prompt-engineer
 description: Agent system prompts (Interviewer, Assessor, Planner), Ukrainian anchors, rubric YAML, calibration datasets and runs. Invoke for any change under prompts/**, configs/rubric/**, or calibration/**.
-model: sonnet
+model: opus
 tools:
   - Read
   - Write

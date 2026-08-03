@@ -95,12 +95,13 @@ Full workflow and maturity phases are documented in [`docs/engineering/multi-age
 
 **Default behaviour at MVP:** sequential single-agent. Sub-agent fan-out happens only when either the user explicitly requests it in the prompt, or the orchestrator proposes it in `/plan` and the user approves. Automatic parallelisation is disabled.
 
-### Sub-agent model policy (owner decision, 2026-08-03)
+### Sub-agent model policy (owner decision, 2026-08-03, rev. 2)
 
-- The main loop (orchestration, design decisions, briefs, synthesis) and the `reviewer` gate run on the session model — the owner runs a top-tier model as the "brain".
-- Implementation sub-agents (`backend-engineer`, `frontend-engineer`, `infra-engineer`, `prompt-engineer`) are pinned to `model: sonnet` in their frontmatter. Do not override upward without the owner's explicit ask.
-- Ad-hoc spawns of built-in agent types (general-purpose, Explore, Plan) and Workflow `agent()` calls for implementation-shaped work must pass an explicit `model: "sonnet"` — never let them silently inherit the session model.
-- Substantive implementation is delegated to sub-agents rather than done inline in the main loop; inline work is for orchestration, research, and glue.
+- The main loop (the "brain" — the owner runs a top-tier session model) owns ALL thinking artifacts: architecture and design decisions, `docs/contracts/*`, and the Spec Kit artifacts (`spec.md`, `plan.md`, `tasks.md`). Sub-agents receive finished designs and implement them faithfully; open details go to spec Clarifications, never into redesign.
+- Implementation sub-agents (`backend-engineer`, `frontend-engineer`, `infra-engineer`, `prompt-engineer`) are pinned to `model: opus` in their frontmatter. Do not raise to the session model without the owner's explicit ask.
+- Mechanical work (running tests/gates, trivial fixes, doc-only touch-ups) goes to `sonnet` (or `haiku` for pure trivia) via an explicit per-launch model.
+- The `reviewer` gate runs on the session model.
+- Ad-hoc spawns of built-in agent types (general-purpose, Explore, Plan) and Workflow `agent()` calls must pass an explicit model per this policy — never let them silently inherit the session model.
 
 ---
 
@@ -174,6 +175,6 @@ When in doubt, surface the question rather than assume. A five-minute clarificat
 
 ## Document versioning
 
-- **This file:** v1.2 — 2026-08-03. (v1.1: Spec Kit section rewritten — skills, not slash commands; auto_commit-off note added. v1.2: sub-agent model policy added.)
+- **This file:** v1.3 — 2026-08-03. (v1.1: Spec Kit section rewritten — skills, not slash commands; auto_commit-off note added. v1.2: sub-agent model policy added. v1.3: policy rev. 2 — spec kit authored by the main loop, implementation on opus.)
 - Update this file when: a new invariant is added, a new sub-agent or skill is introduced, the repository layout materially changes, or a new core workflow is adopted.
 - Keep it under ~250 lines. If it grows beyond that, move details into linked docs.
