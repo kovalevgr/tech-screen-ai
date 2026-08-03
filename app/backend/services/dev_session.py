@@ -271,7 +271,12 @@ class TraceRow(BaseModel):
 
     id: UUID
     created_at: datetime
-    interview_session_id: UUID | None
+    interview_session_id: UUID
+    """Non-optional here even though the column is nullable: the column admits
+    non-session calls (calibration, smoke scripts), but :meth:`list_traces`
+    filters by session id, so every row this model ever carries has one — and
+    the row contract lists the field as required."""
+
     turn_id: UUID | None
     agent: str
     prompt_version: str

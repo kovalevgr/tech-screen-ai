@@ -24,10 +24,18 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.backend.agents.assessor import AssessorOutputInvalid
 from app.backend.agents.interviewer import InterviewerOutput, InterviewerTurnInputs
+from app.backend.llm.errors import VertexTimeoutError
 from app.backend.llm.persistent_trace import PostgresTraceSink
 from app.backend.llm.trace import TraceRecord
-from app.backend.orchestrator.config import load_orchestrator_config
+from app.backend.orchestrator.config import OrchestratorConfig, load_orchestrator_config
+from app.backend.orchestrator.state_machine import (
+    AssessmentFailed,
+    Event,
+    SessionState,
+    transition,
+)
 from app.backend.services import dev_session as shell
 from app.backend.services.dev_session import (
     DevSessionNotAwaitingCandidate,
@@ -196,6 +204,15 @@ async def test_the_happy_path_reaches_completed_with_every_turn_traced(
     # Every ok row is a complete audit artefact: prompt in, answer out.
     assert all(row.system_prompt and row.user_payload for row in traces.traces)
     assert all(row.response_text and row.parsed is not None for row in traces.traces)
+    # ...and every row carries the orchestrator context, assessor rows included
+    # (their call is scheduled by the same transition that issued the move).
+    assert all(row.turn_id is not None for row in traces.traces)
+    assert all(row.transition is not None for row in traces.traces)
+    assert {row.prompt_version for row in traces.traces if row.agent == "assessor"} == {"v0003"}
+    assert {row.transition["phase"] for row in traces.traces if row.transition is not None} <= {
+        "tech",
+        "qa",
+    }
     utterances = [
         row.parsed["utterance"]
         for row in traces.traces
@@ -265,6 +282,67 @@ async def test_the_assessor_runs_in_the_background_and_updates_coverage(
     after = await e2e.service.get_session(_E2E_SESSION_ID)
     assert after.coverage["py.async"]["best_level"] == 1
     assert after.coverage["py.async"]["best_confidence"] == 0.7
+
+
+@pytest.mark.parametrize(
+    ("raised", "expected_kind"),
+    [
+        (AssessorOutputInvalid("contract missed twice"), "assessor_output_invalid"),
+        (VertexTimeoutError("upstream took too long"), "VertexTimeoutError"),
+    ],
+    ids=["contract_miss", "wrapper_error"],
+)
+async def test_an_assessor_failure_becomes_assessment_failed_without_aborting(
+    e2e: _Harness,
+    monkeypatch: pytest.MonkeyPatch,
+    raised: Exception,
+    expected_kind: str,
+) -> None:
+    """§6.3: a failed assessment is reviewer work, never a session-ending event.
+
+    Both branches of the shell's exception handling are driven — the agent's own
+    typed contract miss and any other WrapperError — and both must land as
+    ``AssessmentFailed`` with the cell marked, the session still live, and the
+    interviewer's turn already delivered (§6.1: the move never waited).
+    """
+
+    async def _failing(*args: Any, **kwargs: Any) -> Any:
+        raise raised
+
+    seen: list[Event] = []
+    real_transition = transition
+
+    def _spy(state: SessionState, event: Event, config: OrchestratorConfig) -> Any:
+        seen.append(event)
+        return real_transition(state, event, config)
+
+    await e2e.service.create_session(PLAN, session_id=_E2E_SESSION_ID)
+    await e2e.scheduler.drain()
+    await e2e.turn(_E2E_SESSION_ID, TURNS[0])
+
+    monkeypatch.setattr(shell, "run_assessor_turn", _failing)
+    monkeypatch.setattr(shell, "transition", _spy)
+    result = await e2e.turn(_E2E_SESSION_ID, TURNS[1])
+
+    failures = [event for event in seen if isinstance(event, AssessmentFailed)]
+    assert len(failures) == 1
+    assert failures[0].error_kind == expected_kind
+    assert failures[0].for_turn_id == uuid.uuid5(_E2E_SESSION_ID, "candidate-turn/1")
+    assert result.utterance is not None
+    after = await e2e.service.get_session(_E2E_SESSION_ID)
+    assert after.phase == "TECH"
+    assert after.abort_reason is None
+    assert after.coverage["py.async"]["assessment_failed"] is True
+    assert after.coverage["py.async"]["best_level"] is None
+
+    async with e2e.engine.connect() as conn:
+        decisions = (
+            await conn.execute(
+                text("SELECT count(*) FROM session_decision WHERE interview_session_id = :s"),
+                {"s": _E2E_SESSION_ID},
+            )
+        ).scalar_one()
+    assert decisions == 0
 
 
 # ---------------------------------------------------------------------------

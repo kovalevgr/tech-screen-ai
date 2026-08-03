@@ -21,9 +21,11 @@ Two tightly-coupled backend deliverables: (1) T21 — every LLM call leaves a du
 ## Clarifications (decided — do not reopen)
 
 1. Cost total derives from `turn_trace` (single source, no drift); in-process memo allowed as cache only.
-2. `wrapper_outcome` closes the "trace says ok but wrapper rejected" seam recorded in specs 031/032 — the agent wrappers currently can't report it themselves; the SHELL records `rejected/contract_miss_retried` from the typed exceptions it catches. Direct wrapper self-reporting is a possible later refinement, out of scope.
+2. `wrapper_outcome` closes the "trace says ok but wrapper rejected" seam recorded in specs 031/032 — the agent wrappers currently can't report it themselves; the SHELL records `rejected/contract_miss_retried` from the typed exceptions it catches. Direct wrapper self-reporting is a possible later refinement, out of scope. — **Amended by implementation note 5 (owner adjudication 2026-08-03): the shell does NOT record wrapper verdicts.** The sink writes inside `call_model`, before the wrapper has judged the output, and §3 forbids back-filling; `wrapper_outcome` is nullable-by-design, and the definitive verdict is derived downstream from coverage markers and the `session_decision` stream.
 3. Scripted opening/closing are delivered by the shell (transcript `role=system` entries from the repo prompt files), not via LLM calls.
 4. Dev-only transcript lives inside `session_state` (the machine already accumulates what the UI needs via commands' payloads — extend the SHELL-side view assembly, not the machine). The state machine module is NOT modified in this branch; if a genuine gap blocks the shell, STOP and report — do not patch the core.
+
+*(Numbering continues unbroken through the two subsections below — the 032 convention.)*
 
 ### Implementation notes (recorded during build, not design changes)
 
@@ -51,6 +53,14 @@ Added by `backend-engineer` while executing plan.md phases 2–5. Each is the si
 19. **Routes live under `/api/dev/...`** exactly as the contract writes them, even though the pre-existing routers (`/rubric`, `/position-templates`) carry no `/api` prefix. The contract wins; the generated `openapi.yaml` matches it path-for-path and operation-for-operation, and a contract test keeps it that way.
 20. **Migration name** follows the repo ordinal convention: `alembic/versions/0007_turn_trace_audit_columns.py` (revision id `0007_turn_trace_audit_columns`).
 
+### Fix-round notes (reviewer gate — PASS-WITH-FINDINGS, no blockers)
+
+21. **Double-ceiling interplay (reviewer finding 1, owner-adjudicated 2026-08-03 — DOCUMENT-AS-DESIGNED, no code change).** `call_model`'s pre-existing unconditional budget backstop (`settings.llm_budget_per_session_usd`, default 5.00) fires at the same threshold as the flag-gated shell ceiling. Flag OFF therefore means "status-quo T04 backstop degradation past $5", not unlimited continuation — an honest §9 dark launch (off = old behavior). Flag ON aborts cleanly BEFORE the backstop. Threshold separation (backstop = 2× configs ceiling) and the settings-vs-configs 5.00 duplication are deferred to pilot prep (T49 line item).
+22. **`ck_turn_trace_outcome` no longer admits `trace_write_error` (finding 2).** `TraceOutcome` declares it, but it names the state where the sink ITSELF failed — no code path can ever INSERT a row carrying it, and the row contract's enum is the correct six plus `''` for the pre-T21 transitional default. Edited in place; the migration is unmerged.
+23. **`TraceRow.interview_session_id` is non-optional (nit 4).** The column is nullable for non-session calls, but `list_traces` filters by session id, so every row the API returns has one — and the row contract lists the field as required.
+24. **Assessor failure translation is covered (nit 5).** `test_an_assessor_contract_miss_becomes_assessment_failed` and `test_an_assessor_wrapper_error_becomes_assessment_failed` drive both branches of `_run_assessor`'s exception handling and assert the §6.3 outcome: the coverage cell is marked `assessment_failed`, and the session stays live in TECH — a scoring gap is reviewer work, never an abort. The happy path additionally asserts that ASSESSOR rows carry the `transition` context and their own pinned `prompt_version`, not just interviewer rows.
+25. **Migration filename left as `0007_turn_trace_audit_columns.py`** (nit 6) — owner decision: mixed precedent in the tree, pure churn on an unmerged file.
+
 ## Success criteria
 
 - SC-1 Trace row written for every call through the shell (incl. failed calls with non-ok outcomes); UPDATE/DELETE still blocked at DB level.
@@ -59,3 +69,10 @@ Added by `backend-engineer` while executing plan.md phases 2–5. Each is the si
 - SC-4 Gates green (both DB modes); migration cycle live-verified; openapi regen equality.
 - SC-5 No changes to `app/backend/orchestrator/state_machine.py`, `app/backend/agents/**`, `app/backend/llm/**` (sink/ledger are new modules implementing existing protocols), `prompts/**`.
   - **Amended 2026-08-03 (contract owner):** the `llm/**` clause is relaxed for exactly two files, `llm/trace.py` and `llm/vertex.py`, and only for the additive seam extension in note 5 (two optional fields on `TraceRecord`; `call_model` populating them at its existing write site). Everything else in `llm/**`, and all of `orchestrator/**`, `agents/**` and `prompts/**`, is untouched.
+
+## Handoff notes
+
+- **Pilot prep (T49):** separate the two cost ceilings — make `call_model`'s unconditional backstop 2× the `configs/llm-limits.yaml` value so the flag-gated shell ceiling is the one that fires first, and remove the settings-vs-configs duplication of `5.00` (note 21).
+- **A future task owning `app/backend/agents/**`:** promote `interviewer._load_system_prompt` / `_serialize_user_payload` to public names (the Assessor's equivalents already are), so the shell's audit-payload capture stops reaching for module-private helpers (note 18). Not done here — this branch is not allowed to touch `agents/**`.
+- **T23** inherits the SC-3 happy path and its committed mock fixtures as the seed of the e2e mock session.
+- **T34/T39** own the reviewer-facing surface over `turn_trace`; `user_payload` carries candidate answers, so that surface is role-gated by construction (§15).

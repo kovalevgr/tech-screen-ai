@@ -87,8 +87,13 @@ _TURN_TRACE_COLUMNS: tuple[tuple[str, str], ...] = (
 _TURN_TRACE_CONSTRAINTS: tuple[tuple[str, str], ...] = (
     (
         "ck_turn_trace_outcome",
+        # The row contract's six outcomes plus '' for the pre-T21 rows carrying
+        # the transitional default. `TraceOutcome` also declares
+        # `trace_write_error`, which is deliberately NOT admitted here: it names
+        # the state where the sink itself failed, so no code path can ever
+        # INSERT a row carrying it.
         "outcome IN ('', 'ok', 'schema_error', 'timeout', 'upstream_unavailable', "
-        "'budget_exceeded', 'config_error', 'trace_write_error')",
+        "'budget_exceeded', 'config_error')",
     ),
     (
         "ck_turn_trace_wrapper_outcome",

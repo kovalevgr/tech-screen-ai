@@ -473,11 +473,9 @@ components:
           title: Input Tokens
           type: integer
         interview_session_id:
-          anyOf:
-          - format: uuid
-            type: string
-          - type: 'null'
+          format: uuid
           title: Interview Session Id
+          type: string
         latency_ms:
           title: Latency Ms
           type: integer
