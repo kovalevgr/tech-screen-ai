@@ -40,6 +40,11 @@ pytestmark = pytest.mark.asyncio
 _CEILING = Decimal("5.00")
 
 
+@pytest.fixture(autouse=True)
+def _cleanup(clean_sessions: None) -> None:
+    """Every test in this module leaves the database as it found it."""
+
+
 async def _new_session(engine: AsyncEngine) -> uuid.UUID:
     async with engine.begin() as conn:
         result = await conn.execute(

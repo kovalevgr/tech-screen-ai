@@ -1,0 +1,7 @@
+{
+  "text": "{\"utterance\": \"Розкажіть, будь ласка, що таке event loop у Python.\", \"internal_move_executed\": \"ask_seed\"}",
+  "input_tokens": 400,
+  "output_tokens": 60,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}

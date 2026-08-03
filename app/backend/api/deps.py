@@ -133,6 +133,35 @@ async def get_current_user(
     return Principal(user_id=None, role=identity.role, sub=identity.sub, email=identity.email)
 
 
+async def get_optional_current_user(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)],
+) -> Principal | None:
+    """Resolve the staff identity, or ``None`` when auth is switched off.
+
+    The §9 ``AUTH_MODE`` seam observed from the other side:
+    :func:`get_current_user` answers 401 to everything while no verifier is
+    installed, which is right for the recruiter/reviewer surfaces but would
+    make a dev-only surface unusable in the default local configuration. This
+    variant reports "no identity available" instead, leaving the caller to
+    decide — the dev-session router role-gates only when the verifier exists.
+
+    Args:
+        request: The incoming request (populated with ``state.user`` on success).
+        credentials: The parsed ``Authorization: Bearer`` header, if any.
+
+    Returns:
+        The verified :class:`Principal`, or ``None`` under ``AUTH_MODE=disabled``.
+
+    Raises:
+        HTTPException: 401/403 exactly as :func:`get_current_user`, but only
+            when a verifier IS installed.
+    """
+    if get_verifier() is None:
+        return None
+    return await get_current_user(request, credentials)
+
+
 def require_roles(*roles: str) -> Callable[[Principal], Awaitable[Principal]]:
     """Build a dependency that admits only ``roles`` (else 403)."""
     allowed = frozenset(roles)

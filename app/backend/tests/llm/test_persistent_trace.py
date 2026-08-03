@@ -6,8 +6,8 @@ constraints exist only in the migration).
 
 Rows written here are deliberately NOT rolled back — the sink commits on its
 own connection precisely so an audit row survives a rolled-back request, and
-proving that is half the point of the suite. Every test uses its own session
-id, and the test database is a throwaway.
+proving that is half the point of the suite. The ``clean_sessions`` fixture
+removes them afterwards through the §3-exempt migrator role instead.
 """
 
 from __future__ import annotations
@@ -41,6 +41,11 @@ from app.backend.settings import Settings
 pytestmark = pytest.mark.asyncio
 
 _SHA = "a" * 64
+
+
+@pytest.fixture(autouse=True)
+def _cleanup(clean_sessions: None) -> None:
+    """Every test in this module leaves the database as it found it."""
 
 
 async def _new_session(engine: AsyncEngine) -> uuid.UUID:

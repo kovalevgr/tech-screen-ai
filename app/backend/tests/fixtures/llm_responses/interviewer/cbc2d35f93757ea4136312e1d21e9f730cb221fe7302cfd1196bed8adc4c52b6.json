@@ -1,0 +1,7 @@
+{
+  "text": "{\"utterance\": \"Уточніть, будь ласка, як саме await повертає контроль.\", \"internal_move_executed\": \"depth_probe\"}",
+  "input_tokens": 400,
+  "output_tokens": 60,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}

@@ -16,6 +16,18 @@ components:
       - must_have
       title: CompetencySelection
       type: object
+    CreateSessionRequest:
+      additionalProperties: false
+      description: '``devCreateSession`` body — an inline plan, nothing else.'
+      properties:
+        plan:
+          additionalProperties: true
+          title: Plan
+          type: object
+      required:
+      - plan
+      title: CreateSessionRequest
+      type: object
     HTTPValidationError:
       properties:
         detail:
@@ -214,6 +226,19 @@ components:
           title: Title
       title: PositionTemplateUpdate
       type: object
+    PostTurnRequest:
+      additionalProperties: false
+      description: '``devPostTurn`` body — the candidate''s answer.'
+      properties:
+        text:
+          maxLength: 8000
+          minLength: 1
+          title: Text
+          type: string
+      required:
+      - text
+      title: PostTurnRequest
+      type: object
     RubricSnapshot:
       additionalProperties: false
       description: The whole frozen tree for one rubric version.
@@ -235,6 +260,68 @@ components:
       - label
       - stacks
       title: RubricSnapshot
+      type: object
+    SessionView:
+      additionalProperties: false
+      description: '``SessionView`` from the dev-session contract.'
+      properties:
+        abort_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Abort Reason
+        awaiting:
+          anyOf:
+          - enum:
+            - interviewer
+            - candidate
+            type: string
+          - type: 'null'
+          title: Awaiting
+        competency_index:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Competency Index
+        cost_usd_total:
+          title: Cost Usd Total
+          type: string
+        coverage:
+          additionalProperties: true
+          title: Coverage
+          type: object
+        flagged_for_review:
+          title: Flagged For Review
+          type: boolean
+        phase:
+          enum:
+          - INTRO
+          - TECH
+          - QA
+          - CLOSE
+          - COMPLETED
+          - ABORTED
+          title: Phase
+          type: string
+        session_id:
+          format: uuid
+          title: Session Id
+          type: string
+        transcript:
+          items:
+            $ref: '#/components/schemas/TranscriptEntry'
+          title: Transcript
+          type: array
+      required:
+      - session_id
+      - phase
+      - awaiting
+      - competency_index
+      - coverage
+      - flagged_for_review
+      - cost_usd_total
+      - transcript
+      title: SessionView
       type: object
     SnapshotCompetency:
       additionalProperties: false
@@ -343,6 +430,175 @@ components:
       - name
       title: SnapshotTopic
       type: object
+    TraceList:
+      additionalProperties: false
+      description: '``devListTraces``''s 200 body.'
+      properties:
+        traces:
+          items:
+            $ref: '#/components/schemas/TraceRow'
+          title: Traces
+          type: array
+      required:
+      - traces
+      title: TraceList
+      type: object
+    TraceRow:
+      additionalProperties: false
+      description: One ``turn_trace`` row, shaped by ``docs/contracts/turn-trace.schema.json``.
+      properties:
+        agent:
+          title: Agent
+          type: string
+        attempts:
+          title: Attempts
+          type: integer
+        cost_usd:
+          title: Cost Usd
+          type: string
+        created_at:
+          format: date-time
+          title: Created At
+          type: string
+        error_message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error Message
+        id:
+          format: uuid
+          title: Id
+          type: string
+        input_tokens:
+          title: Input Tokens
+          type: integer
+        interview_session_id:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+          title: Interview Session Id
+        latency_ms:
+          title: Latency Ms
+          type: integer
+        model:
+          title: Model
+          type: string
+        model_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model Version
+        outcome:
+          title: Outcome
+          type: string
+        output_tokens:
+          title: Output Tokens
+          type: integer
+        parsed:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Parsed
+        prompt_sha:
+          title: Prompt Sha
+          type: string
+        prompt_version:
+          title: Prompt Version
+          type: string
+        response_text:
+          title: Response Text
+          type: string
+        system_prompt:
+          title: System Prompt
+          type: string
+        transition:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Transition
+        turn_id:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+          title: Turn Id
+        user_payload:
+          title: User Payload
+          type: string
+        wrapper_outcome:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Wrapper Outcome
+      required:
+      - id
+      - created_at
+      - interview_session_id
+      - turn_id
+      - agent
+      - prompt_version
+      - model
+      - model_version
+      - outcome
+      - wrapper_outcome
+      - attempts
+      - latency_ms
+      - input_tokens
+      - output_tokens
+      - cost_usd
+      - prompt_sha
+      - system_prompt
+      - user_payload
+      - response_text
+      - parsed
+      - error_message
+      - transition
+      title: TraceRow
+      type: object
+    TranscriptEntry:
+      additionalProperties: false
+      description: One chronological message in the dev chat log.
+      properties:
+        role:
+          enum:
+          - interviewer
+          - candidate
+          - system
+          title: Role
+          type: string
+        text:
+          title: Text
+          type: string
+        turn_id:
+          anyOf:
+          - format: uuid
+            type: string
+          - type: 'null'
+          title: Turn Id
+      required:
+      - role
+      - text
+      title: TranscriptEntry
+      type: object
+    TurnResult:
+      additionalProperties: false
+      description: '``devPostTurn``''s 200 body.'
+      properties:
+        session:
+          $ref: '#/components/schemas/SessionView'
+        utterance:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Utterance
+      required:
+      - utterance
+      - session
+      title: TurnResult
+      type: object
     ValidationError:
       properties:
         loc:
@@ -376,6 +632,130 @@ info:
   version: 0.0.0
 openapi: 3.1.0
 paths:
+  /api/dev/sessions:
+    post:
+      operationId: devCreateSession
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionView'
+          description: Successful Response
+        '422':
+          description: PlanInvalid — machine refused the plan (state-machine §7).
+      security:
+      - IdentityPlatformBearer: []
+      summary: Create a session from an inline PlanSnapshot and run SessionStarted.
+      tags:
+      - dev-sessions
+  /api/dev/sessions/{session_id}:
+    get:
+      operationId: devGetSession
+      parameters:
+      - in: path
+        name: session_id
+        required: true
+        schema:
+          format: uuid
+          title: Session Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionView'
+          description: Successful Response
+        '404':
+          description: Unknown session (or flag disabled).
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - IdentityPlatformBearer: []
+      summary: Current state view (poll target for the dev UI).
+      tags:
+      - dev-sessions
+  /api/dev/sessions/{session_id}/traces:
+    get:
+      operationId: devListTraces
+      parameters:
+      - in: path
+        name: session_id
+        required: true
+        schema:
+          format: uuid
+          title: Session Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceList'
+          description: Successful Response
+        '404':
+          description: Unknown session (or flag disabled).
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - IdentityPlatformBearer: []
+      summary: Turn-trace rows for the side panel, oldest first.
+      tags:
+      - dev-sessions
+  /api/dev/sessions/{session_id}/turns:
+    post:
+      operationId: devPostTurn
+      parameters:
+      - in: path
+        name: session_id
+        required: true
+        schema:
+          format: uuid
+          title: Session Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostTurnRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurnResult'
+          description: Successful Response
+        '404':
+          description: Unknown session (or flag disabled).
+        '409':
+          description: Session is terminal or not awaiting a candidate turn.
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - IdentityPlatformBearer: []
+      summary: Candidate turn → transition → interviewer reply.
+      tags:
+      - dev-sessions
   /health:
     get:
       description: 'Liveness probe.

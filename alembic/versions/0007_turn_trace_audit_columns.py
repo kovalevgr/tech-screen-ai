@@ -140,18 +140,18 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Dev/test only — production is forward-only (§10).
 
-    Restoring ``session_decision.decided_by NOT NULL`` fails loudly if the
-    database already holds a system-authored decision (``decided_by IS NULL``).
-    That is intentional: silently deleting audit rows to make a downgrade fit
-    would violate §3. Downgrade a database that has recorded system decisions
-    only by restoring it from a snapshot.
+    ``session_decision.decided_by`` is deliberately LEFT nullable. Restoring
+    ``NOT NULL`` would require deleting every system-authored decision the
+    pre-0007 schema cannot represent, and deleting rows from an append-only
+    audit table is exactly what §3 forbids — even on a local reset. A widened
+    column is harmless (0007's upgrade re-applies ``DROP NOT NULL`` as a
+    no-op), a silently truncated audit trail is not.
     """
     for flag in _SEEDED_FLAGS:
         op.execute(f"DELETE FROM feature_flag WHERE name = '{flag}'")
 
     op.execute("ALTER TABLE interview_session DROP COLUMN IF EXISTS dev_transcript")
 
-    op.execute("ALTER TABLE session_decision ALTER COLUMN decided_by SET NOT NULL")
     op.execute("ALTER TABLE session_decision DROP COLUMN IF EXISTS reason")
 
     op.execute("DROP INDEX IF EXISTS ix_turn_trace_session_created")
