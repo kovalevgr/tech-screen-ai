@@ -1,0 +1,15 @@
+# Tasks — 034 T22 dev UI
+
+- [x] T001 Commit spec kit + contract-snapshot.yaml (verbatim)
+- [x] T002 API client + hand-typed contract types (no schema.d.ts regen)
+- [x] T003 `/dev/session` page: plan form → create; chat thread with role styling; input gated by awaiting; DEV ONLY banner
+- [x] T004 Header: phase / competency / cost_usd_total / flagged badge; terminal + flag-disabled screens
+- [x] T005 Trace side panel (collapsible, pretty JSON, outcome vs wrapper_outcome distinction)
+- [x] T006 Polling loop per FR-034-4
+- [x] T007 jest: client mapping, awaiting gating, trace panel, terminal states
+- [x] T008 eslint + tsc + jest + format green; diff confined to app/frontend/** + specs/034; do NOT push until told
+- [x] T009 Fix round after reviewer gate (PASS-WITH-FINDINGS): cancel the in-flight poll GET before adopting the post-turn view (nit 2); page-level render assertion for the non-terminal `awaiting: null` branch of the composer (nit 3)
+
+Gates re-run locally 2026-08-03 after the fix round: `pnpm lint` (eslint 0
+warnings + `tsc --noEmit`), `pnpm test` (7 suites / 52 tests),
+`pnpm tokens:check`, `pnpm lint:visual-discipline` — all green.
