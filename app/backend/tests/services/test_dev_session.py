@@ -12,6 +12,7 @@ the §3-exempt role) so the suite is re-runnable against the same database.
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
@@ -192,6 +193,15 @@ async def test_the_happy_path_reaches_completed_with_every_turn_traced(
     assert agents.count("interviewer") == 4
     assert agents.count("assessor") == 3
     assert all(row.outcome == "ok" for row in traces.traces)
+    # Every ok row is a complete audit artefact: prompt in, answer out.
+    assert all(row.system_prompt and row.user_payload for row in traces.traces)
+    assert all(row.response_text and row.parsed is not None for row in traces.traces)
+    utterances = [
+        row.parsed["utterance"]
+        for row in traces.traces
+        if row.agent == "interviewer" and row.parsed is not None
+    ]
+    assert [entry.text for entry in view.transcript if entry.role == "interviewer"] == utterances
 
 
 async def test_every_trace_row_carries_the_orchestrator_context(e2e: _Harness) -> None:
@@ -213,6 +223,12 @@ async def test_every_trace_row_carries_the_orchestrator_context(e2e: _Harness) -
     assert row.transition["state_after_sha"] != row.transition["state_before_sha"]
     assert "INTERVIEWER" in row.system_prompt.upper()
     assert "ask_seed" in row.user_payload
+    # T21 seam extension (owner adjudication): call_model carries the model's
+    # own answer onto the record, so the shell's rows are complete.
+    assert row.parsed is not None
+    assert row.parsed["internal_move_executed"] == "ask_seed"
+    assert row.response_text
+    assert json.loads(row.response_text) == row.parsed
 
 
 async def test_the_cost_total_equals_the_sum_of_the_trace_rows(e2e: _Harness) -> None:

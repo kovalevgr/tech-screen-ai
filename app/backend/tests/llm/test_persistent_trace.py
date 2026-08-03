@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
@@ -155,25 +156,53 @@ async def test_bind_restores_the_previous_context(db_engine: AsyncEngine) -> Non
     assert sink.context.prompt_version == "outer"
 
 
-async def test_a_caller_supplied_response_completes_the_row(db_engine: AsyncEngine) -> None:
-    """The payload columns are filled from the context when the caller has them."""
+async def test_the_model_answer_comes_from_the_record_not_the_context(
+    db_engine: AsyncEngine,
+) -> None:
+    """The two sources own disjoint columns — see the module docstring.
+
+    ``response_text`` / ``parsed`` are on the record because only
+    ``call_model`` ever holds the raw bytes; ``wrapper_outcome`` is on the
+    context because only the caller can judge the output. There is no
+    precedence rule because there is no overlap.
+    """
     session_id = await _new_session(db_engine)
     sink = PostgresTraceSink(db_engine)
-    record = _record(session_id, agent="assessor")
-    context = TurnTraceContext(
-        prompt_version="v0003",
-        response_text='{"level": 3}',
-        parsed={"level": 3},
-        wrapper_outcome="accepted",
+    record = _record(session_id, agent="assessor").model_copy(
+        update={"response_text": '{"level": 3}', "parsed": {"level": 3}}
     )
 
-    with sink.bind(context):
+    with sink.bind(TurnTraceContext(prompt_version="v0003", wrapper_outcome="accepted")):
         await sink.write(record)
 
     row = await _fetch_row(db_engine, record.id)
     assert row["response_text"] == '{"level": 3}'
     assert row["parsed"] == {"level": 3}
     assert row["wrapper_outcome"] == "accepted"
+    assert row["prompt_version"] == "v0003"
+
+
+async def test_the_context_cannot_supply_the_model_answer(db_engine: AsyncEngine) -> None:
+    """A caller cannot pass off a reconstruction as the raw response."""
+    with pytest.raises(ValidationError):
+        TurnTraceContext(response_text="reconstructed")  # type: ignore[call-arg]
+    with pytest.raises(ValidationError):
+        TurnTraceContext(parsed={"level": 3})  # type: ignore[call-arg]
+
+
+async def test_a_record_without_a_response_stores_the_empty_string(
+    db_engine: AsyncEngine,
+) -> None:
+    """``response_text`` is NOT NULL; a call that never reached the model is ''."""
+    session_id = await _new_session(db_engine)
+    sink = PostgresTraceSink(db_engine)
+    record = _record(session_id, outcome="config_error")
+
+    await sink.write(record)
+
+    row = await _fetch_row(db_engine, record.id)
+    assert row["response_text"] == ""
+    assert row["parsed"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -289,6 +318,10 @@ async def test_call_model_writes_the_row_before_it_returns(
     assert row["input_tokens"] == 100
     assert row["output_tokens"] == 50
     assert row["cost_usd"] > 0
+    # T21 seam extension: the raw answer and the parsed object reach the row
+    # through the record, byte-identical to what the backend returned.
+    assert row["response_text"] == result.text
+    assert row["parsed"] == {"utterance": "Привіт"}
 
 
 async def test_a_failed_call_is_traced_too(db_engine: AsyncEngine, tmp_path: Path) -> None:
@@ -316,6 +349,9 @@ async def test_a_failed_call_is_traced_too(db_engine: AsyncEngine, tmp_path: Pat
     assert row["outcome"] == "upstream_unavailable"
     assert row["error_message"] is not None
     assert row["cost_usd"] == Decimal("0")
+    # Nothing came back from the model, so there is nothing to record.
+    assert row["response_text"] == ""
+    assert row["parsed"] is None
 
 
 # ---------------------------------------------------------------------------

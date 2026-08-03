@@ -20,13 +20,21 @@ immediately, independent of whatever request transaction the caller is inside.
 An audit row must survive a rolled-back request: the model call really did
 happen and really did cost money.
 
-**The context seam.** ``TraceRecord`` carries T04's metadata only. Everything
-the row contract adds — the orchestrator context (``turn_id``, ``transition``),
-the pinned ``prompt_version``, and the payload columns — reaches the sink
-through a :class:`TurnTraceContext` bound by the caller for the duration of one
-agent call (:meth:`PostgresTraceSink.bind`). With no context bound (calibration
-runs, smoke scripts) the row is written with the metadata alone, which is
-exactly the "non-session call" case the contract describes.
+**Two sources, no overlap.** The row is assembled from exactly two places and
+each owns its columns outright:
+
+- the :class:`~app.backend.llm.trace.TraceRecord` — everything only
+  ``call_model`` can know, including (since the T21 seam extension) the raw
+  ``response_text`` and the ``parsed`` object;
+- a :class:`TurnTraceContext` bound by the caller for the duration of one agent
+  call (:meth:`PostgresTraceSink.bind`) — everything only the CALLER can know:
+  the orchestrator context (``turn_id``, ``transition``), the pinned
+  ``prompt_version``, the assembled prompt and payload, and the wrapper verdict.
+
+Nothing is writable from both sides, so there is no precedence rule to
+remember and no way to record a reconstruction as if it were the raw bytes.
+With no context bound (calibration runs, smoke scripts) the row is written from
+the record alone — exactly the "non-session call" the contract describes.
 """
 
 from __future__ import annotations
@@ -69,18 +77,13 @@ class TransitionContext(BaseModel):
 
 
 class TurnTraceContext(BaseModel):
-    """Everything the row contract needs that :class:`TraceRecord` cannot carry.
+    """The caller's half of the row — what ``TraceRecord`` cannot know.
 
-    Supplied by the caller and bound to the sink for the duration of one agent
-    call. Every field is optional-with-a-default so a caller can supply exactly
-    as much as it actually knows — the sink never invents a value.
-
-    ``response_text`` / ``parsed`` / ``wrapper_outcome`` describe the model's
-    answer and the wrapper's verdict on it. A caller can only fill them if it
-    holds the raw result at the moment the trace is written; the T04 seam hands
-    the sink a ``TraceRecord`` only, so the agent-wrapper path leaves them at
-    their defaults. See ``specs/033-t21-durable-trace-shell/spec.md``
-    Clarification 25.
+    Bound to the sink for the duration of one agent call. Every field is
+    optional-with-a-default so a caller can supply exactly as much as it
+    actually knows; the sink never invents a value. The model's own answer
+    (``response_text``, ``parsed``) is deliberately NOT here — it arrives on
+    the record, straight from ``call_model``.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -95,9 +98,16 @@ class TurnTraceContext(BaseModel):
 
     system_prompt: str = ""
     user_payload: str = ""
-    response_text: str = ""
-    parsed: dict[str, Any] | None = None
+
     wrapper_outcome: WrapperOutcome | None = None
+    """The agent wrapper's verdict, when the caller can know it at write time.
+
+    ``None`` is a legitimate, expected value, not a gap: the sink writes inside
+    ``call_model``, before the wrapper has judged the output, and §3 forbids
+    back-filling the row afterwards. The definitive verdict is derivable
+    downstream from the session's coverage markers and its ``session_decision``
+    stream (row contract, ``wrapper_outcome``)."""
+
     transition: TransitionContext | None = None
 
 
@@ -224,8 +234,12 @@ class PostgresTraceSink:
             "error_message": record.error_message,
             "system_prompt": context.system_prompt,
             "user_payload": context.user_payload,
-            "response_text": context.response_text,
-            "parsed": None if context.parsed is None else json.dumps(context.parsed),
+            # The model's answer comes from the record — `call_model` is the
+            # only thing that ever holds the raw bytes. The column is NOT NULL
+            # (transitional default), so a call that never reached the model
+            # stores the empty string rather than a null.
+            "response_text": record.response_text or "",
+            "parsed": None if record.parsed is None else json.dumps(record.parsed),
         }
 
 
