@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://techscreen.nix.internal/schemas/turn-trace-row.v1.json",
+  "title": "TurnTraceRow",
+  "description": "One durable row per LLM agent call (constitution §1/§3: append-only, reviewer-auditable years later). Extends T04's TraceRecord with the full payloads and orchestrator context. UPDATE/DELETE are blocked by the §3 trigger + REVOKE (already in place since T05).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id", "created_at", "interview_session_id", "agent", "prompt_version",
+    "model", "outcome", "attempts", "latency_ms", "input_tokens",
+    "output_tokens", "cost_usd", "prompt_sha", "system_prompt",
+    "user_payload", "response_text"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid", "description": "Equals TraceRecord.id / ModelCallResult.trace_id — the correlation key across logs, ledger and this table." },
+    "created_at": { "type": "string", "format": "date-time" },
+    "interview_session_id": { "type": "string", "format": "uuid" },
+    "turn_id": { "type": ["string", "null"], "format": "uuid", "description": "Orchestrator turn (uuid5, state-machine contract §6.9). Null for non-session calls (calibration, smoke scripts)." },
+    "agent": { "type": "string", "enum": ["interviewer", "assessor", "planner"] },
+    "prompt_version": { "type": "string", "description": "The prompts/<agent>/<version> in force at call time (from configs/models.yaml pin)." },
+    "model": { "type": "string" },
+    "model_version": { "type": ["string", "null"] },
+    "outcome": { "type": "string", "enum": ["ok", "schema_error", "timeout", "upstream_unavailable", "budget_exceeded", "config_error"], "description": "Mirrors TraceOutcome. Wrapper-level rejection of an ok call (agent contract miss) still records ok here — the wrapper outcome lives in `wrapper_outcome`." },
+    "wrapper_outcome": { "type": ["string", "null"], "enum": ["accepted", "contract_miss_retried", "rejected", null], "description": "State-machine-contract §9 seam + spec 031/032 Clarifications: distinguishes 'model call ok' from 'output accepted by the agent wrapper'. Null for pre-T21 rows and non-agent calls." },
+    "attempts": { "type": "integer", "minimum": 1, "maximum": 3 },
+    "latency_ms": { "type": "integer", "minimum": 0 },
+    "input_tokens": { "type": "integer", "minimum": 0 },
+    "output_tokens": { "type": "integer", "minimum": 0 },
+    "cost_usd": { "type": "string", "description": "NUMERIC(12,6) serialized as string; Decimal end-to-end, never float." },
+    "prompt_sha": { "type": "string", "description": "SHA-256 of the canonical prompt recipe (T04's canonical_prompt_sha)." },
+    "system_prompt": { "type": "string", "description": "Full assembled system prompt. Candidate PII never appears here by construction (system prompts are repo artifacts)." },
+    "user_payload": { "type": "string", "description": "Full serialized user payload — DOES contain candidate answers. This table is the audit trail (§1); access is role-gated at the API layer (T34/T39), never logged elsewhere (§15)." },
+    "response_text": { "type": "string", "description": "Raw model text before parsing." },
+    "parsed": { "type": ["object", "null"], "description": "Schema-validated parsed output when outcome=ok; null otherwise." },
+    "error_message": { "type": ["string", "null"], "description": "Secret-safe message for non-ok outcomes (wrapper already strips secrets)." },
+    "transition": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "description": "Orchestrator context when the call was issued by the state machine (state-machine contract §1). Null for non-session calls.",
+      "properties": {
+        "phase": { "type": "string" },
+        "issued_move": { "type": ["string", "null"] },
+        "state_before_sha": { "type": "string", "description": "SHA-256 of the canonical SessionState JSON before the transition that issued this call." },
+        "state_after_sha": { "type": "string" }
+      },
+      "required": ["phase", "state_before_sha", "state_after_sha"]
+    }
+  }
+}
