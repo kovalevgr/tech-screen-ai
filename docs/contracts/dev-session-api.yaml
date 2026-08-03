@@ -1,0 +1,125 @@
+# Dev Session API — contract (T22, constitution §14)
+#
+# Source of truth for the T21/T22 parallel fan-out. The backend stream
+# implements these routes; app/backend/openapi.yaml (generated) must match
+# them path-for-path and shape-for-shape; the frontend dev UI consumes this
+# file directly (hand-typed client — schema.d.ts regen stays a separate
+# future task, see techscreen backlog).
+#
+# Scope: DEV-ONLY imperative shell over the T20 state machine. Everything is
+# gated by feature flag `enable_live_orchestrator` (default false → routes
+# return 404-as-if-absent) AND, when AUTH_MODE=identity_platform, by the
+# reviewer/admin role. The real candidate surface (magic link, WS) is Tier 5
+# (T28/T29a) and is NOT this contract.
+#
+# Shell obligations carried over from the state-machine contract §9 /
+# spec 032 Clarification 4: persist session_state after EVERY transition and
+# BEFORE issuing wrapper calls; PersistState commands are advisory markers.
+# Assessor commands run as background tasks (never block the response).
+
+openapi: 3.1.0
+info: { title: TechScreen Dev Session API, version: "1" }
+paths:
+  /api/dev/sessions:
+    post:
+      operationId: devCreateSession
+      summary: Create a session from an inline PlanSnapshot and run SessionStarted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [plan]
+              properties:
+                plan: { $ref: "#/components/schemas/PlanSnapshot" }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/SessionView" } } } }
+        "422": { description: PlanInvalid — machine refused the plan (state-machine contract §7). }
+  /api/dev/sessions/{session_id}/turns:
+    post:
+      operationId: devPostTurn
+      summary: Candidate turn → transition → interviewer reply (synchronous for dev; assessor scheduled in background).
+      parameters: [{ name: session_id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 8000 }
+      responses:
+        "200":
+          description: The interviewer's next utterance plus the post-transition view.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [utterance, session]
+                properties:
+                  utterance: { type: [string, "null"], description: "Null when the session ended on this turn (utterance delivery replaced by scripted closing / abort)." }
+                  session: { $ref: "#/components/schemas/SessionView" }
+        "409": { description: Session is terminal or not awaiting a candidate turn. }
+        "404": { description: Unknown session (or flag disabled). }
+  /api/dev/sessions/{session_id}:
+    get:
+      operationId: devGetSession
+      summary: Current state view (poll target for the dev UI).
+      parameters: [{ name: session_id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SessionView" } } } }
+        "404": { description: Unknown session (or flag disabled). }
+  /api/dev/sessions/{session_id}/traces:
+    get:
+      operationId: devListTraces
+      summary: Turn-trace rows for the side panel, oldest first.
+      parameters: [{ name: session_id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [traces]
+                properties:
+                  traces:
+                    type: array
+                    items: { $ref: "docs/contracts/turn-trace.schema.json" }
+components:
+  schemas:
+    PlanSnapshot:
+      description: Exactly state-machine contract §7 — do not redefine, reference it.
+      type: object
+    SessionView:
+      type: object
+      additionalProperties: false
+      required: [session_id, phase, awaiting, competency_index, coverage, flagged_for_review, cost_usd_total, transcript]
+      properties:
+        session_id: { type: string, format: uuid }
+        phase: { type: string, enum: [INTRO, TECH, QA, CLOSE, COMPLETED, ABORTED] }
+        abort_reason: { type: [string, "null"] }
+        awaiting: { type: [string, "null"], enum: [interviewer, candidate, null] }
+        competency_index: { type: [integer, "null"] }
+        coverage:
+          type: object
+          description: node_id → CoverageCell summary (best/latest levels+confidence, gap markers) — the machine's own shape, serialized as-is.
+        flagged_for_review: { type: boolean }
+        cost_usd_total: { type: string, description: Decimal-as-string running total from the durable ledger (T21). }
+        transcript:
+          type: array
+          description: Chronological candidate/interviewer messages for chat rendering.
+          items:
+            type: object
+            additionalProperties: false
+            required: [role, text, turn_id]
+            properties:
+              role: { type: string, enum: [interviewer, candidate, system] }
+              text: { type: string }
+              turn_id: { type: [string, "null"], format: uuid }
