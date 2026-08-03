@@ -1,0 +1,7 @@
+{
+  "text": "{\"turn_id\": \"82958141-b341-5a22-9a4d-604fb511db04\", \"session_id\": \"23232323-2323-5323-8323-232323232323\", \"competency_focus\": \"py.async\", \"assessments\": [{\"rubric_node_id\": \"py.async\", \"level\": 3, \"confidence\": 0.9, \"rationale_en\": \"Correctly explains cooperative scheduling and the executor escape hatch.\", \"evidence_spans\": [\"заблокує цикл — він кооперативний\"]}], \"red_flags\": [], \"needs_manual_review\": false, \"manual_review_reason_en\": null}",
+  "input_tokens": 900,
+  "output_tokens": 180,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}

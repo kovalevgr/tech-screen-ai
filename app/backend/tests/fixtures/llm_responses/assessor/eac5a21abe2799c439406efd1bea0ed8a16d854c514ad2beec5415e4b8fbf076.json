@@ -1,0 +1,7 @@
+{
+  "text": "{\"turn_id\": \"b17dcad2-2827-5f33-b0cc-3665bbbfa091\", \"session_id\": \"23232323-2323-5323-8323-232323232323\", \"competency_focus\": \"py.async\", \"assessments\": [{\"rubric_node_id\": \"py.async\", \"level\": 3, \"confidence\": 0.85, \"rationale_en\": \"Accurate timeout semantics including cancellation and TimeoutError.\", \"evidence_spans\": [\"скасовує її після дедлайну з TimeoutError\"]}], \"red_flags\": [], \"needs_manual_review\": false, \"manual_review_reason_en\": null}",
+  "input_tokens": 900,
+  "output_tokens": 180,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}

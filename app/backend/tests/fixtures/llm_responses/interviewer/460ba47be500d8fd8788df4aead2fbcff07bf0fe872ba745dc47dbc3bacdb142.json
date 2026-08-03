@@ -1,0 +1,7 @@
+{
+  "text": "{\"utterance\": \"Добре, копнімо глибше. Що станеться з CPU-важкою задачею всередині циклу?\", \"internal_move_executed\": \"depth_probe\"}",
+  "input_tokens": 900,
+  "output_tokens": 60,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}

@@ -1,0 +1,7 @@
+{
+  "text": "{\"turn_id\": \"ccca0720-1c18-5cb4-af68-a8f6b9b20d86\", \"session_id\": \"23232323-2323-5323-8323-232323232323\", \"competency_focus\": \"db.transactions\", \"assessments\": [{\"rubric_node_id\": \"db.transactions\", \"level\": 0, \"confidence\": 0.85, \"rationale_en\": \"Second substantive failure; cannot produce any example after two probes.\", \"evidence_spans\": [\"приклад навести не можу\"]}], \"red_flags\": [], \"needs_manual_review\": false, \"manual_review_reason_en\": null}",
+  "input_tokens": 900,
+  "output_tokens": 180,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}

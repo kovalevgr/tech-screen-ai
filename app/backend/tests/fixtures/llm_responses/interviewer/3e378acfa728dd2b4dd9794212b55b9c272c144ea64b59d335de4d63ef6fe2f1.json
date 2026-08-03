@@ -1,0 +1,7 @@
+{
+  "text": "{\"utterance\": \"Дякую за відповідь. Рухаймося далі: Як обмежити час виконання корутини?\", \"internal_move_executed\": \"acknowledge_and_transition\"}",
+  "input_tokens": 900,
+  "output_tokens": 60,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}

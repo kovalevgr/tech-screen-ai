@@ -1,0 +1,7 @@
+{
+  "text": "{\"turn_id\": \"7750a5ce-cb2c-5b5c-a6a1-5bd384c85bea\", \"session_id\": \"23232323-2323-5323-8323-232323232323\", \"competency_focus\": \"py.async\", \"assessments\": [{\"rubric_node_id\": \"py.async\", \"level\": 2, \"confidence\": 0.5, \"rationale_en\": \"Names the mechanism vaguely; no event-loop mechanics demonstrated.\", \"evidence_spans\": [\"якось керує асинхронними задачами\"]}], \"red_flags\": [], \"needs_manual_review\": false, \"manual_review_reason_en\": null}",
+  "input_tokens": 900,
+  "output_tokens": 180,
+  "model": "gemini-2.5-flash",
+  "model_version": "gemini-2.5-flash-001"
+}
